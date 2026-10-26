@@ -6,8 +6,11 @@
  *        ▲                ▲                          │
  *        └──── 15 с ──────┴────────── 5 с ───────────┘
  *
- * Все переходы выполняются в основной задаче: события кнопки, Wi-Fi и веб-сервера
- * приходят командами через очередь. Индикация — docs/led.md.
+ * Все переходы выполняются в основной задаче: события кнопки, Wi-Fi, таймера и
+ * веб-сервера приходят командами через очередь. Индикация — docs/led.md.
+ *
+ * Точка доступа (настройка или Direct) выключается, если к ней 10 минут никто
+ * не подключён; отсчёт начинается заново, когда отключается последний клиент.
  * Позже машина состояний переедет в компонент wcs_fsm.
  */
 #include <stdio.h>
@@ -21,6 +24,7 @@
 #include "esp_netif.h"
 #include "esp_psram.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -40,6 +44,7 @@
 
 #define AP_CHANNEL              1
 #define AP_MAX_CLIENTS          1
+#define AP_IDLE_TIMEOUT_MS      (10 * 60 * 1000)
 /* Адрес точки доступа ESP-IDF по умолчанию */
 #define WEB_URL                 "http://192.168.4.1/"
 
@@ -61,6 +66,7 @@ typedef enum {
     CMD_BUTTON_VERY_LONG,
     CMD_AP_CLIENT_JOINED,
     CMD_AP_CLIENT_LEFT,
+    CMD_AP_IDLE_TIMEOUT,
     CMD_APPLY,
 } app_cmd_t;
 
@@ -94,6 +100,7 @@ static const wcs_led_indication_t s_hint_reset = { WCS_LED_RED, WCS_LED_BLINK_FA
 static const char *TAG = "wcs";
 
 static QueueHandle_t s_cmd_queue;
+static esp_timer_handle_t s_ap_idle_timer;
 static app_state_t s_state;
 static int s_ap_clients;
 static bool s_error;
@@ -173,6 +180,11 @@ static void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
     }
 }
 
+static void on_ap_idle_timer(void *arg)
+{
+    send_cmd(CMD_AP_IDLE_TIMEOUT);
+}
+
 /* Вызывается веб-сервером из своей задачи */
 static esp_err_t on_web_apply(const wcs_settings_t *settings)
 {
@@ -192,9 +204,19 @@ static void make_ssid(const char *prefix, char out[33])
     snprintf(out, 33, "%s%02X%02X", prefix, mac[4], mac[5]);
 }
 
+/* Отсчёт бездействия идёт, пока точка доступа поднята и к ней никто не подключён */
+static void update_ap_idle_timer(void)
+{
+    esp_timer_stop(s_ap_idle_timer);
+    if (wcs_wifi_ap_is_running() && s_ap_clients == 0) {
+        esp_timer_start_once(s_ap_idle_timer, (uint64_t)AP_IDLE_TIMEOUT_MS * 1000);
+    }
+}
+
 /* Останавливает точку доступа и веб-сервер, завершает сессии прежнего режима */
 static void stop_access_point(void)
 {
+    esp_timer_stop(s_ap_idle_timer);
     wcs_web_stop();
     wcs_wifi_ap_stop();
     wcs_auth_logout_all();
@@ -216,6 +238,7 @@ static bool start_access_point(const char *ssid, const char *password, const wcs
         return false;
     }
     ESP_LOGI(TAG, "access point \"%s\", " WEB_URL, ssid);
+    update_ap_idle_timer();
     return true;
 }
 
@@ -282,6 +305,9 @@ static void enter_saved_mode(bool raise_direct_ap)
         enter_bastion(&settings);
         break;
     default:
+        ESP_LOGI(TAG, "-> factory");
+        stop_access_point();
+        wcs_wifi_sta_disconnect();
         s_state = STATE_FACTORY;
         break;
     }
@@ -318,10 +344,24 @@ static void handle(app_cmd_t cmd)
         break;
     case CMD_AP_CLIENT_JOINED:
         s_ap_clients++;
+        update_ap_idle_timer();
         break;
     case CMD_AP_CLIENT_LEFT:
         if (s_ap_clients > 0) {
             s_ap_clients--;
+        }
+        update_ap_idle_timer();
+        break;
+    case CMD_AP_IDLE_TIMEOUT:
+        /* Таймер мог сработать до смены режима или подключения — проверяем заново */
+        if (!wcs_wifi_ap_is_running() || s_ap_clients > 0) {
+            break;
+        }
+        ESP_LOGI(TAG, "access point idle for %d min, closing", AP_IDLE_TIMEOUT_MS / 60000);
+        if (s_state == STATE_SETUP) {
+            enter_saved_mode(false);
+        } else {
+            stop_access_point();
         }
         break;
     case CMD_APPLY:
@@ -373,6 +413,8 @@ void app_main(void)
     ESP_ERROR_CHECK(s_cmd_queue ? ESP_OK : ESP_ERR_NO_MEM);
     ESP_ERROR_CHECK(esp_event_handler_register(WCS_BUTTON_EVENT, ESP_EVENT_ANY_ID, on_button, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi, NULL));
+    const esp_timer_create_args_t idle_timer = { .callback = on_ap_idle_timer, .name = "ap_idle" };
+    ESP_ERROR_CHECK(esp_timer_create(&idle_timer, &s_ap_idle_timer));
 
     enter_saved_mode(false);
     update_led();
