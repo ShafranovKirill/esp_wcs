@@ -6,24 +6,37 @@
 #include "esp_app_desc.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
+#include "esp_https_server.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
 #include "wcs_auth.h"
+#include "wcs_tls.h"
 #include "web_priv.h"
 
 #define SESSION_COOKIE    "wcs_session"
 #define LOGIN_BODY_MAX    512
 #define USERNAME_MAX      64
 #define PASSWORD_MAX      128
-#define SERVER_STACK_SIZE 8192 /* PBKDF2 и поиск Wi-Fi выполняются в задаче сервера */
+#define SERVER_STACK_SIZE 10240 /* TLS, PBKDF2 и поиск Wi-Fi выполняются в задаче сервера */
 #define MAX_URI_HANDLERS  24
+/* Клиент один, но браузер открывает несколько соединений; каждое TLS — ~40 КБ (в PSRAM) */
+#define MAX_OPEN_SOCKETS  5
+#define HOST_MAX          64
+
+/* Сервер перенаправления с HTTP: HTTPS по умолчанию занимает управляющий порт
+ * ESP_HTTPD_DEF_CTRL_PORT + 1, этому достаётся обычный */
+#define REDIRECT_CTRL_PORT    ESP_HTTPD_DEF_CTRL_PORT
+#define REDIRECT_MAX_SOCKETS  2
+#define REDIRECT_STACK_SIZE   3072
 
 static const char *TAG = "wcs_web";
 
 wcs_web_config_t web_config;
 
 static httpd_handle_t s_server;
+static httpd_handle_t s_redirect_server;
+static char s_host[HOST_MAX];
 
 /* ---- встроенные файлы ---- */
 
@@ -223,9 +236,8 @@ static esp_err_t login_post(httpd_req_t *req)
     memset(password, 0, sizeof(password));
 
     if (result == WCS_AUTH_OK) {
-        /* Secure добавится вместе с HTTPS */
         char cookie[sizeof(SESSION_COOKIE) + WCS_AUTH_TOKEN_LEN + 48];
-        snprintf(cookie, sizeof(cookie), SESSION_COOKIE "=%s; Path=/; HttpOnly; SameSite=Strict", token);
+        snprintf(cookie, sizeof(cookie), SESSION_COOKIE "=%s; Path=/; Secure; HttpOnly; SameSite=Strict", token);
         httpd_resp_set_hdr(req, "Set-Cookie", cookie);
         return web_redirect(req, home_path());
     }
@@ -242,7 +254,7 @@ static esp_err_t logout_post(httpd_req_t *req)
     if (get_session_token(req, token)) {
         wcs_auth_logout(token);
     }
-    httpd_resp_set_hdr(req, "Set-Cookie", SESSION_COOKIE "=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+    httpd_resp_set_hdr(req, "Set-Cookie", SESSION_COOKIE "=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0");
     return web_redirect(req, "/login");
 }
 
@@ -286,41 +298,97 @@ static const httpd_uri_t s_routes[] = {
     { .uri = "/assets/*", .method = HTTP_GET, .handler = asset_get },
 };
 
+/* ---- HTTP → HTTPS ---- */
+
+/* Любой запрос по HTTP — на тот же путь по HTTPS. Тело не читается */
+static esp_err_t redirect_any(httpd_req_t *req)
+{
+    char location[sizeof("https://") + HOST_MAX + CONFIG_HTTPD_MAX_URI_LEN];
+    snprintf(location, sizeof(location), "https://%s%s", s_host, req->uri);
+    ESP_LOGD(TAG, "http %s -> https", req->uri);
+    httpd_resp_set_status(req, "301 Moved Permanently");
+    httpd_resp_set_hdr(req, "Location", location);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    return httpd_resp_send(req, NULL, 0);
+}
+
+static esp_err_t start_redirect_server(void)
+{
+    httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
+    cfg.server_port = 80;
+    cfg.ctrl_port = REDIRECT_CTRL_PORT;
+    cfg.max_open_sockets = REDIRECT_MAX_SOCKETS;
+    cfg.stack_size = REDIRECT_STACK_SIZE;
+    cfg.max_uri_handlers = 4;
+    cfg.lru_purge_enable = true;
+    cfg.uri_match_fn = httpd_uri_match_wildcard;
+    ESP_RETURN_ON_ERROR(httpd_start(&s_redirect_server, &cfg), TAG, "redirect server start failed");
+
+    static const httpd_method_t methods[] = { HTTP_GET, HTTP_HEAD, HTTP_POST };
+    for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
+        const httpd_uri_t any = { .uri = "/*", .method = methods[i], .handler = redirect_any };
+        httpd_register_uri_handler(s_redirect_server, &any);
+    }
+    return ESP_OK;
+}
+
+/* ---- запуск ---- */
+
 esp_err_t wcs_web_start(const wcs_web_config_t *config)
 {
     ESP_RETURN_ON_FALSE(config, ESP_ERR_INVALID_ARG, TAG, "config is NULL");
     ESP_RETURN_ON_FALSE(config->mode != WCS_WEB_MODE_SETUP || config->apply, ESP_ERR_INVALID_ARG, TAG,
                         "setup mode requires apply callback");
+    ESP_RETURN_ON_FALSE(config->host && strlen(config->host) < HOST_MAX, ESP_ERR_INVALID_ARG, TAG, "bad host");
     ESP_RETURN_ON_FALSE(!s_server, ESP_ERR_INVALID_STATE, TAG, "already running");
+
+    wcs_tls_server_cred_t cred;
+    ESP_RETURN_ON_ERROR(wcs_tls_get_server_cred(&cred), TAG, "no TLS certificate");
+
     web_config = *config;
+    strlcpy(s_host, config->host, sizeof(s_host));
 
-    httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
-    cfg.stack_size = SERVER_STACK_SIZE;
-    cfg.max_uri_handlers = MAX_URI_HANDLERS;
-    cfg.lru_purge_enable = true;
-    cfg.uri_match_fn = httpd_uri_match_wildcard;
+    httpd_ssl_config_t cfg = HTTPD_SSL_CONFIG_DEFAULT();
+    cfg.servercert = (const uint8_t *)cred.cert_pem;
+    cfg.servercert_len = cred.cert_len;
+    cfg.prvtkey_pem = (const uint8_t *)cred.key_pem;
+    cfg.prvtkey_len = cred.key_len;
+    cfg.httpd.stack_size = SERVER_STACK_SIZE;
+    cfg.httpd.max_uri_handlers = MAX_URI_HANDLERS;
+    cfg.httpd.max_open_sockets = MAX_OPEN_SOCKETS;
+    cfg.httpd.lru_purge_enable = true;
+    cfg.httpd.uri_match_fn = httpd_uri_match_wildcard;
 
-    ESP_RETURN_ON_ERROR(httpd_start(&s_server, &cfg), TAG, "httpd_start failed");
+    ESP_RETURN_ON_ERROR(httpd_ssl_start(&s_server, &cfg), TAG, "httpd_ssl_start failed");
     for (size_t i = 0; i < sizeof(s_routes) / sizeof(s_routes[0]); i++) {
         httpd_register_uri_handler(s_server, &s_routes[i]);
     }
     esp_err_t err = config->mode == WCS_WEB_MODE_SETUP ? web_setup_register(s_server)
                                                        : web_direct_register(s_server);
+    if (err == ESP_OK) {
+        err = start_redirect_server();
+    }
     if (err != ESP_OK) {
         wcs_web_stop();
         return err;
     }
 
-    ESP_LOGI(TAG, "started in %s mode", config->mode == WCS_WEB_MODE_SETUP ? "setup" : "direct");
+    ESP_LOGI(TAG, "started in %s mode, https://%s/", config->mode == WCS_WEB_MODE_SETUP ? "setup" : "direct",
+             s_host);
     return ESP_OK;
 }
 
 esp_err_t wcs_web_stop(void)
 {
+    if (s_redirect_server) {
+        httpd_stop(s_redirect_server);
+        s_redirect_server = NULL;
+    }
     if (!s_server) {
         return ESP_OK;
     }
-    esp_err_t err = httpd_stop(s_server);
+    esp_err_t err = httpd_ssl_stop(s_server);
     s_server = NULL;
     ESP_LOGI(TAG, "stopped");
     return err;

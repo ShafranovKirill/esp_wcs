@@ -16,6 +16,7 @@
  * не подключён; отсчёт начинается заново, когда отключается последний клиент.
  * Позже машина состояний переедет в компонент wcs_fsm.
  */
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -38,6 +39,7 @@
 #include "wcs_defaults.h"
 #include "wcs_led.h"
 #include "wcs_storage.h"
+#include "wcs_tls.h"
 #include "wcs_web.h"
 #include "wcs_wifi.h"
 
@@ -50,8 +52,11 @@
 #define AP_CHANNEL              1
 #define AP_MAX_CLIENTS          1
 #define AP_IDLE_TIMEOUT_MS      (10 * 60 * 1000)
-/* Адрес точки доступа ESP-IDF по умолчанию */
-#define WEB_URL                 "http://192.168.4.1/"
+/* Адрес точки доступа ESP-IDF по умолчанию; веб-интерфейс — только HTTPS */
+#define WEB_HOST                "192.168.4.1"
+#define WEB_URL                 "https://" WEB_HOST "/"
+/* Имя устройства в сертификате HTTPS: esp-wcs-8580 */
+#define DEVICE_NAME_PREFIX      "esp-wcs-"
 
 #define BOOT_FLASH_MS           500
 /* Пауза перед сменой режима, чтобы браузер успел получить ответ */
@@ -261,6 +266,7 @@ static void enter_setup(void)
 
     const wcs_web_config_t web = {
         .mode = WCS_WEB_MODE_SETUP,
+        .host = WEB_HOST,
         .direct = { .ssid = s_direct_ssid, .password = wcs_defaults.direct_ap_password, .url = WEB_URL },
         .apply = on_web_apply,
     };
@@ -269,7 +275,7 @@ static void enter_setup(void)
 
 static void start_direct_access_point(void)
 {
-    const wcs_web_config_t web = { .mode = WCS_WEB_MODE_DIRECT };
+    const wcs_web_config_t web = { .mode = WCS_WEB_MODE_DIRECT, .host = WEB_HOST };
     start_access_point(s_direct_ssid, wcs_defaults.direct_ap_password, &web);
 }
 
@@ -445,6 +451,19 @@ void app_main(void)
 
     make_ssid(wcs_defaults.setup_ap_ssid_prefix, s_setup_ssid);
     make_ssid(wcs_defaults.direct_ap_ssid_prefix, s_direct_ssid);
+
+    /* Сертификат HTTPS: при первом запуске создаётся, дальше берётся из NVS */
+    char device_name[33];
+    make_ssid(DEVICE_NAME_PREFIX, device_name);
+    for (char *p = device_name; *p; p++) {
+        *p = (char)tolower((unsigned char)*p);
+    }
+    wcs_tls_identity_t tls = { .common_name = device_name };
+    esp_netif_str_to_ip4(WEB_HOST, &tls.ip);
+    if (wcs_tls_init(&tls) != ESP_OK) {
+        ESP_LOGE(TAG, "TLS init failed, web interface unavailable");
+        s_error = true;
+    }
 
     s_cmd_queue = xQueueCreate(8, sizeof(app_cmd_t));
     ESP_ERROR_CHECK(s_cmd_queue ? ESP_OK : ESP_ERR_NO_MEM);
