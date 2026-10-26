@@ -1,0 +1,47 @@
+menu "ESP WCS: состояния и кнопка"
+
+    config WCS_FSM_BUTTON_CLICK_MAX_MS
+        int "Короткое нажатие — не дольше, мс"
+        range 100 5000
+        default 1000
+
+    config WCS_FSM_BUTTON_LONG_MS
+        int "Удержание для входа в «Настройку», мс"
+        range 1000 60000
+        default 5000
+
+    config WCS_FSM_BUTTON_VERY_LONG_MS
+        int "Удержание для сброса до заводских, мс"
+        range 2000 120000
+        default 15000
+
+    config WCS_FSM_MULTI_CLICK_GAP_MS
+        int "Тройное нажатие: пауза между нажатиями не больше, мс"
+        range 100 2000
+        default 500
+        help
+            Три коротких нажатия подряд — сразу режим Direct с поднятой точкой доступа.
+
+    config WCS_FSM_AP_IDLE_TIMEOUT_MIN
+        int "Выключать точку доступа без клиентов через, минут"
+        range 1 1440
+        default 10
+
+    config WCS_FSM_AP_CHANNEL
+        int "Канал точки доступа"
+        range 1 13
+        default 1
+
+    config WCS_FSM_AP_MAX_CLIENTS
+        int "Клиентов точки доступа одновременно"
+        range 1 4
+        default 1
+        help
+            По ТЗ — один: консолью пользуется один человек.
+
+    config WCS_FSM_TASK_STACK_SIZE
+        int "Стек задачи машины состояний, байт"
+        range 4096 16384
+        default 6144
+
+endmenu
