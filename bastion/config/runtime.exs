@@ -25,9 +25,6 @@ if System.get_env("PHX_SERVER") do
   config :bastion, BastionWeb.Endpoint, server: true
 end
 
-config :bastion, BastionWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
-
 if config_env() == :dev do
   # Reload browser tabs when matching files change.
   config :bastion, BastionWeb.Endpoint,
@@ -80,17 +77,20 @@ if config_env() == :prod do
   # variable instead.
   secret_key_base = env!("SECRET_KEY_BASE", :string!)
 
-  host = System.get_env("PHX_HOST") || "example.com"
+  host = env!("PHX_HOST", :string, "bastion.local")
 
   config :bastion, BastionWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
-    http: [
-      # Enable IPv6 and bind on all interfaces.
-      # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
-      # See the documentation on https://bandit.hexdocs.pm/Bandit.html#t:options/0
-      # for details about using IPv6 vs IPv4 and loopback vs public addresses.
-      ip: {0, 0, 0, 0, 0, 0, 0, 0}
+    # Только HTTPS (сертификат — BastionWeb.TLS); HTTP лишь перенаправляет (force_ssl)
+    https: [
+      ip: {0, 0, 0, 0, 0, 0, 0, 0},
+      port: env!("BASTION_HTTPS_PORT", :integer, 443),
+      cipher_suite: :strong
     ],
+    http: [ip: {0, 0, 0, 0, 0, 0, 0, 0}, port: env!("BASTION_HTTP_PORT", :integer, 80)],
+    # Бастион открывают по разным адресам (bastion.local, IP, домен) — origin
+    # LiveView сверяется с адресом самого запроса
+    check_origin: :conn,
     secret_key_base: secret_key_base
 
   # ## SSL Support

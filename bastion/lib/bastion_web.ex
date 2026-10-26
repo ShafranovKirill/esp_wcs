@@ -1,6 +1,6 @@
 defmodule BastionWeb do
   # Веб-интерфейс администратора: обращается к контекстам только через их публичный API
-  use Boundary, deps: [Bastion.Events], exports: [Endpoint, Telemetry]
+  use Boundary, deps: [Bastion.Events, Bastion.PKI], exports: [Endpoint, Telemetry, TLS]
 
   @moduledoc """
   The entrypoint for defining your web interface, such

@@ -14,10 +14,9 @@ defmodule Bastion.Application do
       {Phoenix.PubSub, name: Bastion.PubSub},
       # Центр сертификации — до веб-сервера: тот берёт у него сертификат
       Bastion.PKI,
-      # Start a worker by calling: Bastion.Worker.start_link(arg)
-      # {Bastion.Worker, arg},
-      # Start to serve requests, typically the last entry
-      BastionWeb.Endpoint
+      # Веб-сервер с сертификатом из PKI и его перезапуск при перевыпуске
+      BastionWeb.TLS.endpoint_child_spec(),
+      BastionWeb.TLS
     ]
 
     # See https://elixir.hexdocs.pm/Supervisor.html

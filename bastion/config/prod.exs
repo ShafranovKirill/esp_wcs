@@ -12,7 +12,8 @@ config :bastion, BastionWeb.Endpoint, cache_static_manifest: "priv/static/cache_
 # Note `:force_ssl` is required to be set at compile-time.
 config :bastion, BastionWeb.Endpoint,
   force_ssl: [
-    rewrite_on: [:x_forwarded_proto],
+    # Без rewrite_on: прокси перед бастионом нет, а заголовку X-Forwarded-Proto
+    # от клиента доверять нельзя
     exclude: [
       # paths: ["/health"],
       hosts: ["localhost", "127.0.0.1"]
