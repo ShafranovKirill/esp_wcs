@@ -217,3 +217,10 @@ void wcs_auth_logout(const char *token)
     }
     xSemaphoreGive(s_lock);
 }
+
+void wcs_auth_logout_all(void)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    memset(s_sessions, 0, sizeof(s_sessions));
+    xSemaphoreGive(s_lock);
+}

@@ -33,3 +33,6 @@ wcs_auth_result_t wcs_auth_login(const char *username, const char *password,
 bool wcs_auth_session_check(const char *token);
 
 void wcs_auth_logout(const char *token);
+
+/* Завершить все сессии (при смене режима устройства) */
+void wcs_auth_logout_all(void);
