@@ -4,6 +4,7 @@
  *
  * Пока реализован только вход в настройку: удержание кнопки 5 с поднимает
  * точку доступа с веб-интерфейсом. Полная машина состояний — в wcs_fsm (ТЗ, этап 1, пункт 6).
+ * Индикация — docs/led.md.
  */
 #include <stdio.h>
 
@@ -15,12 +16,14 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_psram.h"
+#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "nvs_flash.h"
 #include "wcs_auth.h"
 #include "wcs_button.h"
 #include "wcs_defaults.h"
+#include "wcs_led.h"
 #include "wcs_web.h"
 #include "wcs_wifi.h"
 
@@ -32,13 +35,39 @@
 #define SETUP_AP_CHANNEL        1
 #define SETUP_AP_MAX_CLIENTS    1
 
+#define BOOT_FLASH_MS           500
+
 typedef enum {
     APP_CMD_START_SETUP,
 } app_cmd_t;
 
+/* Что показывает светодиод (docs/led.md) */
+typedef enum {
+    INDICATION_FACTORY,
+    INDICATION_SETUP_WAITING,
+    INDICATION_SETUP_CONNECTED,
+    INDICATION_ERROR,
+} indication_t;
+
+static const wcs_led_indication_t s_indications[] = {
+    [INDICATION_FACTORY] = { WCS_LED_WHITE, WCS_LED_SOLID },
+    [INDICATION_SETUP_WAITING] = { WCS_LED_BLUE, WCS_LED_BREATHE },
+    [INDICATION_SETUP_CONNECTED] = { WCS_LED_BLUE, WCS_LED_SOLID },
+    [INDICATION_ERROR] = { WCS_LED_RED, WCS_LED_BLINK_FAST },
+};
+
+/* Подсказки при удержании кнопки */
+static const wcs_led_indication_t s_hint_setup = { WCS_LED_BLUE, WCS_LED_BLINK_FAST };
+static const wcs_led_indication_t s_hint_reset = { WCS_LED_RED, WCS_LED_BLINK_FAST };
+
 static const char *TAG = "wcs";
 
 static QueueHandle_t s_cmd_queue;
+
+static void show(indication_t indication)
+{
+    wcs_led_set_base(s_indications[indication]);
+}
 
 /* Обработчик работает в задаче цикла событий с маленьким стеком,
  * поэтому тяжёлую работу передаём в основную задачу через очередь */
@@ -47,7 +76,14 @@ static void on_button(void *arg, esp_event_base_t base, int32_t id, void *data)
     app_cmd_t cmd;
 
     switch (id) {
+    case WCS_BUTTON_EVENT_HOLD_LONG:
+        wcs_led_set_overlay(s_hint_setup, 0);
+        break;
+    case WCS_BUTTON_EVENT_HOLD_VERY_LONG:
+        wcs_led_set_overlay(s_hint_reset, 0);
+        break;
     case WCS_BUTTON_EVENT_LONG:
+        wcs_led_clear_overlay();
         cmd = APP_CMD_START_SETUP;
         xQueueSend(s_cmd_queue, &cmd, 0);
         break;
@@ -55,11 +91,27 @@ static void on_button(void *arg, esp_event_base_t base, int32_t id, void *data)
         ESP_LOGI(TAG, "click: no action yet (Direct connection AP)");
         break;
     case WCS_BUTTON_EVENT_VERY_LONG:
+        wcs_led_clear_overlay();
         ESP_LOGI(TAG, "very long press: no action yet (factory reset)");
         break;
     default:
         break;
     }
+}
+
+/* Клиенты точки доступа: синий дышит — ждём, ровно — подключились */
+static void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
+{
+    static int clients;
+
+    if (id == WIFI_EVENT_AP_STACONNECTED) {
+        clients++;
+    } else if (id == WIFI_EVENT_AP_STADISCONNECTED && clients > 0) {
+        clients--;
+    } else {
+        return;
+    }
+    show(clients > 0 ? INDICATION_SETUP_CONNECTED : INDICATION_SETUP_WAITING);
 }
 
 static void start_setup_portal(void)
@@ -82,8 +134,10 @@ static void start_setup_portal(void)
     };
     if (wcs_wifi_ap_start(&ap) != ESP_OK) {
         ESP_LOGE(TAG, "setup AP start failed");
+        show(INDICATION_ERROR);
         return;
     }
+    show(INDICATION_SETUP_WAITING);
 
     esp_ip4_addr_t ip;
     ESP_ERROR_CHECK(wcs_wifi_ap_get_ip(&ip));
@@ -106,6 +160,11 @@ void app_main(void)
 {
     const esp_app_desc_t *app = esp_app_get_description();
 
+    const wcs_led_config_t led = { .gpio = BOARD_RGB_LED_GPIO, .brightness = BOARD_RGB_LED_BRIGHTNESS };
+    ESP_ERROR_CHECK(wcs_led_init(&led));
+    wcs_led_set_overlay((wcs_led_indication_t){ WCS_LED_WHITE, WCS_LED_SOLID }, BOOT_FLASH_MS);
+    show(INDICATION_FACTORY); /* сохранённых настроек пока нет — всегда «Заводское» */
+
     ESP_LOGI(TAG, "%s %s (ESP-IDF %s)", app->project_name, app->version, app->idf_ver);
     ESP_LOGI(TAG, "PSRAM: %u bytes, free heap: internal %u, PSRAM %u",
              (unsigned)esp_psram_get_size(),
@@ -121,6 +180,7 @@ void app_main(void)
     ESP_ERROR_CHECK(s_cmd_queue ? ESP_OK : ESP_ERR_NO_MEM);
 
     ESP_ERROR_CHECK(esp_event_handler_register(WCS_BUTTON_EVENT, ESP_EVENT_ANY_ID, on_button, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi, NULL));
     const wcs_button_config_t button = {
         .gpio = BOARD_BUTTON_GPIO,
         .active_level = BOARD_BUTTON_ACTIVE_LEVEL,
