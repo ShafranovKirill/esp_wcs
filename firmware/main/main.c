@@ -6,6 +6,9 @@
  *        ▲                ▲                          │
  *        └──── 15 с ──────┴────────── 5 с ───────────┘
  *
+ * Три быстрых нажатия из любого состояния — сразу Direct с поднятой точкой
+ * доступа, без веб-интерфейса настройки (настройки бастиона сохраняются).
+ *
  * Все переходы выполняются в основной задаче: события кнопки, Wi-Fi, таймера и
  * веб-сервера приходят командами через очередь. Индикация — docs/led.md.
  *
@@ -14,6 +17,7 @@
  * Позже машина состояний переедет в компонент wcs_fsm.
  */
 #include <stdio.h>
+#include <string.h>
 
 #include "board.h"
 #include "esp_app_desc.h"
@@ -41,6 +45,7 @@
 #define BUTTON_CLICK_MAX_MS     1000
 #define BUTTON_LONG_MS          5000
 #define BUTTON_VERY_LONG_MS     15000
+#define BUTTON_MULTI_CLICK_GAP_MS 500
 
 #define AP_CHANNEL              1
 #define AP_MAX_CLIENTS          1
@@ -64,6 +69,7 @@ typedef enum {
     CMD_BUTTON_CLICK,
     CMD_BUTTON_LONG,
     CMD_BUTTON_VERY_LONG,
+    CMD_BUTTON_TRIPLE_CLICK,
     CMD_AP_CLIENT_JOINED,
     CMD_AP_CLIENT_LEFT,
     CMD_AP_IDLE_TIMEOUT,
@@ -165,6 +171,9 @@ static void on_button(void *arg, esp_event_base_t base, int32_t id, void *data)
         break;
     case WCS_BUTTON_EVENT_VERY_LONG:
         send_cmd(CMD_BUTTON_VERY_LONG); /* подсказка горит до перезагрузки */
+        break;
+    case WCS_BUTTON_EVENT_TRIPLE_CLICK:
+        send_cmd(CMD_BUTTON_TRIPLE_CLICK);
         break;
     default:
         break;
@@ -288,6 +297,31 @@ static void enter_bastion(const wcs_settings_t *settings)
     }
 }
 
+/* Тройное нажатие: сохранить режим Direct и сразу поднять точку доступа */
+static void switch_to_direct(void)
+{
+    if (s_state == STATE_DIRECT) {
+        if (!wcs_wifi_ap_is_running()) {
+            start_direct_access_point();
+        }
+        return;
+    }
+
+    wcs_settings_t settings;
+    if (wcs_storage_load(&settings) != ESP_OK) {
+        memset(&settings, 0, sizeof(settings));
+    }
+    settings.mode = WCS_MODE_DIRECT;
+    esp_err_t err = wcs_storage_save(&settings);
+    memset(&settings, 0, sizeof(settings));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "settings save failed: %s", esp_err_to_name(err));
+        s_error = true;
+        return;
+    }
+    enter_direct(true);
+}
+
 /* Режим по сохранённым настройкам */
 static void enter_saved_mode(bool raise_direct_ap)
 {
@@ -341,6 +375,9 @@ static void handle(app_cmd_t cmd)
         break;
     case CMD_BUTTON_VERY_LONG:
         factory_reset();
+        break;
+    case CMD_BUTTON_TRIPLE_CLICK:
+        switch_to_direct();
         break;
     case CMD_AP_CLIENT_JOINED:
         s_ap_clients++;
@@ -425,9 +462,10 @@ void app_main(void)
         .click_max_ms = BUTTON_CLICK_MAX_MS,
         .long_press_ms = BUTTON_LONG_MS,
         .very_long_press_ms = BUTTON_VERY_LONG_MS,
+        .multi_click_gap_ms = BUTTON_MULTI_CLICK_GAP_MS,
     };
     ESP_ERROR_CHECK(wcs_button_init(&button));
-    ESP_LOGI(TAG, "ready: hold BOOT 5 s for setup, 15 s for factory reset");
+    ESP_LOGI(TAG, "ready: hold BOOT 5 s for setup, 15 s for factory reset, triple click for direct");
 
     for (;;) {
         app_cmd_t cmd;

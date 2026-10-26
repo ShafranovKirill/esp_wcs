@@ -5,6 +5,10 @@
  * CLICK/LONG/VERY_LONG — при отпускании, HOLD_* — во время удержания, когда
  * достигнут порог (для подсказки светодиодом). Данные события — uint32_t,
  * длительность удержания в мс.
+ *
+ * TRIPLE_CLICK — третье короткое нажатие подряд с паузами не больше
+ * multi_click_gap_ms; публикуется вместе с CLICK этого нажатия (одиночные
+ * нажатия не задерживаются). Данные — длительность третьего нажатия.
  */
 #pragma once
 
@@ -22,6 +26,7 @@ typedef enum {
     WCS_BUTTON_EVENT_VERY_LONG, /* от very_long_press_ms */
     WCS_BUTTON_EVENT_HOLD_LONG,      /* кнопка ещё нажата, достигнут long_press_ms */
     WCS_BUTTON_EVENT_HOLD_VERY_LONG, /* кнопка ещё нажата, достигнут very_long_press_ms */
+    WCS_BUTTON_EVENT_TRIPLE_CLICK,   /* три коротких нажатия подряд */
 } wcs_button_event_t;
 
 typedef struct {
@@ -30,6 +35,7 @@ typedef struct {
     uint32_t click_max_ms;       /* удержания между click_max_ms и long_press_ms игнорируются */
     uint32_t long_press_ms;
     uint32_t very_long_press_ms;
+    uint32_t multi_click_gap_ms; /* от отпускания до следующего нажатия; 0 — без TRIPLE_CLICK */
 } wcs_button_config_t;
 
 /* Настраивает пин и запускает задачу опроса. Вызывать один раз. */
