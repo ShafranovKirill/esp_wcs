@@ -260,10 +260,6 @@ static esp_err_t logout_post(httpd_req_t *req)
 
 static esp_err_t api_status_get(httpd_req_t *req)
 {
-    if (!web_is_authorized(req)) {
-        return web_send_unauthorized(req);
-    }
-
     const esp_app_desc_t *app = esp_app_get_description();
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
@@ -289,14 +285,43 @@ static esp_err_t asset_get(httpd_req_t *req)
     return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
 }
 
-static const httpd_uri_t s_routes[] = {
-    { .uri = "/", .method = HTTP_GET, .handler = root_get },
-    { .uri = "/login", .method = HTTP_GET, .handler = login_get },
-    { .uri = "/login", .method = HTTP_POST, .handler = login_post },
-    { .uri = "/logout", .method = HTTP_POST, .handler = logout_post },
-    { .uri = "/api/status", .method = HTTP_GET, .handler = api_status_get },
-    { .uri = "/assets/*", .method = HTTP_GET, .handler = asset_get },
+static const web_route_t s_routes[] = {
+    { .uri = "/", .method = HTTP_GET, .handler = root_get, .access = WEB_ACCESS_PUBLIC },
+    { .uri = "/login", .method = HTTP_GET, .handler = login_get, .access = WEB_ACCESS_PUBLIC },
+    { .uri = "/login", .method = HTTP_POST, .handler = login_post, .access = WEB_ACCESS_PUBLIC },
+    { .uri = "/logout", .method = HTTP_POST, .handler = logout_post, .access = WEB_ACCESS_PUBLIC },
+    { .uri = "/api/status", .method = HTTP_GET, .handler = api_status_get, .access = WEB_ACCESS_API },
+    { .uri = "/assets/*", .method = HTTP_GET, .handler = asset_get, .access = WEB_ACCESS_PUBLIC },
 };
+
+/* ---- маршруты ---- */
+
+static esp_err_t dispatch(httpd_req_t *req)
+{
+    const web_route_t *route = req->user_ctx;
+    if (route->access != WEB_ACCESS_PUBLIC && !web_is_authorized(req)) {
+        return route->access == WEB_ACCESS_PAGE ? web_redirect(req, "/login") : web_send_unauthorized(req);
+    }
+    return route->handler(req);
+}
+
+esp_err_t web_register_routes(httpd_handle_t server, const web_route_t *routes, size_t count)
+{
+    for (size_t i = 0; i < count; i++) {
+        const httpd_uri_t uri = {
+            .uri = routes[i].uri,
+            .method = routes[i].method,
+            .handler = dispatch,
+            .user_ctx = (void *)&routes[i],
+        };
+        esp_err_t err = httpd_register_uri_handler(server, &uri);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "route %s: %s", routes[i].uri, esp_err_to_name(err));
+            return err;
+        }
+    }
+    return ESP_OK;
+}
 
 /* ---- HTTP → HTTPS ---- */
 
@@ -361,11 +386,10 @@ esp_err_t wcs_web_start(const wcs_web_config_t *config)
     cfg.httpd.uri_match_fn = httpd_uri_match_wildcard;
 
     ESP_RETURN_ON_ERROR(httpd_ssl_start(&s_server, &cfg), TAG, "httpd_ssl_start failed");
-    for (size_t i = 0; i < sizeof(s_routes) / sizeof(s_routes[0]); i++) {
-        httpd_register_uri_handler(s_server, &s_routes[i]);
+    esp_err_t err = WEB_REGISTER_ROUTES(s_server, s_routes);
+    if (err == ESP_OK) {
+        err = config->mode == WCS_WEB_MODE_SETUP ? web_setup_register(s_server) : web_direct_register(s_server);
     }
-    esp_err_t err = config->mode == WCS_WEB_MODE_SETUP ? web_setup_register(s_server)
-                                                       : web_direct_register(s_server);
     if (err == ESP_OK) {
         err = start_redirect_server();
     }

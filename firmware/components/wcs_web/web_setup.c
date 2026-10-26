@@ -49,18 +49,11 @@ static bool bastion_addr_valid(const char *addr)
 
 static esp_err_t setup_get(httpd_req_t *req)
 {
-    if (!web_is_authorized(req)) {
-        return web_redirect(req, "/login");
-    }
     return web_send_embedded(req, WEB_HTML, setup_html_start, setup_html_end);
 }
 
 static esp_err_t info_get(httpd_req_t *req)
 {
-    if (!web_is_authorized(req)) {
-        return web_send_unauthorized(req);
-    }
-
     wcs_settings_t saved;
     if (wcs_storage_load(&saved) != ESP_OK) {
         memset(&saved, 0, sizeof(saved));
@@ -89,10 +82,6 @@ static esp_err_t info_get(httpd_req_t *req)
 
 static esp_err_t scan_get(httpd_req_t *req)
 {
-    if (!web_is_authorized(req)) {
-        return web_send_unauthorized(req);
-    }
-
     wcs_wifi_network_t *networks = calloc(SCAN_MAX, sizeof(*networks));
     char *json = malloc(SCAN_MAX * SCAN_ITEM_JSON + 32);
     if (!networks || !json) {
@@ -127,10 +116,6 @@ static esp_err_t scan_get(httpd_req_t *req)
 
 static esp_err_t connect_post(httpd_req_t *req)
 {
-    if (!web_is_authorized(req)) {
-        return web_send_unauthorized(req);
-    }
-
     char body[BODY_MAX];
     char ssid[FORM_SSID_MAX];
     char password[FORM_PASS_MAX] = "";
@@ -153,10 +138,6 @@ static esp_err_t connect_post(httpd_req_t *req)
 
 static esp_err_t status_get(httpd_req_t *req)
 {
-    if (!web_is_authorized(req)) {
-        return web_send_unauthorized(req);
-    }
-
     static const char *const states[] = {
         [WCS_WIFI_STA_IDLE] = "idle",
         [WCS_WIFI_STA_CONNECTING] = "connecting",
@@ -185,10 +166,6 @@ static esp_err_t status_get(httpd_req_t *req)
 /* Доступен ли бастион из сети, к которой устройство подключилось */
 static esp_err_t bastion_check_post(httpd_req_t *req)
 {
-    if (!web_is_authorized(req)) {
-        return web_send_unauthorized(req);
-    }
-
     char body[BODY_MAX];
     char addr[FORM_ADDR_MAX];
     if (web_read_body(req, body, sizeof(body)) != ESP_OK || !web_form_value(body, "bastion", addr, sizeof(addr))) {
@@ -222,10 +199,6 @@ static esp_err_t bastion_check_post(httpd_req_t *req)
 
 static esp_err_t apply_post(httpd_req_t *req)
 {
-    if (!web_is_authorized(req)) {
-        return web_send_unauthorized(req);
-    }
-
     char body[BODY_MAX];
     char mode[16];
     if (web_read_body(req, body, sizeof(body)) != ESP_OK || !web_form_value(body, "mode", mode, sizeof(mode))) {
@@ -279,8 +252,8 @@ static esp_err_t apply_post(httpd_req_t *req)
     return web_send_json(req, NULL, "{\"ok\":true}");
 }
 
-static const httpd_uri_t s_routes[] = {
-    { .uri = "/setup", .method = HTTP_GET, .handler = setup_get },
+static const web_route_t s_routes[] = {
+    { .uri = "/setup", .method = HTTP_GET, .handler = setup_get, .access = WEB_ACCESS_PAGE },
     { .uri = "/api/setup/info", .method = HTTP_GET, .handler = info_get },
     { .uri = "/api/setup/apply", .method = HTTP_POST, .handler = apply_post },
     { .uri = "/api/wifi/scan", .method = HTTP_GET, .handler = scan_get },
@@ -291,11 +264,5 @@ static const httpd_uri_t s_routes[] = {
 
 esp_err_t web_setup_register(httpd_handle_t server)
 {
-    for (size_t i = 0; i < sizeof(s_routes) / sizeof(s_routes[0]); i++) {
-        esp_err_t err = httpd_register_uri_handler(server, &s_routes[i]);
-        if (err != ESP_OK) {
-            return err;
-        }
-    }
-    return ESP_OK;
+    return WEB_REGISTER_ROUTES(server, s_routes);
 }

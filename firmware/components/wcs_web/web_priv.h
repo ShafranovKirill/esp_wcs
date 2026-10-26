@@ -21,6 +21,29 @@ esp_err_t web_send_embedded(httpd_req_t *req, const char *type, const uint8_t *s
 esp_err_t web_redirect(httpd_req_t *req, const char *location);
 bool web_is_authorized(httpd_req_t *req);
 
+/*
+ * Маршруты. Проверка входа делается в одном месте — при диспетчеризации,
+ * обработчик вызывается только если доступ разрешён.
+ * Значение по умолчанию (0) — только после входа: забытое поле не открывает адрес всем.
+ */
+typedef enum {
+    WEB_ACCESS_API = 0, /* без входа — 401 с JSON */
+    WEB_ACCESS_PAGE,    /* без входа — перенаправление на /login */
+    WEB_ACCESS_PUBLIC,  /* доступно без входа */
+} web_access_t;
+
+typedef struct {
+    const char *uri; /* можно с * в конце */
+    httpd_method_t method;
+    esp_err_t (*handler)(httpd_req_t *req);
+    web_access_t access;
+} web_route_t;
+
+/* routes должен жить, пока работает сервер (static const) */
+esp_err_t web_register_routes(httpd_handle_t server, const web_route_t *routes, size_t count);
+#define WEB_REGISTER_ROUTES(server, routes) \
+    web_register_routes((server), (routes), sizeof(routes) / sizeof((routes)[0]))
+
 /* JSON-ответ; status = NULL — 200 OK */
 esp_err_t web_send_json(httpd_req_t *req, const char *status, const char *json);
 esp_err_t web_send_unauthorized(httpd_req_t *req);
