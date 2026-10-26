@@ -59,6 +59,22 @@ defmodule Bastion.PKI do
           | {:error, :invalid_csr | :bad_signature | :unsupported_key | :subject_mismatch}
   def sign_device_csr(csr_pem, device_id), do: Authority.sign_device_csr(csr_pem, device_id)
 
+  @doc """
+  Проверить CSR из заявки, ничего не подписывая: подпись верна, ключ P-256,
+  CN = `device_id`. Возвращает код устройства для сверки.
+  """
+  @spec check_device_csr(String.t() | nil, String.t()) ::
+          {:ok, Code.t()}
+          | {:error, :invalid_csr | :bad_signature | :unsupported_key | :subject_mismatch}
+  def check_device_csr(csr_pem, device_id) when is_binary(csr_pem) do
+    with {:ok, %{public_key: public_key, common_name: cn}} <- Certificates.parse_csr(csr_pem),
+         true <- cn == device_id || {:error, :subject_mismatch} do
+      {:ok, public_key |> Certificates.spki_der() |> Code.from_spki_der()}
+    end
+  end
+
+  def check_device_csr(_csr_pem, _device_id), do: {:error, :invalid_csr}
+
   @doc "Код устройства по его CSR (без подписи) — для заявки"
   @spec device_code(String.t()) ::
           {:ok, Code.t()} | {:error, :invalid_csr | :bad_signature | :unsupported_key}
