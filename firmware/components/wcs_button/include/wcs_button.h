@@ -1,8 +1,10 @@
 /*
  * Кнопка режимов: опрос с подавлением дребезга, классификация нажатия по длительности.
  *
- * Событие публикуется в стандартный цикл событий (esp_event_loop_create_default)
- * при отпускании кнопки. Данные события — uint32_t, длительность удержания в мс.
+ * События публикуются в стандартный цикл событий (esp_event_loop_create_default).
+ * CLICK/LONG/VERY_LONG — при отпускании, HOLD_* — во время удержания, когда
+ * достигнут порог (для подсказки светодиодом). Данные события — uint32_t,
+ * длительность удержания в мс.
  */
 #pragma once
 
@@ -18,6 +20,8 @@ typedef enum {
     WCS_BUTTON_EVENT_CLICK,     /* короче click_max_ms */
     WCS_BUTTON_EVENT_LONG,      /* от long_press_ms до very_long_press_ms */
     WCS_BUTTON_EVENT_VERY_LONG, /* от very_long_press_ms */
+    WCS_BUTTON_EVENT_HOLD_LONG,      /* кнопка ещё нажата, достигнут long_press_ms */
+    WCS_BUTTON_EVENT_HOLD_VERY_LONG, /* кнопка ещё нажата, достигнут very_long_press_ms */
 } wcs_button_event_t;
 
 typedef struct {

@@ -25,6 +25,14 @@ static bool read_pressed(void)
     return gpio_get_level(s_config.gpio) == s_config.active_level;
 }
 
+static void post(wcs_button_event_t event, uint32_t held_ms)
+{
+    esp_err_t err = esp_event_post(WCS_BUTTON_EVENT, event, &held_ms, sizeof(held_ms), 0);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "event post failed: %s", esp_err_to_name(err));
+    }
+}
+
 static void post_release(uint32_t held_ms)
 {
     wcs_button_event_t event;
@@ -41,21 +49,38 @@ static void post_release(uint32_t held_ms)
     }
 
     ESP_LOGI(TAG, "held %" PRIu32 " ms: event %d", held_ms, event);
-    esp_err_t err = esp_event_post(WCS_BUTTON_EVENT, event, &held_ms, sizeof(held_ms), 0);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "event post failed: %s", esp_err_to_name(err));
+    post(event, held_ms);
+}
+
+/* Пороги, достигнутые во время удержания, — каждый публикуется один раз за нажатие */
+static void check_hold(int64_t pressed_at_us, int *thresholds_passed)
+{
+    uint32_t held_ms = (uint32_t)((esp_timer_get_time() - pressed_at_us) / 1000);
+    if (*thresholds_passed == 0 && held_ms >= s_config.long_press_ms) {
+        *thresholds_passed = 1;
+        post(WCS_BUTTON_EVENT_HOLD_LONG, held_ms);
+    }
+    if (*thresholds_passed == 1 && held_ms >= s_config.very_long_press_ms) {
+        *thresholds_passed = 2;
+        post(WCS_BUTTON_EVENT_HOLD_VERY_LONG, held_ms);
     }
 }
 
 static void button_task(void *arg)
 {
-    bool stable = read_pressed();
-    bool last_raw = stable;
-    int same_count = DEBOUNCE_SAMPLES;
+    /* Нажатие, начатое до запуска, отсчитывается от запуска */
+    bool stable = false;
+    bool last_raw = false;
+    int same_count = 0;
     int64_t pressed_at_us = 0;
+    int thresholds_passed = 0;
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_PERIOD_MS));
+
+        if (stable) {
+            check_hold(pressed_at_us, &thresholds_passed);
+        }
 
         bool raw = read_pressed();
         if (raw != last_raw) {
@@ -70,6 +95,7 @@ static void button_task(void *arg)
         stable = raw;
         if (stable) {
             pressed_at_us = esp_timer_get_time();
+            thresholds_passed = 0;
         } else {
             post_release((uint32_t)((esp_timer_get_time() - pressed_at_us) / 1000));
         }
