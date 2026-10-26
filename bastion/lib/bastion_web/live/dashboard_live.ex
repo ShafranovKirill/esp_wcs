@@ -9,7 +9,10 @@ defmodule BastionWeb.DashboardLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Fleet.subscribe()
+    if connected?(socket) do
+      Fleet.subscribe()
+      Bastion.Link.subscribe()
+    end
 
     socket =
       socket
@@ -29,7 +32,7 @@ defmodule BastionWeb.DashboardLive do
 
   defp load(socket) do
     overview = Fleet.overview()
-    assign(socket, overview: overview, total: count(overview))
+    assign(socket, overview: overview, total: count(overview), online: Bastion.Link.online())
   end
 
   defp count(%{folders: folders, unfiled: unfiled}),
@@ -38,6 +41,9 @@ defmodule BastionWeb.DashboardLive do
   # ---- события Fleet ----
 
   @impl true
+  def handle_info({:event, %Bastion.Link.Events.PresenceChanged{}}, socket),
+    do: {:noreply, assign(socket, online: Bastion.Link.online())}
+
   def handle_info({:event, _event}, socket), do: {:noreply, load(socket)}
 
   # ---- поиск ----
@@ -263,6 +269,7 @@ defmodule BastionWeb.DashboardLive do
           devices={filter(devices, @query)}
           all_count={length(devices)}
           collapsed={MapSet.member?(@collapsed, folder.id)}
+          online={@online}
         />
         <.folder
           :if={@overview.unfiled != []}
@@ -271,6 +278,7 @@ defmodule BastionWeb.DashboardLive do
           devices={filter(@overview.unfiled, @query)}
           all_count={length(@overview.unfiled)}
           collapsed={MapSet.member?(@collapsed, "none")}
+          online={@online}
         />
       </section>
 
@@ -337,6 +345,7 @@ defmodule BastionWeb.DashboardLive do
   attr :devices, :list, required: true
   attr :all_count, :integer, required: true
   attr :collapsed, :boolean, default: false
+  attr :online, :map, default: %{}
 
   defp folder(assigns) do
     assigns = assign(assigns, :key, if(assigns.folder, do: assigns.folder.id, else: "none"))
@@ -421,7 +430,7 @@ defmodule BastionWeb.DashboardLive do
               <span class="min-w-40 font-medium">{device.name}</span>
               <span class="font-mono text-xs text-base-content/50">{Fleet.format_mac(device.device_id)}</span>
               <span class="flex-1"></span>
-              <.presence :if={device.status == :approved} device={device} />
+              <.presence :if={device.status == :approved} device={device} online={@online[device.id]} />
               <.status_badge :if={device.status != :approved} status={device.status} />
               <.icon name="hero-chevron-right" class="size-4 text-base-content/30" />
             </.link>

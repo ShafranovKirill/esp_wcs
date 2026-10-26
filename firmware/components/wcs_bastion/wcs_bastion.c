@@ -12,7 +12,11 @@
 #include "lwip/inet.h"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
+#include "mbedtls/net_sockets.h"
+#include "mbedtls/pem.h"
+#include "mbedtls/ssl.h"
 #include "mdns.h"
+#include "psa/crypto.h"
 
 #define MDNS_QUERY_TIMEOUT_MS 2000
 
@@ -91,7 +95,8 @@ static bool resolve(const char *host, esp_ip4_addr_t *ip)
     return true;
 }
 
-static wcs_bastion_probe_result_t tcp_probe(const esp_ip4_addr_t *ip, uint16_t port, uint32_t timeout_ms)
+/* TCP-подключение с таймаутом; при успехе сокет остаётся открытым (*fd) */
+static wcs_bastion_probe_result_t tcp_connect(const esp_ip4_addr_t *ip, uint16_t port, uint32_t timeout_ms, int *fd)
 {
     int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (s < 0) {
@@ -124,20 +129,124 @@ static wcs_bastion_probe_result_t tcp_probe(const esp_ip4_addr_t *ip, uint16_t p
             }
         }
     }
-    close(s);
 
     switch (err) {
     case 0:
+        /* Дальше TLS в блокирующем режиме с таймаутом на чтение */
+        fcntl(s, F_SETFL, fcntl(s, F_GETFL, 0) & ~O_NONBLOCK);
+        struct timeval rcv = { .tv_sec = timeout_ms / 1000, .tv_usec = (timeout_ms % 1000) * 1000 };
+        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &rcv, sizeof(rcv));
+        setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &rcv, sizeof(rcv));
+        *fd = s;
         return WCS_BASTION_PROBE_OK;
     case ECONNREFUSED:
     case ECONNRESET: /* lwIP сообщает об отказе (RST) так */
+        close(s);
         return WCS_BASTION_PROBE_REFUSED;
     case ETIMEDOUT:
+        close(s);
         return WCS_BASTION_PROBE_TIMEOUT;
     default:
         ESP_LOGD(TAG, "connect errno %d", err);
+        close(s);
         return WCS_BASTION_PROBE_UNREACHABLE;
     }
+}
+
+/* Сокет блокирующий с таймаутами: любая ошибка — конец рукопожатия */
+static int bio_send(void *ctx, const unsigned char *buf, size_t len)
+{
+    int r = send(*(int *)ctx, buf, len, 0);
+    return r < 0 ? MBEDTLS_ERR_NET_SEND_FAILED : r;
+}
+
+static int bio_recv(void *ctx, unsigned char *buf, size_t len)
+{
+    int r = recv(*(int *)ctx, buf, len, 0);
+    if (r == 0) {
+        return MBEDTLS_ERR_NET_CONN_RESET;
+    }
+    return r < 0 ? MBEDTLS_ERR_NET_RECV_FAILED : r;
+}
+
+/* Корневой сертификат: последний в цепочке, CA и самоподписанный */
+static const mbedtls_x509_crt *chain_root(const mbedtls_x509_crt *chain)
+{
+    const mbedtls_x509_crt *root = chain;
+    while (root && root->next && root->next->raw.len) {
+        root = root->next;
+    }
+    if (!root || root == chain || mbedtls_x509_crt_get_ca_istrue(root) != 1 || root->issuer_raw.len != root->subject_raw.len ||
+        memcmp(root->issuer_raw.p, root->subject_raw.p, root->subject_raw.len) != 0) {
+        return NULL;
+    }
+    return root;
+}
+
+/*
+ * TLS-рукопожатие без проверки сертификата (это первое подключение: доверие —
+ * по коду, который сверяет человек), из цепочки — корневой сертификат бастиона.
+ */
+static wcs_bastion_probe_result_t tls_inspect(int fd, const char *host, wcs_bastion_probe_t *out)
+{
+    mbedtls_ssl_context ssl;
+    mbedtls_ssl_config conf;
+    mbedtls_ssl_init(&ssl);
+    mbedtls_ssl_config_init(&conf);
+
+    wcs_bastion_probe_result_t result = WCS_BASTION_PROBE_NOT_BASTION;
+    int ret = mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM,
+                                          MBEDTLS_SSL_PRESET_DEFAULT);
+    if (ret == 0) {
+        mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_NONE);
+        mbedtls_ssl_conf_min_tls_version(&conf, MBEDTLS_SSL_VERSION_TLS1_3);
+        ret = mbedtls_ssl_setup(&ssl, &conf);
+    }
+    if (ret == 0) {
+        mbedtls_ssl_set_hostname(&ssl, host);
+        mbedtls_ssl_set_bio(&ssl, &fd, bio_send, bio_recv, NULL);
+        do {
+            ret = mbedtls_ssl_handshake(&ssl);
+        } while (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE);
+    }
+
+    if (ret != 0) {
+        ESP_LOGI(TAG, "TLS handshake failed: -0x%x", -ret);
+    } else {
+        const mbedtls_x509_crt *root = chain_root(mbedtls_ssl_get_peer_cert(&ssl));
+        size_t pem_len = 0;
+        if (root &&
+            mbedtls_pem_write_buffer("-----BEGIN CERTIFICATE-----\n", "-----END CERTIFICATE-----\n", root->raw.p,
+                                     root->raw.len, (unsigned char *)out->ca_pem, sizeof(out->ca_pem), &pem_len) == 0 &&
+            wcs_bastion_code(root->pk_raw.p, root->pk_raw.len, out->code) == ESP_OK) {
+            result = WCS_BASTION_PROBE_OK;
+        } else {
+            ESP_LOGI(TAG, "no self-signed root CA in the server chain");
+        }
+        mbedtls_ssl_close_notify(&ssl);
+    }
+
+    mbedtls_ssl_free(&ssl);
+    mbedtls_ssl_config_free(&conf);
+    return result;
+}
+
+esp_err_t wcs_bastion_code(const uint8_t *spki_der, size_t len, char out[WCS_BASTION_CODE_LEN + 1])
+{
+    uint8_t hash[32];
+    size_t hash_len;
+    if (psa_hash_compute(PSA_ALG_SHA_256, spki_der, len, hash, sizeof(hash), &hash_len) != PSA_SUCCESS) {
+        return ESP_FAIL;
+    }
+    /* 6 байт → 12 hex группами по 4: 7F3A-91C2-B4E0 (docs/protocol.md) */
+    snprintf(out, WCS_BASTION_CODE_LEN + 1, "%02X%02X-%02X%02X-%02X%02X", hash[0], hash[1], hash[2], hash[3],
+             hash[4], hash[5]);
+    return ESP_OK;
+}
+
+esp_err_t wcs_bastion_resolve(const char *host, esp_ip4_addr_t *ip)
+{
+    return resolve(host, ip) ? ESP_OK : ESP_ERR_NOT_FOUND;
 }
 
 esp_err_t wcs_bastion_probe(const char *addr, uint32_t timeout_ms, wcs_bastion_probe_t *out)
@@ -156,9 +265,15 @@ esp_err_t wcs_bastion_probe(const char *addr, uint32_t timeout_ms, wcs_bastion_p
     }
 
     int64_t start = esp_timer_get_time();
-    out->result = tcp_probe(&out->ip, parsed.port, timeout_ms);
+    int fd = -1;
+    out->result = tcp_connect(&out->ip, parsed.port, timeout_ms, &fd);
     out->time_ms = (uint32_t)((esp_timer_get_time() - start) / 1000);
-    ESP_LOGI(TAG, "probe %s (" IPSTR ":%u): result %d, %" PRIu32 " ms",
-             parsed.host, IP2STR(&out->ip), parsed.port, out->result, out->time_ms);
+    if (out->result == WCS_BASTION_PROBE_OK) {
+        out->result = tls_inspect(fd, parsed.host, out);
+        close(fd);
+    }
+    ESP_LOGI(TAG, "probe %s (" IPSTR ":%u): result %d, %" PRIu32 " ms%s%s", parsed.host, IP2STR(&out->ip),
+             parsed.port, out->result, out->time_ms, out->result == WCS_BASTION_PROBE_OK ? ", code " : "",
+             out->result == WCS_BASTION_PROBE_OK ? out->code : "");
     return ESP_OK;
 }

@@ -10,6 +10,7 @@
 #define KEY_STA_SSID     "sta_ssid"
 #define KEY_STA_PASSWORD "sta_pass"
 #define KEY_BASTION      "bastion"
+#define KEY_BASTION_CA   "bastion_ca"
 
 static const char *TAG = "wcs_storage";
 
@@ -92,4 +93,33 @@ esp_err_t wcs_storage_erase(void)
     }
     nvs_close(nvs);
     return err;
+}
+
+esp_err_t wcs_storage_save_bastion_ca(const char *pem)
+{
+    ESP_RETURN_ON_FALSE(pem, ESP_ERR_INVALID_ARG, TAG, "pem is NULL");
+
+    nvs_handle_t nvs;
+    ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs), TAG, "nvs_open failed");
+    esp_err_t err = nvs_set_str(nvs, KEY_BASTION_CA, pem);
+    if (err == ESP_OK) {
+        err = nvs_commit(nvs);
+    }
+    nvs_close(nvs);
+    return err;
+}
+
+esp_err_t wcs_storage_load_bastion_ca(char *pem, size_t size)
+{
+    ESP_RETURN_ON_FALSE(pem && size, ESP_ERR_INVALID_ARG, TAG, "bad buffer");
+
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs);
+    if (err != ESP_OK) {
+        return err == ESP_ERR_NVS_NOT_FOUND ? ESP_ERR_NOT_FOUND : err;
+    }
+    size_t len = size;
+    err = nvs_get_str(nvs, KEY_BASTION_CA, pem, &len);
+    nvs_close(nvs);
+    return err == ESP_ERR_NVS_NOT_FOUND ? ESP_ERR_NOT_FOUND : err;
 }

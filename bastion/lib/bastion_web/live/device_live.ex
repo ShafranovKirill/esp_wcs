@@ -27,7 +27,14 @@ defmodule BastionWeb.DeviceLive do
           Fleet.subscribe()
         end
 
-        {:ok, socket |> assign(device: device, folders: Fleet.list_folders()) |> assign_forms()}
+        {:ok,
+         socket
+         |> assign(
+           device: device,
+           folders: Fleet.list_folders(),
+           online: Bastion.Link.presence(device.id)
+         )
+         |> assign_forms()}
     end
   end
 
@@ -71,6 +78,15 @@ defmodule BastionWeb.DeviceLive do
   # ---- события ----
 
   @impl true
+  def handle_info(
+        {:event, %Bastion.Link.Events.PresenceChanged{id: id}},
+        %{assigns: %{device: %{id: id}}} = socket
+      ),
+      do: {:noreply, assign(socket, online: Bastion.Link.presence(id))}
+
+  def handle_info({:event, %Bastion.Link.Events.PresenceChanged{}}, socket),
+    do: {:noreply, socket}
+
   def handle_info({:event, _event}, socket), do: {:noreply, reload(socket)}
 
   @impl true
@@ -155,7 +171,7 @@ defmodule BastionWeb.DeviceLive do
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h1 class="text-2xl font-semibold" id="device-name">{@device.name}</h1>
         <.status_badge status={@device.status} />
-        <.presence :if={@device.status == :approved} device={@device} />
+        <.presence :if={@device.status == :approved} device={@device} online={@online} />
       </div>
 
       <div
@@ -212,7 +228,7 @@ defmodule BastionWeb.DeviceLive do
         folder_form={@folder_form}
         folders={@folders}
       />
-      <.info_tab :if={@tab == :info} device={@device} />
+      <.info_tab :if={@tab == :info} device={@device} online={@online} />
       <.journal_tab :if={@tab == :journal} events={@events} />
 
       <.dialog id="approve-dialog" title={gettext("Approve the device?")}>
@@ -429,6 +445,7 @@ defmodule BastionWeb.DeviceLive do
   # ---- вкладка «Сведения» ----
 
   attr :device, :map, required: true
+  attr :online, :map, default: nil
 
   defp info_tab(assigns) do
     ~H"""
@@ -439,6 +456,18 @@ defmodule BastionWeb.DeviceLive do
           <span class="font-mono">{Fleet.format_mac(@device.device_id)}</span>
         </.info_row>
         <.info_row label={gettext("Device code")}><.code code={@device.device_code} /></.info_row>
+        <.info_row label={gettext("Connection")}>
+          <.presence device={@device} online={@online} />
+        </.info_row>
+        <.info_row :if={@online} label={gettext("Connected since")}>
+          <.time at={@online[:connected_at]} format="relative" id="info-connected" />
+        </.info_row>
+        <.info_row :if={@online && @online[:rssi]} label={gettext("Wi-Fi signal")}>
+          {@online[:rssi]} dBm <.signal rssi={@online[:rssi]} />
+        </.info_row>
+        <.info_row :if={@online && @online[:uptime]} label={gettext("Uptime")}>
+          {format_uptime(@online[:uptime])}
+        </.info_row>
         <.info_row label={gettext("IP address")}>{@device.last_ip || "—"}</.info_row>
         <.info_row label={gettext("Firmware")}>{@device.firmware_version || "—"}</.info_row>
         <.info_row label={gettext("Last seen")}>
@@ -504,6 +533,18 @@ defmodule BastionWeb.DeviceLive do
   end
 
   # ---- тексты ----
+
+  defp format_uptime(seconds) do
+    days = div(seconds, 86_400)
+    hours = div(rem(seconds, 86_400), 3600)
+    minutes = div(rem(seconds, 3600), 60)
+
+    cond do
+      days > 0 -> gettext("%{d} d %{h} h", d: days, h: hours)
+      hours > 0 -> gettext("%{h} h %{m} min", h: hours, m: minutes)
+      true -> gettext("%{m} min", m: minutes)
+    end
+  end
 
   defp tab_path(device, :console), do: ~p"/devices/#{device.id}"
   defp tab_path(device, :settings), do: ~p"/devices/#{device.id}/settings"
