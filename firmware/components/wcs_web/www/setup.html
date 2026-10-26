@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP WCS — настройка</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <main class="card">
+    <header class="row">
+      <h1>Настройка</h1>
+      <form method="post" action="/logout">
+        <button type="submit" class="secondary">Выйти</button>
+      </form>
+    </header>
+    <p id="progress" class="muted"></p>
+
+    <!-- Шаги мастера: показывается один, переключение через #адрес (работает кнопка «Назад» браузера) -->
+
+    <section class="step" data-step="mode" hidden>
+      <h2>Режим работы</h2>
+      <div class="choices">
+        <div class="choice">
+          <label><input type="radio" name="mode" value="direct"> Direct connection</label>
+          <button type="button" class="help" data-help="help-direct" aria-label="Что это?">?</button>
+        </div>
+        <p id="help-direct" class="hint" hidden>
+          Устройство само раздаёт Wi-Fi. Ноутбук подключается к нему напрямую,
+          консоль открывается в браузере. Другие сети и интернет не нужны.
+        </p>
+        <div class="choice">
+          <label><input type="radio" name="mode" value="bastion"> Bastion connection</label>
+          <button type="button" class="help" data-help="help-bastion" aria-label="Что это?">?</button>
+        </div>
+        <p id="help-bastion" class="hint" hidden>
+          Устройство подключается к вашей Wi-Fi сети и держит связь с бастионом.
+          Консолью и всеми устройствами вы управляете через веб-интерфейс бастиона.
+        </p>
+      </div>
+      <div class="nav">
+        <span></span>
+        <button type="button" id="mode-next" disabled>Далее</button>
+      </div>
+    </section>
+
+    <section class="step" data-step="direct" hidden>
+      <h2>Direct connection</h2>
+      <p>Интерфейс настройки закроется, и устройство поднимет новую точку доступа:</p>
+      <dl>
+        <dt>Сеть Wi-Fi</dt><dd data-direct="ssid">…</dd>
+        <dt>Пароль</dt><dd data-direct="password">…</dd>
+        <dt>Адрес</dt><dd data-direct="url">…</dd>
+      </dl>
+      <p class="muted">Подключитесь к этой сети и откройте адрес в браузере.</p>
+      <div class="nav">
+        <button type="button" class="secondary" data-back>Назад</button>
+        <button type="button" id="apply-direct">Применить</button>
+      </div>
+    </section>
+
+    <section class="step" data-step="wifi" hidden>
+      <div class="row">
+        <h2>Сеть Wi-Fi</h2>
+        <button type="button" id="scan" class="secondary small">Обновить</button>
+      </div>
+      <p id="scan-status" class="muted"></p>
+      <ul id="networks" class="networks"></ul>
+
+      <form id="wifi-form" hidden>
+        <p>Сеть: <strong id="wifi-ssid"></strong></p>
+        <label id="wifi-password-label">Пароль
+          <input id="wifi-password" type="password" autocomplete="off">
+        </label>
+        <button type="submit" id="wifi-connect">Подключиться</button>
+      </form>
+      <p id="wifi-status"></p>
+      <div class="nav">
+        <button type="button" class="secondary" data-back>Назад</button>
+        <button type="button" id="wifi-next" disabled>Далее</button>
+      </div>
+    </section>
+
+    <section class="step" data-step="bastion" hidden>
+      <h2>Бастион</h2>
+      <form id="bastion-form">
+        <label>Адрес бастиона
+          <input id="bastion" placeholder="192.168.1.10, bastion.example.com или bastion.local" autocomplete="off">
+        </label>
+        <p class="muted" id="bastion-hint"></p>
+        <button type="submit" id="bastion-check" disabled>Проверить</button>
+      </form>
+      <p id="bastion-status"></p>
+      <div class="nav">
+        <button type="button" class="secondary" data-back>Назад</button>
+        <button type="button" id="bastion-next" disabled>Далее</button>
+      </div>
+    </section>
+
+    <section class="step" data-step="confirm" hidden>
+      <h2>Проверьте настройки</h2>
+      <dl>
+        <dt>Режим</dt><dd>Bastion connection</dd>
+        <dt>Сеть Wi-Fi</dt><dd id="confirm-ssid"></dd>
+        <dt>Адрес устройства</dt><dd id="confirm-ip"></dd>
+        <dt>Бастион</dt><dd id="confirm-bastion"></dd>
+        <dt>Проверка</dt><dd id="confirm-check"></dd>
+      </dl>
+      <p class="muted">После применения интерфейс настройки закроется, точка доступа выключится.</p>
+      <div class="nav">
+        <button type="button" class="secondary" data-back>Назад</button>
+        <button type="button" id="apply-bastion">Применить</button>
+      </div>
+    </section>
+
+    <p id="apply-error" class="error" hidden></p>
+
+    <section class="step" data-step="done" hidden>
+      <h2>Готово</h2>
+      <p id="done-text"></p>
+      <p class="muted">Вернуться к настройке — удерживать кнопку на устройстве 5 секунд.</p>
+    </section>
+
+    <details>
+      <summary>Об устройстве</summary>
+      <dl>
+        <dt>Прошивка</dt><dd data-key="firmware">…</dd>
+        <dt>ESP-IDF</dt><dd data-key="idf">…</dd>
+        <dt>MAC</dt><dd data-key="mac">…</dd>
+        <dt>Время работы</dt><dd data-key="uptime">…</dd>
+        <dt>Свободно RAM / PSRAM</dt><dd data-key="heap">…</dd>
+      </dl>
+    </details>
+  </main>
+  <script src="/assets/setup.js"></script>
+</body>
+</html>

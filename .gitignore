@@ -12,6 +12,7 @@ erl_crash.dump
 /bastion/priv/static/assets/
 
 # Секреты и ключи — никогда не коммитить
+.env
 *.pem
 *.key
 *.p12

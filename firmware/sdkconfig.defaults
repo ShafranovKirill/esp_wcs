@@ -20,3 +20,9 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 # Своя таблица разделов: два слота OTA, NVS с запасом под ключи и сертификаты
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Основная задача поднимает Wi-Fi и веб-сервер
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
+
+# Браузеры присылают длинные заголовки
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048

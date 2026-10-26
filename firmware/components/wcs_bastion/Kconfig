@@ -1,0 +1,16 @@
+menu "ESP WCS: бастион"
+
+    config WCS_BASTION_DEFAULT_PORT
+        int "Порт бастиона, если в адресе он не указан"
+        range 1 65535
+        default 7443
+        help
+            Обычно ничем не занят: стандартные 443 и 8443 часто держат
+            другие веб-серверы на той же машине.
+
+    config WCS_BASTION_PROBE_TIMEOUT_MS
+        int "Ожидание ответа при проверке доступности, мс"
+        range 500 30000
+        default 5000
+
+endmenu

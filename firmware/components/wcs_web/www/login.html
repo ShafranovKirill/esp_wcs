@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP WCS — вход</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <main class="card narrow">
+    <h1>ESP WCS</h1>
+    <p class="muted">Настройка консольного сервера</p>
+    <form method="post" action="/login" autocomplete="on">
+      <label>Логин
+        <input name="username" autocomplete="username" required autofocus>
+      </label>
+      <label>Пароль
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <p id="error" class="error" hidden></p>
+      <button type="submit">Войти</button>
+    </form>
+  </main>
+  <script src="/assets/login.js"></script>
+</body>
+</html>
