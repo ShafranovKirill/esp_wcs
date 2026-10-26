@@ -91,9 +91,15 @@
         <button type="submit" id="bastion-check" disabled>Проверить</button>
       </form>
       <p id="bastion-status"></p>
+      <div id="bastion-code-box" class="codebox" hidden>
+        <p>Код бастиона</p>
+        <p class="code" id="bastion-code"></p>
+        <p class="muted">Сверьте его с кодом на главной странице бастиона. Совпадает — это ваш бастион,
+          устройство запомнит его и будет подключаться только к нему. Не совпадает — не продолжайте.</p>
+      </div>
       <div class="nav">
         <button type="button" class="secondary" data-back>Назад</button>
-        <button type="button" id="bastion-next" disabled>Далее</button>
+        <button type="button" id="bastion-next" disabled>Коды совпадают, далее</button>
       </div>
     </section>
 
@@ -104,9 +110,15 @@
         <dt>Сеть Wi-Fi</dt><dd id="confirm-ssid"></dd>
         <dt>Адрес устройства</dt><dd id="confirm-ip"></dd>
         <dt>Бастион</dt><dd id="confirm-bastion"></dd>
-        <dt>Проверка</dt><dd id="confirm-check"></dd>
+        <dt>Код бастиона</dt><dd id="confirm-bastion-code"></dd>
       </dl>
-      <p class="muted">После применения интерфейс настройки закроется, точка доступа выключится.</p>
+      <div class="codebox">
+        <p>Код устройства</p>
+        <p class="code" id="device-code"></p>
+        <p class="muted">После «Применить» устройство отправит заявку на бастион. Одобрите её,
+          только если код в заявке совпадает с этим.</p>
+      </div>
+      <p class="muted">Интерфейс настройки закроется, точка доступа выключится.</p>
       <div class="nav">
         <button type="button" class="secondary" data-back>Назад</button>
         <button type="button" id="apply-bastion">Применить</button>

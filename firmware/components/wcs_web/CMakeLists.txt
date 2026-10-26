@@ -20,7 +20,7 @@ idf_component_register(SRCS "wcs_web.c" "web_setup.c" "web_direct.c" "${gen_src}
                        INCLUDE_DIRS "include"
                        PRIV_INCLUDE_DIRS "."
                        REQUIRES wcs_storage
-                       PRIV_REQUIRES esp_http_server esp_https_server wcs_tls wcs_auth wcs_wifi wcs_bastion esp_app_format esp_hw_support esp_timer)
+                       PRIV_REQUIRES esp_http_server esp_https_server wcs_tls wcs_auth wcs_wifi wcs_bastion wcs_link esp_app_format esp_hw_support esp_timer)
 
 idf_build_get_property(python PYTHON)
 add_custom_command(OUTPUT "${gen_src}"

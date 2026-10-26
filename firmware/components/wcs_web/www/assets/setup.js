@@ -248,8 +248,10 @@
   function updateBastion() {
     var fresh = check && check.addr === bastionAddr();
     $('bastion-check').disabled = !bastionAddr();
-    $('bastion-next').disabled = !fresh;
-    $('bastion-next').textContent = fresh && !check.ok ? 'Продолжить без проверки' : 'Далее';
+    // Дальше — только после успешной проверки: устройство запомнит корневой сертификат бастиона
+    $('bastion-next').disabled = !(fresh && check.ok);
+    $('bastion-code-box').hidden = !(fresh && check.ok);
+    if (fresh && check.ok) $('bastion-code').textContent = check.code;
   }
 
   // Адрес поменялся — прошлая проверка к нему не относится
@@ -264,7 +266,8 @@
   }
 
   var checkText = {
-    ok: function (r) { return 'Бастион доступен: ' + hostPort(r) + ', ' + r.time_ms + ' мс'; },
+    ok: function (r) { return 'Бастион найден: ' + hostPort(r) + ', ' + r.time_ms + ' мс'; },
+    not_bastion: function (r) { return 'На ' + hostPort(r) + ' отвечает не бастион ESP WCS (нет TLS 1.3 с корневым сертификатом)'; },
     not_resolved: function () { return 'Имя не найдено: проверьте адрес или укажите IP'; },
     refused: function (r) { return 'Хост ' + r.ip + ' отвечает, но порт ' + r.port + ' закрыт: бастион не запущен или слушает другой порт'; },
     timeout: function (r) { return 'Нет ответа от ' + hostPort(r) + ': хост выключен или порт закрыт файрволом'; },
@@ -292,7 +295,7 @@
         return;
       }
       var r = res.body;
-      check = { addr: addr, ok: r.result === 'ok', text: (checkText[r.result] || checkText.unreachable)(r) };
+      check = { addr: addr, ok: r.result === 'ok', code: r.code, text: (checkText[r.result] || checkText.unreachable)(r) };
       setStatus($('bastion-status'), check.text, check.ok ? 'success' : 'error');
     }).catch(function () {
       setStatus($('bastion-status'), 'Нет связи с устройством, попробуйте ещё раз', 'error');
@@ -307,14 +310,16 @@
     $('confirm-ssid').textContent = connected.ssid;
     $('confirm-ip').textContent = connected.ip;
     $('confirm-bastion').textContent = check.addr;
-    $('confirm-check').textContent = check.ok ? 'бастион доступен' : 'не пройдена — ' + check.text;
+    $('confirm-bastion-code').textContent = check.code;
+    $('device-code').textContent = info ? info.device.code : '…';
   }
 
   $('apply-bastion').addEventListener('click', function () {
     var addr = check.addr;
     apply({ mode: 'bastion', ssid: connected.ssid, password: connected.password, bastion: addr }, function () {
-      return 'Интерфейс настройки закрыт. Устройство подключено к «' + connected.ssid +
-        '» и будет подключаться к бастиону ' + addr + '.';
+      return 'Интерфейс настройки закрыт. Устройство подключится к бастиону ' + addr +
+        ' через сеть «' + connected.ssid + '» и отправит заявку — одобрите её на бастионе, сверив код устройства ' +
+        info.device.code + '.';
     });
   });
 
@@ -322,7 +327,8 @@
 
   var applyErrors = {
     invalid_bastion: 'Проверьте адрес бастиона: IP, домен или имя .local, можно с портом',
-    wifi_not_connected: 'Устройство не подключено к выбранной сети, подключитесь заново'
+    wifi_not_connected: 'Устройство не подключено к выбранной сети, подключитесь заново',
+    bastion_not_checked: 'Проверьте бастион ещё раз: адрес изменился после проверки'
   };
 
   function apply(fields, doneText) {

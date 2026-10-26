@@ -14,6 +14,7 @@
 #include "esp_log.h"
 #include "esp_netif_ip_addr.h"
 #include "wcs_bastion.h"
+#include "wcs_link.h"
 #include "wcs_wifi.h"
 #include "web_priv.h"
 
@@ -26,6 +27,16 @@
 #define FORM_ADDR_MAX    (WCS_BASTION_ADDR_MAX_LEN * 3 + 1)
 
 static const char *TAG = "wcs_web_setup";
+
+/*
+ * Последний успешно проверенный бастион: его корневой сертификат закрепляется
+ * при «Применить» — только если пользователь видел именно этот код (тот же адрес)
+ */
+static struct {
+    char addr[WCS_BASTION_ADDR_MAX_LEN + 1];
+    char code[WCS_BASTION_CODE_LEN + 1];
+    char ca_pem[WCS_BASTION_CA_PEM_MAX];
+} s_checked;
 
 static const char *mode_name(wcs_mode_t mode)
 {
@@ -69,12 +80,19 @@ static esp_err_t info_get(httpd_req_t *req)
     web_json_escape(saved.bastion_addr, bastion, sizeof(bastion));
     memset(&saved.sta_password, 0, sizeof(saved.sta_password)); /* пароль в браузер не отдаём */
 
+    /* Код устройства — для сверки с заявкой на бастионе (шаг «Итог») */
+    char device_code[WCS_LINK_CODE_LEN + 1] = "";
+    char device_id[WCS_LINK_DEVICE_ID_LEN + 1] = "";
+    wcs_link_device_code(device_code);
+    wcs_link_device_id(device_id);
+
     char json[2048];
     snprintf(json, sizeof(json),
              "{\"direct\":{\"ssid\":\"%s\",\"password\":\"%s\",\"url\":\"%s\"},"
              "\"saved\":{\"mode\":\"%s\",\"sta_ssid\":\"%s\",\"bastion\":\"%s\"},"
-             "\"bastion_default_port\":%d}",
-             ssid, password, url, mode_name(saved.mode), sta_ssid, bastion, CONFIG_WCS_BASTION_DEFAULT_PORT);
+             "\"bastion_default_port\":%d,\"device\":{\"id\":\"%s\",\"code\":\"%s\"}}",
+             ssid, password, url, mode_name(saved.mode), sta_ssid, bastion, CONFIG_WCS_BASTION_DEFAULT_PORT,
+             device_id, device_code);
     return web_send_json(req, NULL, json);
 }
 
@@ -176,9 +194,20 @@ static esp_err_t bastion_check_post(httpd_req_t *req)
         return web_send_json(req, "409 Conflict", "{\"error\":\"wifi_not_connected\"}");
     }
 
-    wcs_bastion_probe_t probe;
-    if (wcs_bastion_probe(addr, CONFIG_WCS_BASTION_PROBE_TIMEOUT_MS, &probe) != ESP_OK) {
+    /* ~1,7 КБ — не на стек задачи сервера */
+    wcs_bastion_probe_t *probe = malloc(sizeof(*probe));
+    if (!probe) {
+        return web_send_json(req, "500 Internal Server Error", "{\"error\":\"no_memory\"}");
+    }
+    if (wcs_bastion_probe(addr, CONFIG_WCS_BASTION_PROBE_TIMEOUT_MS, probe) != ESP_OK) {
+        free(probe);
         return web_send_json(req, "400 Bad Request", "{\"error\":\"invalid_bastion\"}");
+    }
+
+    if (probe->result == WCS_BASTION_PROBE_OK) {
+        strlcpy(s_checked.addr, addr, sizeof(s_checked.addr));
+        strlcpy(s_checked.code, probe->code, sizeof(s_checked.code));
+        strlcpy(s_checked.ca_pem, probe->ca_pem, sizeof(s_checked.ca_pem));
     }
 
     static const char *const results[] = {
@@ -187,11 +216,14 @@ static esp_err_t bastion_check_post(httpd_req_t *req)
         [WCS_BASTION_PROBE_REFUSED] = "refused",
         [WCS_BASTION_PROBE_TIMEOUT] = "timeout",
         [WCS_BASTION_PROBE_UNREACHABLE] = "unreachable",
+        [WCS_BASTION_PROBE_NOT_BASTION] = "not_bastion",
     };
-    char json[128];
+    char json[160];
     snprintf(json, sizeof(json),
-             "{\"result\":\"%s\",\"ip\":\"" IPSTR "\",\"port\":%u,\"time_ms\":%" PRIu32 "}",
-             results[probe.result], IP2STR(&probe.ip), probe.port, probe.time_ms);
+             "{\"result\":\"%s\",\"ip\":\"" IPSTR "\",\"port\":%u,\"time_ms\":%" PRIu32 ",\"code\":\"%s\"}",
+             results[probe->result], IP2STR(&probe->ip), probe->port, probe->time_ms,
+             probe->result == WCS_BASTION_PROBE_OK ? probe->code : "");
+    free(probe);
     return web_send_json(req, NULL, json);
 }
 
@@ -231,6 +263,17 @@ static esp_err_t apply_post(httpd_req_t *req)
             memset(password, 0, sizeof(password));
             return web_send_json(req, "409 Conflict", "{\"error\":\"wifi_not_connected\"}");
         }
+
+        /* Бастион должен быть проверен по этому же адресу: пользователь сверил его код */
+        if (strcmp(s_checked.addr, addr) != 0 || s_checked.code[0] == '\0') {
+            memset(password, 0, sizeof(password));
+            return web_send_json(req, "409 Conflict", "{\"error\":\"bastion_not_checked\"}");
+        }
+        if (wcs_storage_save_bastion_ca(s_checked.ca_pem) != ESP_OK) {
+            memset(password, 0, sizeof(password));
+            return web_send_json(req, "500 Internal Server Error", "{\"error\":\"apply_failed\"}");
+        }
+        ESP_LOGI(TAG, "bastion %s pinned, code %s", addr, s_checked.code);
 
         settings.mode = WCS_MODE_BASTION;
         strlcpy(settings.sta_ssid, ssid, sizeof(settings.sta_ssid));

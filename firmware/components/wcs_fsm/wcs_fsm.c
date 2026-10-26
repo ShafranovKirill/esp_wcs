@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "esp_app_desc.h"
 #include "esp_check.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -19,6 +20,7 @@
 #include "wcs_button.h"
 #include "wcs_defaults.h"
 #include "wcs_led.h"
+#include "wcs_link.h"
 #include "wcs_storage.h"
 #include "wcs_tls.h"
 #include "wcs_web.h"
@@ -45,6 +47,7 @@ typedef enum {
     CMD_AP_CLIENT_LEFT,
     CMD_AP_IDLE_TIMEOUT,
     CMD_APPLY,
+    CMD_LINK_STATE,
 } app_cmd_t;
 
 /* Что показывает светодиод (docs/led.md) */
@@ -56,6 +59,9 @@ typedef enum {
     INDICATION_DIRECT_WAITING,
     INDICATION_DIRECT_CONNECTED,
     INDICATION_BASTION_CONNECTING,
+    INDICATION_BASTION_PENDING,
+    INDICATION_BASTION_ONLINE,
+    INDICATION_BASTION_OFFLINE,
     INDICATION_ERROR,
 } indication_t;
 
@@ -67,6 +73,9 @@ static const wcs_led_indication_t s_indications[] = {
     [INDICATION_DIRECT_WAITING] = { WCS_LED_GREEN, WCS_LED_BREATHE },
     [INDICATION_DIRECT_CONNECTED] = { WCS_LED_GREEN, WCS_LED_SOLID },
     [INDICATION_BASTION_CONNECTING] = { WCS_LED_PURPLE, WCS_LED_BREATHE },
+    [INDICATION_BASTION_PENDING] = { WCS_LED_YELLOW, WCS_LED_BREATHE },
+    [INDICATION_BASTION_ONLINE] = { WCS_LED_PURPLE, WCS_LED_SOLID },
+    [INDICATION_BASTION_OFFLINE] = { WCS_LED_RED, WCS_LED_BREATHE },
     [INDICATION_ERROR] = { WCS_LED_RED, WCS_LED_BLINK_FAST },
 };
 
@@ -83,6 +92,8 @@ static int s_ap_clients;
 static bool s_error;
 static char s_setup_ssid[33];
 static char s_direct_ssid[33];
+/* Имя устройства: в сертификате HTTPS и в заявке на бастион (esp-wcs-8581) */
+static char s_device_name[33];
 
 /* ---- индикация ---- */
 
@@ -103,8 +114,20 @@ static void update_led(void)
                                             : INDICATION_DIRECT_WAITING;
             break;
         case WCS_FSM_STATE_BASTION:
-            /* Связь с бастионом — этап 2; пока всегда «подключение» */
-            ind = INDICATION_BASTION_CONNECTING;
+            switch (wcs_link_get_state()) {
+            case WCS_LINK_STATE_PENDING:
+                ind = INDICATION_BASTION_PENDING;
+                break;
+            case WCS_LINK_STATE_ONLINE:
+                ind = INDICATION_BASTION_ONLINE;
+                break;
+            case WCS_LINK_STATE_OFFLINE:
+                ind = INDICATION_BASTION_OFFLINE;
+                break;
+            default:
+                ind = INDICATION_BASTION_CONNECTING;
+                break;
+            }
             break;
         case WCS_FSM_STATE_FACTORY:
         default:
@@ -158,6 +181,11 @@ static void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
     } else if (id == WIFI_EVENT_AP_STADISCONNECTED) {
         send_cmd(CMD_AP_CLIENT_LEFT);
     }
+}
+
+static void on_link(void *arg, esp_event_base_t base, int32_t id, void *data)
+{
+    send_cmd(CMD_LINK_STATE);
 }
 
 static void on_ap_idle_timer(void *arg)
@@ -225,6 +253,7 @@ static bool start_access_point(const char *ssid, const char *password, const wcs
 static void enter_setup(void)
 {
     ESP_LOGI(TAG, "-> setup");
+    wcs_link_stop();
     stop_access_point();
     wcs_wifi_sta_disconnect();
     s_error = false;
@@ -249,6 +278,7 @@ static void start_direct_access_point(void)
 static void enter_direct(bool raise_ap)
 {
     ESP_LOGI(TAG, "-> direct");
+    wcs_link_stop();
     stop_access_point();
     wcs_wifi_sta_disconnect();
     s_error = false;
@@ -265,6 +295,18 @@ static void enter_bastion(const wcs_settings_t *settings)
     s_error = false;
     s_state = WCS_FSM_STATE_BASTION;
     if (wcs_wifi_sta_connect(settings->sta_ssid, settings->sta_password, true) != ESP_OK) {
+        s_error = true;
+        return;
+    }
+
+    /* Сеанс с бастионом сам дождётся Wi-Fi: пока сети нет, подключение просто повторяется */
+    wcs_link_stop();
+    const wcs_link_config_t link = {
+        .bastion_addr = settings->bastion_addr,
+        .name = s_device_name,
+        .firmware = esp_app_get_description()->version,
+    };
+    if (wcs_link_start(&link) != ESP_OK) {
         s_error = true;
     }
 }
@@ -312,6 +354,7 @@ static void enter_saved_mode(bool raise_direct_ap)
         break;
     default:
         ESP_LOGI(TAG, "-> factory");
+        wcs_link_stop();
         stop_access_point();
         wcs_wifi_sta_disconnect();
         s_state = WCS_FSM_STATE_FACTORY;
@@ -322,6 +365,7 @@ static void enter_saved_mode(bool raise_direct_ap)
 static void factory_reset(void)
 {
     ESP_LOGW(TAG, "factory reset");
+    wcs_link_stop();
     stop_access_point();
     wcs_wifi_sta_disconnect();
     if (wcs_storage_erase() != ESP_OK) {
@@ -373,6 +417,9 @@ static void handle(app_cmd_t cmd)
             stop_access_point();
         }
         break;
+    case CMD_LINK_STATE:
+        /* Только индикация: update_led() ниже */
+        break;
     case CMD_APPLY:
         if (s_state == WCS_FSM_STATE_SETUP) {
             vTaskDelay(pdMS_TO_TICKS(APPLY_DELAY_MS));
@@ -398,12 +445,7 @@ static void fsm_task(void *arg)
 /* Сертификат HTTPS: при первом запуске создаётся, дальше берётся из NVS */
 static void init_tls(void)
 {
-    char device_name[33];
-    make_ssid(DEVICE_NAME_PREFIX, device_name);
-    for (char *p = device_name; *p; p++) {
-        *p = (char)tolower((unsigned char)*p);
-    }
-    wcs_tls_identity_t tls = { .common_name = device_name };
+    wcs_tls_identity_t tls = { .common_name = s_device_name };
     esp_netif_str_to_ip4(WEB_HOST, &tls.ip);
     if (wcs_tls_init(&tls) != ESP_OK) {
         ESP_LOGE(TAG, "TLS init failed, web interface unavailable");
@@ -418,7 +460,16 @@ esp_err_t wcs_fsm_start(const wcs_fsm_config_t *config)
 
     make_ssid(wcs_defaults.setup_ap_ssid_prefix, s_setup_ssid);
     make_ssid(wcs_defaults.direct_ap_ssid_prefix, s_direct_ssid);
+    make_ssid(DEVICE_NAME_PREFIX, s_device_name);
+    for (char *p = s_device_name; *p; p++) {
+        *p = (char)tolower((unsigned char)*p);
+    }
     init_tls();
+    /* Ключ устройства для бастиона: при первом запуске создаётся, дальше из NVS */
+    if (wcs_link_identity_init() != ESP_OK) {
+        ESP_LOGE(TAG, "device identity init failed, Bastion mode unavailable");
+        s_error = true;
+    }
 
     s_cmd_queue = xQueueCreate(CMD_QUEUE_LEN, sizeof(app_cmd_t));
     ESP_RETURN_ON_FALSE(s_cmd_queue, ESP_ERR_NO_MEM, TAG, "queue create failed");
@@ -426,6 +477,8 @@ esp_err_t wcs_fsm_start(const wcs_fsm_config_t *config)
                         TAG, "button handler");
     ESP_RETURN_ON_ERROR(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi, NULL),
                         TAG, "wifi handler");
+    ESP_RETURN_ON_ERROR(esp_event_handler_register(WCS_LINK_EVENT, WCS_LINK_EVENT_STATE, on_link, NULL),
+                        TAG, "link handler");
     const esp_timer_create_args_t idle_timer = { .callback = on_ap_idle_timer, .name = "ap_idle" };
     ESP_RETURN_ON_ERROR(esp_timer_create(&idle_timer, &s_ap_idle_timer), TAG, "timer create failed");
 
