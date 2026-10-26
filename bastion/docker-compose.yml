@@ -1,0 +1,23 @@
+# PostgreSQL для бастиона. Порт 5434 на localhost, чтобы не мешать другим PostgreSQL.
+#   docker compose up -d db
+# Бастион на сервере Linux — см. docs/bastion.md, «Запуск».
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${BASTION_DB_USER:-bastion}
+      POSTGRES_PASSWORD: ${BASTION_DB_PASSWORD:-bastion}
+      POSTGRES_DB: bastion_dev
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db_data:
