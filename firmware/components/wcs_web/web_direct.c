@@ -1,11 +1,9 @@
 /* Режим Direct connection: после входа — консоль */
 #include "web_priv.h"
 
-EMBEDDED(console_html);
-
 static esp_err_t console_get(httpd_req_t *req)
 {
-    return web_send_embedded(req, WEB_HTML, console_html_start, console_html_end);
+    return web_send_file(req, "pages/console.html");
 }
 
 static const web_route_t s_routes[] = {

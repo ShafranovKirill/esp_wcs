@@ -8,16 +8,11 @@
 #include "esp_http_server.h"
 #include "wcs_web.h"
 
-#define EMBEDDED(name)                                                   \
-    extern const uint8_t name##_start[] asm("_binary_" #name "_start"); \
-    extern const uint8_t name##_end[] asm("_binary_" #name "_end")
-
-#define WEB_HTML "text/html; charset=utf-8"
-
 extern wcs_web_config_t web_config;
 
 void web_set_security_headers(httpd_req_t *req);
-esp_err_t web_send_embedded(httpd_req_t *req, const char *type, const uint8_t *start, const uint8_t *end);
+/* Встроенный файл из www/ (путь относительно www/, например "pages/setup.html"); нет — 404 */
+esp_err_t web_send_file(httpd_req_t *req, const char *path);
 esp_err_t web_redirect(httpd_req_t *req, const char *location);
 bool web_is_authorized(httpd_req_t *req);
 

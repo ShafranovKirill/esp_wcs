@@ -12,6 +12,7 @@
 #include "esp_timer.h"
 #include "wcs_auth.h"
 #include "wcs_tls.h"
+#include "web_files.h"
 #include "web_priv.h"
 
 #define SESSION_COOKIE    "wcs_session"
@@ -38,26 +39,6 @@ static httpd_handle_t s_server;
 static httpd_handle_t s_redirect_server;
 static char s_host[HOST_MAX];
 
-/* ---- встроенные файлы ---- */
-
-EMBEDDED(login_html);
-EMBEDDED(login_js);
-EMBEDDED(setup_js);
-EMBEDDED(style_css);
-
-typedef struct {
-    const char *uri;
-    const char *type;
-    const uint8_t *start;
-    const uint8_t *end;
-} asset_t;
-
-static const asset_t s_assets[] = {
-    { "/assets/login.js", "text/javascript", login_js_start, login_js_end },
-    { "/assets/setup.js", "text/javascript", setup_js_start, setup_js_end },
-    { "/assets/style.css", "text/css", style_css_start, style_css_end },
-};
-
 /* ---- общие помощники ---- */
 
 void web_set_security_headers(httpd_req_t *req)
@@ -69,11 +50,20 @@ void web_set_security_headers(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'");
 }
 
-esp_err_t web_send_embedded(httpd_req_t *req, const char *type, const uint8_t *start, const uint8_t *end)
+esp_err_t web_send_file(httpd_req_t *req, const char *path)
 {
-    web_set_security_headers(req);
-    httpd_resp_set_type(req, type);
-    return httpd_resp_send(req, (const char *)start, end - start);
+    for (size_t i = 0; i < web_files_count; i++) {
+        const web_file_t *f = &web_files[i];
+        if (strcmp(f->path, path) == 0) {
+            web_set_security_headers(req);
+            httpd_resp_set_type(req, f->type);
+            if (f->gzip) {
+                httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+            }
+            return httpd_resp_send(req, (const char *)f->data, f->len);
+        }
+    }
+    return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
 }
 
 esp_err_t web_redirect(httpd_req_t *req, const char *location)
@@ -211,7 +201,7 @@ static esp_err_t login_get(httpd_req_t *req)
     if (web_is_authorized(req)) {
         return web_redirect(req, home_path());
     }
-    return web_send_embedded(req, WEB_HTML, login_html_start, login_html_end);
+    return web_send_file(req, "pages/login.html");
 }
 
 static esp_err_t login_post(httpd_req_t *req)
@@ -274,15 +264,13 @@ static esp_err_t api_status_get(httpd_req_t *req)
     return web_send_json(req, NULL, json);
 }
 
+/* /assets/<путь> → www/assets/<путь>; страницы из www/pages/ так не достать */
 static esp_err_t asset_get(httpd_req_t *req)
 {
-    for (size_t i = 0; i < sizeof(s_assets) / sizeof(s_assets[0]); i++) {
-        const asset_t *a = &s_assets[i];
-        if (strcmp(req->uri, a->uri) == 0) {
-            return web_send_embedded(req, a->type, a->start, a->end);
-        }
-    }
-    return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
+    char path[CONFIG_HTTPD_MAX_URI_LEN + 1];
+    strlcpy(path, req->uri + 1, sizeof(path)); /* без ведущего "/" */
+    path[strcspn(path, "?#")] = '\0';
+    return web_send_file(req, path);
 }
 
 static const web_route_t s_routes[] = {

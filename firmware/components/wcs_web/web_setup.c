@@ -27,8 +27,6 @@
 
 static const char *TAG = "wcs_web_setup";
 
-EMBEDDED(setup_html);
-
 static const char *mode_name(wcs_mode_t mode)
 {
     switch (mode) {
@@ -49,7 +47,7 @@ static bool bastion_addr_valid(const char *addr)
 
 static esp_err_t setup_get(httpd_req_t *req)
 {
-    return web_send_embedded(req, WEB_HTML, setup_html_start, setup_html_end);
+    return web_send_file(req, "pages/setup.html");
 }
 
 static esp_err_t info_get(httpd_req_t *req)
