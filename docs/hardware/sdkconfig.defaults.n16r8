@@ -1,0 +1,24 @@
+# Настройки для ESP32-S3-WROOM-1-N16R8 (16 МБ Flash, 8 МБ Octal PSRAM)
+# Проверено на ESP-IDF v6.1
+#
+# Использование в новом проекте:
+#   cp ~/esp/sdkconfig.defaults.n16r8 ./sdkconfig.defaults
+#   idf.py set-target esp32s3
+#
+# Важно: в main/CMakeLists.txt добавить esp_psram в PRIV_REQUIRES,
+# иначе настройки PSRAM будут проигнорированы (особенность ESP-IDF 6.x).
+
+# Плата
+CONFIG_IDF_TARGET="esp32s3"
+
+# Flash 16 МБ, режим QIO
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+# PSRAM 8 МБ, Octal, 80 МГц
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+# Процессор 240 МГц
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y

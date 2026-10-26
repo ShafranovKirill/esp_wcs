@@ -1,0 +1,11 @@
+# Таблица разделов ESP WCS, flash 16 МБ.
+# Сразу закладываем два слота OTA (этап 3) и NVS с запасом под ключи, сертификаты и настройки.
+# nvs_keys нужен для шифрования NVS при включении Flash Encryption (этап 3).
+# Свободно после 0x822000 (~7.8 МБ) — резерв под буфер истории, логи и т.п.
+# Name,   Type, SubType,  Offset,   Size
+nvs,      data, nvs,      0x9000,   0x10000
+otadata,  data, ota,      0x19000,  0x2000
+phy_init, data, phy,      0x1B000,  0x1000
+ota_0,    app,  ota_0,    0x20000,  0x400000
+ota_1,    app,  ota_1,    0x420000, 0x400000
+nvs_keys, data, nvs_keys, 0x820000, 0x1000

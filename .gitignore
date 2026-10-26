@@ -1,0 +1,27 @@
+# ESP-IDF
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+
+# Elixir / Phoenix (бастион)
+_build/
+deps/
+*.ez
+erl_crash.dump
+/bastion/priv/static/assets/
+
+# Секреты и ключи — никогда не коммитить
+*.pem
+*.key
+*.p12
+secrets/
+
+# Редакторы и инструменты
+.vscode/
+.idea/
+.cache/
+.clangd
+compile_commands.json
+*.swp
+.DS_Store
