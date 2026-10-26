@@ -17,6 +17,7 @@ typedef struct {
     const char *password; /* от 8 до 63 символов */
     uint8_t channel;
     uint8_t max_clients;
+    const char *captive_portal_uri; /* RFC 8910, DHCP-опция 114; NULL — не объявлять */
 } wcs_wifi_ap_config_t;
 
 esp_err_t wcs_wifi_ap_start(const wcs_wifi_ap_config_t *config);

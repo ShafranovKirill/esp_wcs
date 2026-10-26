@@ -13,6 +13,7 @@ static const char *TAG = "wcs_wifi";
 
 static esp_netif_t *s_ap_netif;
 static bool s_ap_running;
+static char s_captive_portal_uri[64]; /* DHCP-сервер хранит указатель, а не копию */
 
 static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
@@ -44,6 +45,23 @@ static esp_err_t wifi_init_once(void)
     return ESP_OK;
 }
 
+/* Телефоны и ноутбуки с поддержкой RFC 8910 открывают портал сразу по этой опции,
+ * не дожидаясь проверки доступа в интернет */
+static esp_err_t set_captive_portal_uri(const char *uri)
+{
+    if (!uri) {
+        return ESP_OK;
+    }
+    ESP_RETURN_ON_FALSE(strlen(uri) < sizeof(s_captive_portal_uri), ESP_ERR_INVALID_ARG, TAG, "captive portal URI too long");
+    strcpy(s_captive_portal_uri, uri);
+
+    esp_netif_dhcps_stop(s_ap_netif);
+    ESP_RETURN_ON_ERROR(esp_netif_dhcps_option(s_ap_netif, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI,
+                                               s_captive_portal_uri, strlen(s_captive_portal_uri)),
+                        TAG, "set captive portal URI failed");
+    return esp_netif_dhcps_start(s_ap_netif);
+}
+
 esp_err_t wcs_wifi_ap_start(const wcs_wifi_ap_config_t *config)
 {
     ESP_RETURN_ON_FALSE(config && config->ssid && config->password, ESP_ERR_INVALID_ARG, TAG, "invalid config");
@@ -54,6 +72,7 @@ esp_err_t wcs_wifi_ap_start(const wcs_wifi_ap_config_t *config)
     ESP_RETURN_ON_FALSE(!s_ap_running, ESP_ERR_INVALID_STATE, TAG, "AP already running");
 
     ESP_RETURN_ON_ERROR(wifi_init_once(), TAG, "wifi init failed");
+    ESP_RETURN_ON_ERROR(set_captive_portal_uri(config->captive_portal_uri), TAG, "DHCP setup failed");
 
     wifi_config_t wifi_config = {
         .ap = {
