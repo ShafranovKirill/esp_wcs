@@ -35,3 +35,5 @@ CONFIG_MBEDTLS_X509_CRT_WRITE_C=y
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 # Сокеты: HTTPS-сервер (5 соединений + 3 служебных) + перенаправление с HTTP (2 + 3) + запас
 CONFIG_LWIP_MAX_SOCKETS=16
+# WCS Link с бастионом — только TLS 1.3 (docs/protocol.md); TLS 1.2 остаётся для браузеров
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y

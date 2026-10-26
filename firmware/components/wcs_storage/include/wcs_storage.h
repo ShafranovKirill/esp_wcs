@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <stddef.h>
+
 #include "esp_err.h"
 
 #define WCS_SSID_MAX_LEN          32
@@ -28,6 +30,14 @@ typedef struct {
 /* Отсутствующие значения заполняются заводскими (режим не выбран, строки пустые) */
 esp_err_t wcs_storage_load(wcs_settings_t *settings);
 esp_err_t wcs_storage_save(const wcs_settings_t *settings);
+
+/*
+ * Корневой сертификат бастиона (PEM), закреплённый в мастере настройки после
+ * сверки кода: дальше устройство подключается только к бастиону с этим CA.
+ * Сбрасывается вместе с настройками. ESP_ERR_NOT_FOUND — не закреплён.
+ */
+esp_err_t wcs_storage_save_bastion_ca(const char *pem);
+esp_err_t wcs_storage_load_bastion_ca(char *pem, size_t size);
 
 /* Сброс до заводских: стирает все настройки */
 esp_err_t wcs_storage_erase(void);
