@@ -1,0 +1,32 @@
+menu "ESP WCS: авторизация"
+
+    config WCS_AUTH_MAX_SESSIONS
+        int "Максимум одновременных сессий входа"
+        range 1 16
+        default 4
+        help
+            При превышении вытесняется самая давно неактивная сессия.
+
+    config WCS_AUTH_SESSION_IDLE_TIMEOUT_MIN
+        int "Сессия истекает после бездействия, минут"
+        range 1 1440
+        default 30
+
+    config WCS_AUTH_FREE_ATTEMPTS
+        int "Неверных попыток входа без паузы"
+        range 1 20
+        default 5
+
+    config WCS_AUTH_LOCKOUT_BASE_S
+        int "Первая пауза после превышения попыток, секунд"
+        range 1 600
+        default 5
+        help
+            Каждая следующая неверная попытка удваивает паузу.
+
+    config WCS_AUTH_LOCKOUT_MAX_S
+        int "Максимальная пауза, секунд"
+        range 1 86400
+        default 900
+
+endmenu
