@@ -21,6 +21,8 @@ typedef struct {
 typedef struct {
     const char *setup_ap_ssid_prefix; /* к нему добавляются 4 hex-цифры MAC */
     const char *setup_ap_password;
+    const char *direct_ap_ssid_prefix; /* к нему добавляются 4 hex-цифры MAC */
+    const char *direct_ap_password;
     const char *admin_username;
     wcs_password_hash_t admin_password;
 } wcs_defaults_t;

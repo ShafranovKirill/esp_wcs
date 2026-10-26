@@ -13,6 +13,8 @@ HASH_LEN = 32
 REQUIRED = (
     'WCS_SETUP_AP_SSID_PREFIX',
     'WCS_SETUP_AP_PASSWORD',
+    'WCS_DIRECT_AP_SSID_PREFIX',
+    'WCS_DIRECT_AP_PASSWORD',
     'WCS_ADMIN_USERNAME',
     'WCS_ADMIN_PASSWORD',
     'WCS_PBKDF2_ITERATIONS',
@@ -37,10 +39,21 @@ def parse_env(path):
             if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
                 value = value[1:-1]
             values[key.strip()] = value
-    missing = [k for k in REQUIRED if k not in values]
-    if missing:
-        fail(f'{path}: не заданы {", ".join(missing)} (см. .env.example)')
     return values
+
+
+def check_ssid_prefix(env, name):
+    prefix = env[name]
+    if not 1 <= len(prefix) <= 28:
+        fail(f'{name}: от 1 до 28 символов (SSID до 32, плюс 4 цифры MAC)')
+    return prefix
+
+
+def check_ap_password(env, name):
+    password = env[name]
+    if not 8 <= len(password) <= 63:
+        fail(f'{name}: от 8 до 63 символов (требование WPA2)')
+    return password
 
 
 def c_string(value, name):
@@ -54,16 +67,19 @@ def c_bytes(data):
 
 
 def main():
-    if len(sys.argv) != 3:
-        fail('использование: gen_defaults.py <.env> <выходной .c>')
-    env = parse_env(sys.argv[1])
+    if len(sys.argv) != 4:
+        fail('использование: gen_defaults.py <.env> <.env.example> <выходной .c>')
+    # Новые переменные, которых ещё нет в .env пользователя, берутся из шаблона
+    env = parse_env(sys.argv[2])
+    env.update(parse_env(sys.argv[1]))
+    missing = [k for k in REQUIRED if k not in env]
+    if missing:
+        fail(f'не заданы {", ".join(missing)}')
 
-    prefix = env['WCS_SETUP_AP_SSID_PREFIX']
-    if not 1 <= len(prefix) <= 28:
-        fail('WCS_SETUP_AP_SSID_PREFIX: от 1 до 28 символов (SSID до 32, плюс 4 цифры MAC)')
-    ap_password = env['WCS_SETUP_AP_PASSWORD']
-    if not 8 <= len(ap_password) <= 63:
-        fail('WCS_SETUP_AP_PASSWORD: от 8 до 63 символов (требование WPA2)')
+    setup_prefix = check_ssid_prefix(env, 'WCS_SETUP_AP_SSID_PREFIX')
+    setup_password = check_ap_password(env, 'WCS_SETUP_AP_PASSWORD')
+    direct_prefix = check_ssid_prefix(env, 'WCS_DIRECT_AP_SSID_PREFIX')
+    direct_password = check_ap_password(env, 'WCS_DIRECT_AP_PASSWORD')
     username = env['WCS_ADMIN_USERNAME']
     if not 1 <= len(username) <= 32:
         fail('WCS_ADMIN_USERNAME: от 1 до 32 символов')
@@ -84,8 +100,10 @@ def main():
 #include "wcs_defaults.h"
 
 const wcs_defaults_t wcs_defaults = {{
-    .setup_ap_ssid_prefix = {c_string(prefix, 'WCS_SETUP_AP_SSID_PREFIX')},
-    .setup_ap_password = {c_string(ap_password, 'WCS_SETUP_AP_PASSWORD')},
+    .setup_ap_ssid_prefix = {c_string(setup_prefix, 'WCS_SETUP_AP_SSID_PREFIX')},
+    .setup_ap_password = {c_string(setup_password, 'WCS_SETUP_AP_PASSWORD')},
+    .direct_ap_ssid_prefix = {c_string(direct_prefix, 'WCS_DIRECT_AP_SSID_PREFIX')},
+    .direct_ap_password = {c_string(direct_password, 'WCS_DIRECT_AP_PASSWORD')},
     .admin_username = {c_string(username, 'WCS_ADMIN_USERNAME')},
     .admin_password = {{
         .iterations = {iterations},
@@ -94,7 +112,7 @@ const wcs_defaults_t wcs_defaults = {{
     }},
 }};
 '''
-    with open(sys.argv[2], 'w', encoding='utf-8') as f:
+    with open(sys.argv[3], 'w', encoding='utf-8') as f:
         f.write(source)
 
 
