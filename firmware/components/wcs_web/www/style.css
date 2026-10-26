@@ -135,3 +135,6 @@ summary { cursor: pointer; color: var(--muted); }
 details dl { margin-top: 12px; }
 section > p { margin: 0 0 12px; }
 section > button { margin-top: 8px; }
+
+.nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 24px; }
+#progress { margin: 0; }

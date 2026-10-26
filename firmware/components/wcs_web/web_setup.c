@@ -3,15 +3,17 @@
  *
  * Direct — показать, куда подключаться дальше, и применить.
  * Bastion — найти Wi-Fi, проверить подключение (параллельно с точкой настройки),
- * задать адрес бастиона и применить.
+ * задать адрес бастиона, проверить его доступность и применить.
+ * Шаги мастера переключаются в браузере, сервер только отвечает на запросы API.
  */
-#include <ctype.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "esp_log.h"
 #include "esp_netif_ip_addr.h"
+#include "wcs_bastion.h"
 #include "wcs_wifi.h"
 #include "web_priv.h"
 
@@ -39,27 +41,10 @@ static const char *mode_name(wcs_mode_t mode)
     }
 }
 
-/* Хост или IPv4 с необязательным портом: буквы, цифры, точка, дефис, двоеточие */
 static bool bastion_addr_valid(const char *addr)
 {
-    size_t len = strlen(addr);
-    if (len == 0 || len > WCS_BASTION_ADDR_MAX_LEN) {
-        return false;
-    }
-    const char *colon = strchr(addr, ':');
-    for (const char *p = addr; *p; p++) {
-        if (!(isalnum((unsigned char)*p) || *p == '.' || *p == '-' || p == colon)) {
-            return false;
-        }
-    }
-    if (colon) {
-        char *end;
-        long port = strtol(colon + 1, &end, 10);
-        if (colon == addr || *end != '\0' || end == colon + 1 || port < 1 || port > 65535) {
-            return false;
-        }
-    }
-    return true;
+    wcs_bastion_addr_t parsed;
+    return wcs_bastion_parse_addr(addr, &parsed);
 }
 
 static esp_err_t setup_get(httpd_req_t *req)
@@ -96,8 +81,9 @@ static esp_err_t info_get(httpd_req_t *req)
     char json[2048];
     snprintf(json, sizeof(json),
              "{\"direct\":{\"ssid\":\"%s\",\"password\":\"%s\",\"url\":\"%s\"},"
-             "\"saved\":{\"mode\":\"%s\",\"sta_ssid\":\"%s\",\"bastion\":\"%s\"}}",
-             ssid, password, url, mode_name(saved.mode), sta_ssid, bastion);
+             "\"saved\":{\"mode\":\"%s\",\"sta_ssid\":\"%s\",\"bastion\":\"%s\"},"
+             "\"bastion_default_port\":%d}",
+             ssid, password, url, mode_name(saved.mode), sta_ssid, bastion, CONFIG_WCS_BASTION_DEFAULT_PORT);
     return web_send_json(req, NULL, json);
 }
 
@@ -196,6 +182,44 @@ static esp_err_t status_get(httpd_req_t *req)
     return web_send_json(req, NULL, json);
 }
 
+/* Доступен ли бастион из сети, к которой устройство подключилось */
+static esp_err_t bastion_check_post(httpd_req_t *req)
+{
+    if (!web_is_authorized(req)) {
+        return web_send_unauthorized(req);
+    }
+
+    char body[BODY_MAX];
+    char addr[FORM_ADDR_MAX];
+    if (web_read_body(req, body, sizeof(body)) != ESP_OK || !web_form_value(body, "bastion", addr, sizeof(addr))) {
+        return web_send_json(req, "400 Bad Request", "{\"error\":\"bad_request\"}");
+    }
+
+    wcs_wifi_sta_status_t st;
+    wcs_wifi_sta_get_status(&st);
+    if (st.state != WCS_WIFI_STA_CONNECTED) {
+        return web_send_json(req, "409 Conflict", "{\"error\":\"wifi_not_connected\"}");
+    }
+
+    wcs_bastion_probe_t probe;
+    if (wcs_bastion_probe(addr, CONFIG_WCS_BASTION_PROBE_TIMEOUT_MS, &probe) != ESP_OK) {
+        return web_send_json(req, "400 Bad Request", "{\"error\":\"invalid_bastion\"}");
+    }
+
+    static const char *const results[] = {
+        [WCS_BASTION_PROBE_OK] = "ok",
+        [WCS_BASTION_PROBE_NOT_RESOLVED] = "not_resolved",
+        [WCS_BASTION_PROBE_REFUSED] = "refused",
+        [WCS_BASTION_PROBE_TIMEOUT] = "timeout",
+        [WCS_BASTION_PROBE_UNREACHABLE] = "unreachable",
+    };
+    char json[128];
+    snprintf(json, sizeof(json),
+             "{\"result\":\"%s\",\"ip\":\"" IPSTR "\",\"port\":%u,\"time_ms\":%" PRIu32 "}",
+             results[probe.result], IP2STR(&probe.ip), probe.port, probe.time_ms);
+    return web_send_json(req, NULL, json);
+}
+
 static esp_err_t apply_post(httpd_req_t *req)
 {
     if (!web_is_authorized(req)) {
@@ -262,6 +286,7 @@ static const httpd_uri_t s_routes[] = {
     { .uri = "/api/wifi/scan", .method = HTTP_GET, .handler = scan_get },
     { .uri = "/api/wifi/connect", .method = HTTP_POST, .handler = connect_post },
     { .uri = "/api/wifi/status", .method = HTTP_GET, .handler = status_get },
+    { .uri = "/api/bastion/check", .method = HTTP_POST, .handler = bastion_check_post },
 };
 
 esp_err_t web_setup_register(httpd_handle_t server)

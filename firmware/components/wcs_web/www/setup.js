@@ -3,8 +3,12 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var info = null;
+  var mode = null;          // выбранный режим: 'direct' | 'bastion'
   var selected = null;      // выбранная сеть {ssid, secured}
-  var connectedSsid = null; // сеть, к которой устройство подключилось
+  var pending = null;       // подключение в процессе {ssid, password}
+  var connected = null;     // сеть, к которой устройство подключилось {ssid, password, ip}
+  var check = null;         // результат проверки бастиона {addr, ok, text}
+  var applied = false;
   var pollTimer = null;
 
   function api(path, options) {
@@ -30,6 +34,63 @@
     el.className = cls || '';
   }
 
+  // ---- шаги мастера ----
+
+  // Шаг, на который ведёт «Назад», и номер шага в своей ветке
+  var steps = {
+    mode:    { back: null,      n: 1 },
+    direct:  { back: 'mode',    n: 2, of: 2 },
+    wifi:    { back: 'mode',    n: 2, of: 4 },
+    bastion: { back: 'wifi',    n: 3, of: 4 },
+    confirm: { back: 'bastion', n: 4, of: 4 },
+    done:    { back: null }
+  };
+
+  // Куда можно попасть сейчас: без выполненных условий — откат на шаг раньше
+  function allowed(step) {
+    if (applied) return 'done';
+    switch (step) {
+      case 'direct': return 'direct';
+      case 'wifi': return 'wifi';
+      case 'bastion': return connected ? 'bastion' : 'wifi';
+      case 'confirm':
+        if (!connected) return 'wifi';
+        return check && check.addr === bastionAddr() ? 'confirm' : 'bastion';
+      default: return 'mode';
+    }
+  }
+
+  function go(step) {
+    location.hash = step;
+  }
+
+  function render() {
+    var want = location.hash.slice(1);
+    var step = allowed(want);
+    if (step !== want) {
+      history.replaceState(null, '', '#' + step);
+    }
+    document.querySelectorAll('.step').forEach(function (s) {
+      s.hidden = s.dataset.step !== step;
+    });
+    $('apply-error').hidden = true;
+
+    var st = steps[step];
+    $('progress').textContent = !st.n ? '' : st.of ? 'Шаг ' + st.n + ' из ' + st.of : 'Шаг 1';
+
+    if (step === 'wifi' && !$('networks').children.length) scan();
+    if (step === 'bastion') updateBastion();
+    if (step === 'confirm') fillConfirm();
+  }
+
+  window.addEventListener('hashchange', render);
+
+  document.querySelectorAll('[data-back]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      go(steps[location.hash.slice(1)].back);
+    });
+  });
+
   // ---- подсказки «?» ----
 
   document.querySelectorAll('.help').forEach(function (btn) {
@@ -39,18 +100,18 @@
     });
   });
 
-  // ---- выбор режима ----
+  // ---- шаг 1: режим ----
 
   document.querySelectorAll('input[name=mode]').forEach(function (radio) {
-    radio.addEventListener('change', function () { showMode(radio.value); });
+    radio.addEventListener('change', function () {
+      mode = radio.value;
+      $('mode-next').disabled = false;
+    });
   });
 
-  function showMode(mode) {
-    $('panel-direct').hidden = mode !== 'direct';
-    $('panel-bastion').hidden = mode !== 'bastion';
-    $('apply-error').hidden = true;
-    if (mode === 'bastion' && !$('networks').children.length) scan();
-  }
+  $('mode-next').addEventListener('click', function () {
+    go(mode === 'direct' ? 'direct' : 'wifi');
+  });
 
   // ---- Direct ----
 
@@ -61,7 +122,7 @@
     });
   });
 
-  // ---- Bastion: поиск сетей ----
+  // ---- Bastion, шаг 2: Wi-Fi ----
 
   function signal(rssi) {
     var bars = rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -75 ? 2 : 1;
@@ -83,6 +144,7 @@
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'network';
+        if (connected && connected.ssid === n.ssid) btn.classList.add('selected');
         var name = document.createElement('span');
         name.textContent = n.ssid;
         var meta = document.createElement('span');
@@ -110,11 +172,8 @@
     $('wifi-password-label').hidden = !n.secured;
     $('wifi-password').value = '';
     $('wifi-form').hidden = false;
-    setStatus($('wifi-status'), '');
     if (n.secured) $('wifi-password').focus();
   }
-
-  // ---- Bastion: подключение ----
 
   var failText = {
     wrong_password: 'Неверный пароль',
@@ -122,19 +181,27 @@
     other: 'Не удалось подключиться'
   };
 
+  function setConnected(c) {
+    connected = c;
+    check = null;
+    $('wifi-next').disabled = !connected;
+  }
+
   $('wifi-form').addEventListener('submit', function (e) {
     e.preventDefault();
     if (!selected) return;
-    connectedSsid = null;
-    updateApply();
-    setStatus($('wifi-status'), 'Подключение к «' + selected.ssid + '»…', 'muted');
+    pending = { ssid: selected.ssid, password: selected.secured ? $('wifi-password').value : '' };
+    setConnected(null);
+    $('wifi-connect').disabled = true;
+    setStatus($('wifi-status'), 'Подключение к «' + pending.ssid + '»…', 'muted');
 
-    post('/api/wifi/connect', { ssid: selected.ssid, password: $('wifi-password').value })
+    post('/api/wifi/connect', pending)
       .then(function (res) {
         if (!res.ok) throw new Error(res.body.error);
         pollStatus(Date.now() + 40000);
       })
       .catch(function () {
+        $('wifi-connect').disabled = false;
         setStatus($('wifi-status'), 'Не удалось начать подключение', 'error');
       });
   });
@@ -145,34 +212,108 @@
     pollTimer = setTimeout(function () {
       api('/api/wifi/status').then(function (res) {
         var s = res.body;
-        if (s.state === 'connected') {
-          connectedSsid = s.ssid;
+        if (s.state === 'connected' && s.ssid === pending.ssid) {
+          setConnected({ ssid: s.ssid, password: pending.password, ip: s.ip });
+          $('wifi-connect').disabled = false;
           setStatus($('wifi-status'), 'Подключено к «' + s.ssid + '», адрес ' + s.ip, 'success');
-          updateApply();
         } else if (s.state === 'failed') {
+          $('wifi-connect').disabled = false;
           var text = failText[s.fail] || failText.other;
           setStatus($('wifi-status'), text + (s.fail === 'other' ? ' (код ' + s.reason + ')' : ''), 'error');
         } else if (Date.now() < deadline) {
           pollStatus(deadline);
         } else {
+          $('wifi-connect').disabled = false;
           setStatus($('wifi-status'), 'Подключение не удалось за 40 секунд', 'error');
         }
       }).catch(function () {
-        if (Date.now() < deadline) pollStatus(deadline);
+        if (Date.now() < deadline) {
+          pollStatus(deadline);
+        } else {
+          $('wifi-connect').disabled = false;
+          setStatus($('wifi-status'), 'Нет связи с устройством', 'error');
+        }
       });
     }, 1000);
   }
 
-  function updateApply() {
-    $('apply-bastion').disabled = !(connectedSsid && $('bastion').value.trim());
+  $('wifi-next').addEventListener('click', function () { go('bastion'); });
+
+  // ---- Bastion, шаг 3: адрес и проверка ----
+
+  function bastionAddr() {
+    return $('bastion').value.trim();
   }
 
-  $('bastion').addEventListener('input', updateApply);
+  function updateBastion() {
+    var fresh = check && check.addr === bastionAddr();
+    $('bastion-check').disabled = !bastionAddr();
+    $('bastion-next').disabled = !fresh;
+    $('bastion-next').textContent = fresh && !check.ok ? 'Продолжить без проверки' : 'Далее';
+  }
+
+  // Адрес поменялся — прошлая проверка к нему не относится
+  $('bastion').addEventListener('input', function () {
+    check = null;
+    setStatus($('bastion-status'), '');
+    updateBastion();
+  });
+
+  function hostPort(r) {
+    return r.ip + ':' + r.port;
+  }
+
+  var checkText = {
+    ok: function (r) { return 'Бастион доступен: ' + hostPort(r) + ', ' + r.time_ms + ' мс'; },
+    not_resolved: function () { return 'Имя не найдено: проверьте адрес или укажите IP'; },
+    refused: function (r) { return 'Хост ' + r.ip + ' отвечает, но порт ' + r.port + ' закрыт: бастион не запущен или слушает другой порт'; },
+    timeout: function (r) { return 'Нет ответа от ' + hostPort(r) + ': хост выключен или порт закрыт файрволом'; },
+    unreachable: function (r) { return 'Нет маршрута до ' + r.ip + ' из сети «' + connected.ssid + '»'; }
+  };
+
+  var checkErrors = {
+    invalid_bastion: 'Проверьте адрес: IP, домен или имя .local, порт — через двоеточие',
+    wifi_not_connected: 'Устройство отключилось от Wi-Fi, вернитесь на шаг назад и подключитесь заново'
+  };
+
+  $('bastion-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var addr = bastionAddr();
+    if (!addr) return;
+    check = null;
+    updateBastion();
+    $('bastion-check').disabled = true;
+    setStatus($('bastion-status'), 'Проверка ' + addr + '…', 'muted');
+
+    post('/api/bastion/check', { bastion: addr }).then(function (res) {
+      if (bastionAddr() !== addr) return; // адрес успели поменять
+      if (!res.ok) {
+        setStatus($('bastion-status'), checkErrors[res.body.error] || 'Не удалось проверить', 'error');
+        return;
+      }
+      var r = res.body;
+      check = { addr: addr, ok: r.result === 'ok', text: (checkText[r.result] || checkText.unreachable)(r) };
+      setStatus($('bastion-status'), check.text, check.ok ? 'success' : 'error');
+    }).catch(function () {
+      setStatus($('bastion-status'), 'Нет связи с устройством, попробуйте ещё раз', 'error');
+    }).finally(updateBastion);
+  });
+
+  $('bastion-next').addEventListener('click', function () { go('confirm'); });
+
+  // ---- Bastion, шаг 4: подтверждение ----
+
+  function fillConfirm() {
+    $('confirm-ssid').textContent = connected.ssid;
+    $('confirm-ip').textContent = connected.ip;
+    $('confirm-bastion').textContent = check.addr;
+    $('confirm-check').textContent = check.ok ? 'бастион доступен' : 'не пройдена — ' + check.text;
+  }
 
   $('apply-bastion').addEventListener('click', function () {
-    var addr = $('bastion').value.trim();
-    apply({ mode: 'bastion', ssid: connectedSsid, password: $('wifi-password').value, bastion: addr }, function () {
-      return 'Интерфейс настройки закрыт. Устройство подключено к «' + connectedSsid +
+    var addr = check.addr;
+    apply({ mode: 'bastion', ssid: connected.ssid, password: connected.password, bastion: addr }, function () {
+      return 'Интерфейс настройки закрыт. Устройство подключено к «' + connected.ssid +
         '» и будет подключаться к бастиону ' + addr + '.';
     });
   });
@@ -180,7 +321,7 @@
   // ---- применение ----
 
   var applyErrors = {
-    invalid_bastion: 'Проверьте адрес бастиона: IP, домен или bastion.local, можно с портом',
+    invalid_bastion: 'Проверьте адрес бастиона: IP, домен или имя .local, можно с портом',
     wifi_not_connected: 'Устройство не подключено к выбранной сети, подключитесь заново'
   };
 
@@ -192,9 +333,9 @@
         $('apply-error').hidden = false;
         return;
       }
-      $('wizard').hidden = true;
+      applied = true;
       $('done-text').textContent = doneText();
-      $('done').hidden = false;
+      go('done');
     }).catch(function () {
       $('apply-error').textContent = 'Нет связи с устройством';
       $('apply-error').hidden = false;
@@ -203,16 +344,22 @@
 
   // ---- начальная загрузка ----
 
+  render();
+
   api('/api/setup/info').then(function (res) {
     info = res.body;
     ['ssid', 'password', 'url'].forEach(function (k) {
       document.querySelector('[data-direct="' + k + '"]').textContent = info.direct[k];
     });
+    var port = info.bastion_default_port;
+    $('bastion-hint').textContent = 'Порт по умолчанию — ' + port + '. Другой укажите через двоеточие: bastion.local:8443';
     $('bastion').value = info.saved.bastion || '';
+    updateBastion();
     var radio = document.querySelector('input[name=mode][value="' + info.saved.mode + '"]');
     if (radio) {
       radio.checked = true;
-      showMode(info.saved.mode);
+      mode = info.saved.mode;
+      $('mode-next').disabled = false;
     }
   }).catch(function () {});
 

@@ -17,7 +17,7 @@
 #define USERNAME_MAX      64
 #define PASSWORD_MAX      128
 #define SERVER_STACK_SIZE 8192 /* PBKDF2 и поиск Wi-Fi выполняются в задаче сервера */
-#define MAX_URI_HANDLERS  16
+#define MAX_URI_HANDLERS  24
 
 static const char *TAG = "wcs_web";
 
