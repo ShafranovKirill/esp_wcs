@@ -74,7 +74,9 @@ defmodule Bastion.MixProject do
       {:boundary, "~> 0.10", runtime: false},
       {:argon2_elixir, "~> 4.1"},
       # bastion/.env → переменные окружения
-      {:dotenvy, "~> 1.1"}
+      {:dotenvy, "~> 1.1"},
+      # Центр сертификации: ключи, сертификаты, CSR (обёртка над :public_key)
+      {:x509, "~> 0.9.2"}
     ]
   end
 

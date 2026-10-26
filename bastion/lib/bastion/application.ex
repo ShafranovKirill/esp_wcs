@@ -3,7 +3,7 @@ defmodule Bastion.Application do
   # for more information on OTP Applications
   @moduledoc false
 
-  use Boundary, top_level?: true, deps: [Bastion.Repo, BastionWeb]
+  use Boundary, top_level?: true, deps: [Bastion.Repo, Bastion.PKI, BastionWeb]
   use Application
 
   @impl true
@@ -12,6 +12,8 @@ defmodule Bastion.Application do
       BastionWeb.Telemetry,
       Bastion.Repo,
       {Phoenix.PubSub, name: Bastion.PubSub},
+      # Центр сертификации — до веб-сервера: тот берёт у него сертификат
+      Bastion.PKI,
       # Start a worker by calling: Bastion.Worker.start_link(arg)
       # {Bastion.Worker, arg},
       # Start to serve requests, typically the last entry

@@ -45,6 +45,17 @@ if config_env() == :dev do
     ]
 end
 
+if config_env() in [:dev, :prod] do
+  config :bastion, Bastion.PKI,
+    data_dir: env!("BASTION_DATA_DIR", :string, "data"),
+    ca_passphrase: env!("BASTION_CA_PASSPHRASE", :string!),
+    extra_hosts:
+      env!("BASTION_HOSTS", :string, "")
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+end
+
 if config_env() == :dev do
   config :bastion, Bastion.Repo, url: env!("DATABASE_URL", :string!)
 end

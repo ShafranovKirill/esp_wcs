@@ -35,3 +35,9 @@ config :phoenix_live_view,
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# Центр сертификации в тестах: свой каталог, быстрый вывод ключа
+config :bastion, Bastion.PKI,
+  data_dir: Path.expand("../tmp/test/pki", __DIR__),
+  ca_passphrase: "test-passphrase",
+  kdf_iterations: 1_000
