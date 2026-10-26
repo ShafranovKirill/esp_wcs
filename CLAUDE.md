@@ -7,7 +7,8 @@
 - План работ и статус: `docs/roadmap.md`
 - Установка среды и сборка: `docs/setup.md`
 - Справочник по плате: `docs/hardware/esp32-s3-n16r8-board.md`
-- Текущий этап: **этап 1 (MVP) — Direct connection**
+- Бастион (этап 2): `docs/bastion.md`, протокол ESP ↔ бастион — `docs/protocol.md`
+- Текущий этап: **этап 1 (MVP) — Direct connection**; параллельно идёт этап 2 — бастион
 
 ## Структура репозитория
 
@@ -18,7 +19,7 @@
 | `firmware/components/wcs_*/` | модули прошивки, каждый — отдельный компонент ESP-IDF; машина состояний — `wcs_fsm`, как добавлять страницы и API — `firmware/components/README.md` |
 | `bastion/` | сервер-бастион на Elixir/Phoenix (этап 2) |
 | `docs/` | ТЗ, план, справочник по железу, исходные документы |
-| `.github/workflows/` | CI: сборка прошивки на каждый PR |
+| `.github/workflows/` | CI: сборка прошивки и тесты бастиона на каждый PR |
 
 ## Порядок работы (git)
 
@@ -220,3 +221,25 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 - Большие буферы (TLS, кольцевой буфер консоли) выделять в PSRAM
 - Веб-файлы (HTML, JS, xterm.js) хранятся во флеше, без CDN — интернета в сети точки доступа нет
 - Имена в коде — на английском, комментарии и документация — на русском
+
+---
+
+## Бастион (`bastion/`)
+
+Elixir 1.20 / OTP 28, Phoenix 1.8 + LiveView, PostgreSQL в Docker Compose. Архитектура,
+решения и интерфейс — `docs/bastion.md`; Phoenix-правила — `bastion/AGENTS.md`.
+
+- Все команды `mix` — из папки `bastion/`. БД: `docker compose up -d db` (порт 5434)
+- Запуск: `mix phx.server` → `https://localhost:4443` (только HTTPS, сертификат от своего CA в `bastion/data/`)
+- Администратор: `mix bastion.admin` (пароль из `bastion/.env`, `--reset` — перезаписать)
+- Перед коммитом: `mix precommit` (компиляция с `--warnings-as-errors`, формат, тесты)
+- **DDD**: контексты `Bastion.Accounts`, `PKI`, `Fleet`, `Link`, `Console`, `Control` — каждый
+  со своим публичным API в `lib/bastion/<контекст>.ex`, внутри слои `domain/`, `application/`,
+  `infrastructure/`. Границы проверяет `boundary`: обращение во внутренности чужого контекста —
+  ошибка компиляции. Странные предупреждения boundary после удаления файлов — `mix compile --force`
+- Контексты общаются публичным API и доменными событиями (`Bastion.Events`, PubSub);
+  события публикуются только после фиксации транзакции
+- Строки интерфейса — на английском через `gettext`, переводы в `priv/gettext/ru`; после
+  новых строк: `mix gettext.extract --merge` и перевести `ru`
+- Без inline-скриптов (CSP), без CDN: сторонний JS — в `assets/vendor/`
+- Секреты (`.env`, `data/`) не коммитить и не класть в Docker-контекст

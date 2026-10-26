@@ -1,0 +1,45 @@
+name: bastion
+
+on:
+  push:
+    branches: [main]
+    paths: ["bastion/**", ".github/workflows/bastion.yml"]
+  pull_request:
+    paths: ["bastion/**", ".github/workflows/bastion.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bastion
+    env:
+      MIX_ENV: test
+    services:
+      # Та же БД, что в docker-compose.yml: порт 5434, пользователь bastion
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: bastion
+          POSTGRES_PASSWORD: bastion
+        ports: ["5434:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bastion"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          version-file: bastion/.tool-versions
+          version-type: strict
+      - uses: actions/cache@v4
+        with:
+          path: |
+            bastion/deps
+            bastion/_build
+          key: mix-${{ runner.os }}-${{ hashFiles('bastion/.tool-versions', 'bastion/mix.lock') }}
+      - run: mix deps.get
+      # Предупреждения — ошибки: так же ловятся нарушения границ контекстов (boundary)
+      - run: mix compile --warnings-as-errors
+      - run: mix format --check-formatted
+      - run: mix test

@@ -137,7 +137,9 @@ PostgreSQL — всегда в Docker Compose. Бастион:
 
 - **разработка, ноутбук** — напрямую (`mix phx.server`), в Docker только БД;
 - **сервер на Linux** — в Docker Compose с `network_mode: host` (бастиону нужны
-  настоящие IP машины для сертификата и mDNS).
+  настоящие IP машины для сертификата и mDNS): `docker compose --profile server up -d --build`.
+  Релиз работает от `nobody`; привилегированные порты 443/80 — через
+  `cap_net_bind_service` только для BEAM.
 
 Подробности — `bastion/README.md`.
 
