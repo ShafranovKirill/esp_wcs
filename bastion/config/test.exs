@@ -44,3 +44,6 @@ config :bastion, Bastion.PKI,
 
 # Argon2 в тестах — быстрый (в работе — параметры по умолчанию)
 config :argon2_elixir, t_cost: 1, m_cost: 8
+
+# В тестах слушатель WCS Link не нужен: сеансы проверяются напрямую
+config :bastion, Bastion.Link, listen: false

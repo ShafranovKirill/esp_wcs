@@ -3,7 +3,10 @@ defmodule Bastion.Application do
   # for more information on OTP Applications
   @moduledoc false
 
-  use Boundary, top_level?: true, deps: [Bastion.Repo, Bastion.PKI, Bastion.Accounts, BastionWeb]
+  use Boundary,
+    top_level?: true,
+    deps: [Bastion.Repo, Bastion.PKI, Bastion.Accounts, Bastion.Link, BastionWeb]
+
   use Application
 
   @impl true
@@ -15,6 +18,8 @@ defmodule Bastion.Application do
       # Центр сертификации — до веб-сервера: тот берёт у него сертификат
       Bastion.PKI,
       Bastion.Accounts,
+      # Устройства по WCS Link (порт 7443)
+      Bastion.Link,
       # Веб-сервер с сертификатом из PKI и его перезапуск при перевыпуске
       BastionWeb.TLS.endpoint_child_spec(),
       BastionWeb.TLS

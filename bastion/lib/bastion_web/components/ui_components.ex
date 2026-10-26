@@ -30,14 +30,24 @@ defmodule BastionWeb.UIComponents do
   def status_text(:revoked), do: gettext("Revoked")
 
   @doc """
-  Связь с устройством. Онлайн-статус появится вместе с WCS Link; пока —
-  когда устройство было на связи в последний раз.
+  Связь с устройством: онлайн (отклик, сигнал) или когда было на связи.
+  `online` — показатели из `Bastion.Link.presence/1` или `nil`.
   """
   attr :device, :map, required: true
+  attr :online, :map, default: nil
 
   def presence(assigns) do
     ~H"""
-    <span class="inline-flex items-center gap-1.5 text-sm text-base-content/60">
+    <span :if={@online} class="inline-flex items-center gap-1.5 text-sm text-success">
+      <span class="relative flex size-2">
+        <span class="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60"></span>
+        <span class="relative inline-flex size-2 rounded-full bg-success"></span>
+      </span>
+      {gettext("online")}
+      <span :if={@online[:rtt]} class="text-base-content/60">· {gettext("%{ms} ms", ms: @online[:rtt])}</span>
+      <.signal :if={@online[:rssi]} rssi={@online[:rssi]} />
+    </span>
+    <span :if={!@online} class="inline-flex items-center gap-1.5 text-sm text-base-content/60">
       <span class="size-2 rounded-full bg-base-content/25"></span>
       <%= if @device.last_seen_at do %>
         {gettext("offline")} ·
@@ -48,6 +58,33 @@ defmodule BastionWeb.UIComponents do
     </span>
     """
   end
+
+  @doc "Уровень сигнала Wi-Fi: 1–4 полоски по RSSI"
+  attr :rssi, :integer, required: true
+
+  def signal(assigns) do
+    assigns = assign(assigns, :bars, signal_bars(assigns.rssi))
+
+    ~H"""
+    <span
+      class="inline-flex items-end gap-px"
+      title={"#{@rssi} dBm"}
+      aria-label={gettext("Signal %{bars} of 4", bars: @bars)}
+    >
+      <span
+        :for={i <- 1..4}
+        class={["w-1 rounded-sm", if(i <= @bars, do: "bg-current", else: "bg-base-content/20")]}
+        style={"height: #{3 + i * 3}px"}
+      ></span>
+    </span>
+    """
+  end
+
+  @doc false
+  def signal_bars(rssi) when rssi >= -55, do: 4
+  def signal_bars(rssi) when rssi >= -67, do: 3
+  def signal_bars(rssi) when rssi >= -75, do: 2
+  def signal_bars(_rssi), do: 1
 
   @doc "Код для сверки: моноширинный, крупный, группами"
   attr :code, :string, required: true

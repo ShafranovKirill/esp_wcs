@@ -84,6 +84,23 @@ defmodule Bastion.PKI do
     end
   end
 
+  @doc """
+  CN и серийный номер сертификата клиента (DER) из TLS. Цепочку уже проверил
+  `:ssl` (сертификат подписан нашим CA); здесь — только данные для сверки с БД.
+  """
+  @spec client_certificate_identity(binary()) ::
+          {:ok, %{common_name: String.t(), serial: String.t()}} | {:error, :invalid_certificate}
+  def client_certificate_identity(cert_der) when is_binary(cert_der) do
+    cert = Certificates.from_der!(cert_der)
+
+    case X509.Certificate.subject(cert, "CN") do
+      [cn] -> {:ok, %{common_name: cn, serial: Certificates.serial_hex(cert)}}
+      _ -> {:error, :invalid_certificate}
+    end
+  rescue
+    _ -> {:error, :invalid_certificate}
+  end
+
   @doc "Код по сертификату (DER) — например, для сертификата клиента в TLS"
   @spec certificate_code(binary()) :: Code.t()
   def certificate_code(cert_der) do
