@@ -10,17 +10,25 @@
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 
 #define SCAN_MAX_RECORDS       32
 #define STA_CHECK_ATTEMPTS     3     /* попыток при проверке сети без auto_reconnect */
 #define STA_RETRY_MIN_MS       1000
 #define STA_RETRY_MAX_MS       30000
+#define STA_START_TIMEOUT_MS   2000
+#define SCAN_ACTIVE_MIN_MS     100
+#define SCAN_ACTIVE_MAX_MS     300
+
+#define STA_STARTED_BIT        BIT0
 
 static const char *TAG = "wcs_wifi";
 
 static esp_netif_t *s_ap_netif;
 static esp_netif_t *s_sta_netif;
 static esp_timer_handle_t s_retry_timer;
+static EventGroupHandle_t s_events;
 static bool s_started;
 static bool s_ap_running;
 static bool s_sta_enabled;
@@ -118,9 +126,13 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
         break;
     }
     case WIFI_EVENT_STA_START:
+        xEventGroupSetBits(s_events, STA_STARTED_BIT);
         if (s_sta_connect_pending && s_sta_enabled) {
             sta_try_connect();
         }
+        break;
+    case WIFI_EVENT_STA_STOP:
+        xEventGroupClearBits(s_events, STA_STARTED_BIT);
         break;
     case WIFI_EVENT_STA_DISCONNECTED:
         on_sta_disconnected(data);
@@ -148,6 +160,9 @@ static esp_err_t wifi_init_once(void)
     if (s_ap_netif) {
         return ESP_OK;
     }
+
+    s_events = xEventGroupCreate();
+    ESP_RETURN_ON_FALSE(s_events, ESP_ERR_NO_MEM, TAG, "event group create failed");
 
     s_ap_netif = esp_netif_create_default_wifi_ap();
     s_sta_netif = esp_netif_create_default_wifi_sta();
@@ -279,9 +294,19 @@ esp_err_t wcs_wifi_scan(wcs_wifi_network_t *networks, size_t max, size_t *count)
         set_sta_state(WCS_WIFI_STA_IDLE, WCS_WIFI_FAIL_NONE, 0);
         ESP_RETURN_ON_ERROR(apply_mode(), TAG, "enable STA failed");
     }
+    /* Сразу после включения интерфейс клиента ещё не готов, и поиск ничего не находит */
+    EventBits_t bits = xEventGroupWaitBits(s_events, STA_STARTED_BIT, pdFALSE, pdTRUE,
+                                           pdMS_TO_TICKS(STA_START_TIMEOUT_MS));
+    ESP_RETURN_ON_FALSE(bits & STA_STARTED_BIT, ESP_ERR_TIMEOUT, TAG, "STA did not start");
 
-    ESP_RETURN_ON_ERROR(esp_wifi_scan_start(NULL, true), TAG, "scan failed");
+    const wifi_scan_config_t scan_config = {
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time.active = { .min = SCAN_ACTIVE_MIN_MS, .max = SCAN_ACTIVE_MAX_MS },
+    };
+    ESP_RETURN_ON_ERROR(esp_wifi_scan_start(&scan_config, true), TAG, "scan failed");
 
+    uint16_t total = 0;
+    esp_wifi_scan_get_ap_num(&total);
     uint16_t found = SCAN_MAX_RECORDS;
     wifi_ap_record_t *records = calloc(found, sizeof(*records));
     ESP_RETURN_ON_FALSE(records, ESP_ERR_NO_MEM, TAG, "no memory for scan results");
@@ -317,7 +342,7 @@ esp_err_t wcs_wifi_scan(wcs_wifi_network_t *networks, size_t max, size_t *count)
     free(records);
 
     qsort(networks, *count, sizeof(*networks), compare_rssi);
-    ESP_LOGI(TAG, "scan: %u networks", (unsigned)*count);
+    ESP_LOGI(TAG, "scan: %u access points, %u networks", total, (unsigned)*count);
     return ESP_OK;
 }
 
