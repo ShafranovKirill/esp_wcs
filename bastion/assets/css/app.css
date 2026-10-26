@@ -3,6 +3,7 @@
 
 @import "tailwindcss" source(none);
 @import "phoenix-colocated/bastion/colocated.css";
+@import "../vendor/xterm/xterm.css";
 @source "../css";
 @source "../js";
 @source "../../lib/bastion_web";

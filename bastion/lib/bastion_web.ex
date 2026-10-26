@@ -1,7 +1,7 @@
 defmodule BastionWeb do
   # Веб-интерфейс администратора: обращается к контекстам только через их публичный API
   use Boundary,
-    deps: [Bastion.Events, Bastion.PKI, Bastion.Accounts],
+    deps: [Bastion.Events, Bastion.PKI, Bastion.Accounts, Bastion.Fleet, Bastion.Link],
     exports: [Endpoint, Telemetry, TLS]
 
   @moduledoc """
@@ -91,6 +91,7 @@ defmodule BastionWeb do
       import Phoenix.HTML
       # Core UI components
       import BastionWeb.CoreComponents
+      import BastionWeb.UIComponents
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

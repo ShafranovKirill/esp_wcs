@@ -43,6 +43,8 @@ if config_env() == :dev do
 end
 
 if config_env() in [:dev, :prod] do
+  config :bastion, Bastion.Link, port: env!("BASTION_LINK_PORT", :integer, 7443)
+
   config :bastion, Bastion.PKI,
     data_dir: env!("BASTION_DATA_DIR", :string, "data"),
     ca_passphrase: env!("BASTION_CA_PASSPHRASE", :string!),

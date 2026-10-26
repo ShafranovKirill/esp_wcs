@@ -15,6 +15,7 @@ defmodule BastionWeb.Router do
     plug :put_root_layout, html: {BastionWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers, %{"content-security-policy" => @csp}
+    plug BastionWeb.Locale
     plug :fetch_current_admin
   end
 
@@ -34,12 +35,26 @@ defmodule BastionWeb.Router do
   end
 
   scope "/", BastionWeb do
+    pipe_through :browser
+
+    post "/locale", LocaleController, :update
+
+    # Корневой сертификат открыт: это публичные данные, его ставят до первого входа
+    get "/ca.crt", CAController, :show
+  end
+
+  scope "/", BastionWeb do
     pipe_through [:browser, :authenticated]
 
     delete "/logout", SessionController, :delete
 
-    live_session :admin, on_mount: [{BastionWeb.AdminAuth, :require_admin}] do
+    live_session :admin, on_mount: [BastionWeb.Locale, {BastionWeb.AdminAuth, :require_admin}] do
       live "/", DashboardLive, :index
+      live "/connect", ConnectLive, :index
+      live "/devices/:id", DeviceLive, :console
+      live "/devices/:id/settings", DeviceLive, :settings
+      live "/devices/:id/info", DeviceLive, :info
+      live "/devices/:id/journal", DeviceLive, :journal
     end
   end
 

@@ -22,6 +22,9 @@ config :bastion, BastionWeb.Endpoint,
   pubsub_server: Bastion.PubSub,
   live_view: [signing_salt: "tDGHvnc0"]
 
+# Языки интерфейса: строки в коде на английском, переводы — priv/gettext/<язык>
+config :bastion, BastionWeb.Gettext, default_locale: "ru", locales: ~w(ru en)
+
 # Configure LiveView
 config :phoenix_live_view,
   # the attribute set on all root tags. Used for Phoenix.LiveView.ColocatedCSS.
