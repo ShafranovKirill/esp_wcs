@@ -1,6 +1,8 @@
 defmodule BastionWeb do
   # Веб-интерфейс администратора: обращается к контекстам только через их публичный API
-  use Boundary, deps: [Bastion.Events, Bastion.PKI], exports: [Endpoint, Telemetry, TLS]
+  use Boundary,
+    deps: [Bastion.Events, Bastion.PKI, Bastion.Accounts],
+    exports: [Endpoint, Telemetry, TLS]
 
   @moduledoc """
   The entrypoint for defining your web interface, such
@@ -20,7 +22,7 @@ defmodule BastionWeb do
   those modules here.
   """
 
-  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
+  def static_paths, do: ~w(assets fonts images js favicon.ico robots.txt)
 
   def router do
     quote do

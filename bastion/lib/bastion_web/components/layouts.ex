@@ -12,62 +12,64 @@ defmodule BastionWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
-  Renders your app layout.
+  Основной макет страниц после входа: шапка с названием, переключателем темы,
+  логином администратора и выходом.
 
-  This function is typically invoked from every template,
-  and it often contains your application menu, sidebar,
-  or similar.
-
-  ## Examples
-
-      <Layouts.app flash={@flash}>
-        <h1>Content</h1>
+      <Layouts.app flash={@flash} current_admin={@current_admin}>
+        ...
       </Layouts.app>
-
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
-
-  attr :current_scope, :map,
-    default: nil,
-    doc: "the current [scope](https://phoenix.hexdocs.pm/scopes.html)"
-
+  attr :current_admin, :map, default: nil, doc: "вошедший администратор"
   slot :inner_block, required: true
 
   def app(assigns) do
     ~H"""
-    <header class="navbar px-4 sm:px-6 lg:px-8">
+    <header class="navbar border-b border-base-300 bg-base-100 px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
-        <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
-        </a>
+        <.link navigate={~p"/"} class="flex items-center gap-2 font-semibold">
+          <.icon name="hero-server-stack" class="size-6 text-primary" />
+          <span>{gettext("ESP WCS Bastion")}</span>
+        </.link>
       </div>
-      <div class="flex-none">
-        <ul class="flex flex-column px-1 space-x-4 items-center">
-          <li>
-            <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
-          </li>
-          <li>
-            <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
-          </li>
-          <li>
-            <.theme_toggle />
-          </li>
-          <li>
-            <a href="https://phoenix.hexdocs.pm/overview.html" class="btn btn-primary">
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
-          </li>
-        </ul>
+      <div class="flex flex-none items-center gap-3">
+        <.theme_toggle />
+        <span :if={@current_admin} class="hidden text-sm text-base-content/70 sm:inline">
+          {@current_admin.username}
+        </span>
+        <.link
+          :if={@current_admin}
+          href={~p"/logout"}
+          method="delete"
+          id="logout"
+          class="btn btn-ghost btn-sm"
+        >
+          <.icon name="hero-arrow-right-start-on-rectangle" class="size-4" />
+          {gettext("Sign out")}
+        </.link>
       </div>
     </header>
 
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
+    <main class="px-4 py-8 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl space-y-6">
         {render_slot(@inner_block)}
       </div>
     </main>
 
+    <.flash_group flash={@flash} />
+    """
+  end
+
+  @doc "Макет страницы входа: карточка по центру экрана"
+  attr :flash, :map, required: true
+  slot :inner_block, required: true
+
+  def auth(assigns) do
+    ~H"""
+    <main class="flex min-h-screen items-center justify-center bg-base-200 px-4">
+      {render_slot(@inner_block)}
+    </main>
+    <div class="fixed right-4 top-4"><.theme_toggle /></div>
     <.flash_group flash={@flash} />
     """
   end

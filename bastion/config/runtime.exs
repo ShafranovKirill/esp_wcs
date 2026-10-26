@@ -53,6 +53,13 @@ if config_env() in [:dev, :prod] do
       |> Enum.reject(&(&1 == ""))
 end
 
+if config_env() in [:dev, :prod] do
+  # Читается только задачей bastion.admin / Bastion.Release.admin
+  config :bastion, :admin,
+    username: env!("BASTION_ADMIN_USERNAME", :string, "admin"),
+    password: env!("BASTION_ADMIN_PASSWORD", :string, nil)
+end
+
 if config_env() == :dev do
   config :bastion, Bastion.Repo, url: env!("DATABASE_URL", :string!)
 end

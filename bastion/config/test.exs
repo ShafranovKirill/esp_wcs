@@ -41,3 +41,6 @@ config :bastion, Bastion.PKI,
   data_dir: Path.expand("../tmp/test/pki", __DIR__),
   ca_passphrase: "test-passphrase",
   kdf_iterations: 1_000
+
+# Argon2 в тестах — быстрый (в работе — параметры по умолчанию)
+config :argon2_elixir, t_cost: 1, m_cost: 8

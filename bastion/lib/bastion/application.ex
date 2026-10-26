@@ -3,7 +3,7 @@ defmodule Bastion.Application do
   # for more information on OTP Applications
   @moduledoc false
 
-  use Boundary, top_level?: true, deps: [Bastion.Repo, Bastion.PKI, BastionWeb]
+  use Boundary, top_level?: true, deps: [Bastion.Repo, Bastion.PKI, Bastion.Accounts, BastionWeb]
   use Application
 
   @impl true
@@ -14,6 +14,7 @@ defmodule Bastion.Application do
       {Phoenix.PubSub, name: Bastion.PubSub},
       # Центр сертификации — до веб-сервера: тот берёт у него сертификат
       Bastion.PKI,
+      Bastion.Accounts,
       # Веб-сервер с сертификатом из PKI и его перезапуск при перевыпуске
       BastionWeb.TLS.endpoint_child_spec(),
       BastionWeb.TLS

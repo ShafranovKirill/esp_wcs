@@ -1,14 +1,16 @@
 defmodule BastionWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :bastion
 
-  # The session will be stored in the cookie and signed,
-  # this means its contents can be read but not tampered with.
-  # Set :encryption_salt if you would also like to encrypt it.
+  # Сессия в cookie: подписана и зашифрована, только по HTTPS, недоступна из JS,
+  # не отправляется с чужих сайтов. Срок жизни сессии — на сервере (30 мин бездействия)
   @session_options [
     store: :cookie,
     key: "_bastion_key",
     signing_salt: "cuBvctu/",
-    same_site: "Lax"
+    encryption_salt: "Vb2rQkXm",
+    same_site: "Strict",
+    secure: true,
+    http_only: true
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

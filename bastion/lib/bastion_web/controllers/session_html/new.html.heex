@@ -1,0 +1,36 @@
+<Layouts.auth flash={@flash}>
+  <div class="card w-full max-w-sm bg-base-100 shadow-xl">
+    <div class="card-body gap-5">
+      <div>
+        <h1 class="text-2xl font-semibold">{gettext("ESP WCS Bastion")}</h1>
+        <p class="text-sm text-base-content/60">{gettext("Sign in to manage devices")}</p>
+      </div>
+
+      <div :if={@error} id="login-error" role="alert" class="alert alert-error alert-soft text-sm">
+        <.icon name="hero-exclamation-triangle" class="size-5" />
+        <span>{@error}</span>
+      </div>
+
+      <.form for={@form} id="login-form" action={~p"/login"} class="flex flex-col gap-1">
+        <.input
+          field={@form[:username]}
+          label={gettext("Username")}
+          autocomplete="username"
+          required
+          autofocus
+        />
+        <.input
+          field={@form[:password]}
+          type="password"
+          label={gettext("Password")}
+          autocomplete="current-password"
+          value=""
+          required
+        />
+        <button type="submit" id="login-submit" class="btn btn-primary mt-3 w-full">
+          {gettext("Sign in")}
+        </button>
+      </.form>
+    </div>
+  </div>
+</Layouts.auth>

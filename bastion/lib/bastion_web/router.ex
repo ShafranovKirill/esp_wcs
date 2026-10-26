@@ -1,29 +1,47 @@
 defmodule BastionWeb.Router do
   use BastionWeb, :router
 
+  import BastionWeb.AdminAuth,
+    only: [fetch_current_admin: 2, require_admin: 2, redirect_if_admin: 2]
+
+  # Всё своё, без CDN; inline-стили нужны LiveView и xterm.js, inline-скриптов нет
+  @csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " <>
+         "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {BastionWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+    plug :put_secure_browser_headers, %{"content-security-policy" => @csp}
+    plug :fetch_current_admin
   end
 
-  pipeline :api do
-    plug :accepts, ["json"]
+  pipeline :authenticated do
+    plug :require_admin
+  end
+
+  pipeline :guest do
+    plug :redirect_if_admin
   end
 
   scope "/", BastionWeb do
-    pipe_through :browser
+    pipe_through [:browser, :guest]
 
-    get "/", PageController, :home
+    get "/login", SessionController, :new
+    post "/login", SessionController, :create
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", BastionWeb do
-  #   pipe_through :api
-  # end
+  scope "/", BastionWeb do
+    pipe_through [:browser, :authenticated]
+
+    delete "/logout", SessionController, :delete
+
+    live_session :admin, on_mount: [{BastionWeb.AdminAuth, :require_admin}] do
+      live "/", DashboardLive, :index
+    end
+  end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:bastion, :dev_routes) do
