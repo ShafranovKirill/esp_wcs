@@ -21,7 +21,6 @@
 #include "wcs_auth.h"
 #include "wcs_button.h"
 #include "wcs_defaults.h"
-#include "wcs_dns.h"
 #include "wcs_web.h"
 #include "wcs_wifi.h"
 
@@ -32,8 +31,6 @@
 
 #define SETUP_AP_CHANNEL        1
 #define SETUP_AP_MAX_CLIENTS    1
-/* Адрес точки доступа ESP-IDF по умолчанию; объявляется клиентам через DHCP */
-#define SETUP_PORTAL_URI        "http://192.168.4.1/"
 
 typedef enum {
     APP_CMD_START_SETUP,
@@ -82,7 +79,6 @@ static void start_setup_portal(void)
         .password = wcs_defaults.setup_ap_password,
         .channel = SETUP_AP_CHANNEL,
         .max_clients = SETUP_AP_MAX_CLIENTS,
-        .captive_portal_uri = SETUP_PORTAL_URI,
     };
     if (wcs_wifi_ap_start(&ap) != ESP_OK) {
         ESP_LOGE(TAG, "setup AP start failed");
@@ -91,8 +87,7 @@ static void start_setup_portal(void)
 
     esp_ip4_addr_t ip;
     ESP_ERROR_CHECK(wcs_wifi_ap_get_ip(&ip));
-    ESP_ERROR_CHECK(wcs_dns_start(ip));
-    ESP_ERROR_CHECK(wcs_web_start(&(wcs_web_config_t){ .portal_ip = ip }));
+    ESP_ERROR_CHECK(wcs_web_start());
     ESP_LOGI(TAG, "setup portal: Wi-Fi \"%s\", http://" IPSTR "/", ssid, IP2STR(&ip));
 }
 

@@ -23,7 +23,6 @@
 static const char *TAG = "wcs_web";
 
 static httpd_handle_t s_server;
-static char s_portal_url[32];
 
 /* ---- встроенные файлы ---- */
 
@@ -238,14 +237,6 @@ static esp_err_t asset_get(httpd_req_t *req)
     return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
 }
 
-/* Captive portal: всё неизвестное — на страницу входа (iOS нужен непустой ответ) */
-static esp_err_t captive_redirect(httpd_req_t *req, httpd_err_code_t err)
-{
-    httpd_resp_set_status(req, "302 Found");
-    httpd_resp_set_hdr(req, "Location", s_portal_url);
-    return httpd_resp_sendstr(req, "Redirect to the captive portal");
-}
-
 static const httpd_uri_t s_routes[] = {
     { .uri = "/", .method = HTTP_GET, .handler = root_get },
     { .uri = "/login", .method = HTTP_GET, .handler = login_get },
@@ -256,12 +247,9 @@ static const httpd_uri_t s_routes[] = {
     { .uri = "/assets/*", .method = HTTP_GET, .handler = asset_get },
 };
 
-esp_err_t wcs_web_start(const wcs_web_config_t *config)
+esp_err_t wcs_web_start(void)
 {
-    ESP_RETURN_ON_FALSE(config, ESP_ERR_INVALID_ARG, TAG, "config is NULL");
     ESP_RETURN_ON_FALSE(!s_server, ESP_ERR_INVALID_STATE, TAG, "already running");
-
-    snprintf(s_portal_url, sizeof(s_portal_url), "http://" IPSTR "/", IP2STR(&config->portal_ip));
 
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.stack_size = SERVER_STACK_SIZE;
@@ -273,9 +261,8 @@ esp_err_t wcs_web_start(const wcs_web_config_t *config)
     for (size_t i = 0; i < sizeof(s_routes) / sizeof(s_routes[0]); i++) {
         httpd_register_uri_handler(s_server, &s_routes[i]);
     }
-    httpd_register_err_handler(s_server, HTTPD_404_NOT_FOUND, captive_redirect);
 
-    ESP_LOGI(TAG, "started at %s", s_portal_url);
+    ESP_LOGI(TAG, "started on port %u", cfg.server_port);
     return ESP_OK;
 }
 
