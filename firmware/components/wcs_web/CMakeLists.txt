@@ -1,8 +1,10 @@
-idf_component_register(SRCS "wcs_web.c"
+idf_component_register(SRCS "wcs_web.c" "web_setup.c" "web_direct.c"
                        INCLUDE_DIRS "include"
-                       PRIV_REQUIRES esp_http_server wcs_auth esp_app_format esp_hw_support esp_timer
+                       REQUIRES wcs_storage
+                       PRIV_REQUIRES esp_http_server wcs_auth wcs_wifi esp_app_format esp_hw_support esp_timer
                        EMBED_FILES "www/login.html"
                                    "www/login.js"
-                                   "www/settings.html"
-                                   "www/settings.js"
+                                   "www/setup.html"
+                                   "www/setup.js"
+                                   "www/console.html"
                                    "www/style.css")

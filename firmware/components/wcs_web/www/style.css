@@ -89,3 +89,49 @@ button.secondary { color: var(--text); background: transparent; border: 1px soli
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; }
 dt { color: var(--muted); }
 dd { margin: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; }
+
+:root { --success: #2e7d32; }
+@media (prefers-color-scheme: dark) { :root { --success: #6fcf73; } }
+
+.success { color: var(--success); }
+.hint { margin: 0 0 8px 28px; font-size: 14px; color: var(--muted); }
+
+.choices { display: flex; flex-direction: column; gap: 6px; }
+.choice { display: flex; align-items: center; gap: 10px; }
+.choice label { flex-direction: row; align-items: center; gap: 10px; font-size: 16px; color: var(--text); cursor: pointer; }
+
+button.help {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 24px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+}
+
+button.small { padding: 4px 10px; font-size: 14px; font-weight: 500; }
+
+.networks { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+
+button.network {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 400;
+  text-align: left;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid transparent;
+}
+
+button.network.selected { border-color: var(--accent); }
+
+details { margin-top: 28px; }
+summary { cursor: pointer; color: var(--muted); }
+details dl { margin-top: 12px; }
+section > p { margin: 0 0 12px; }
+section > button { margin-top: 8px; }
