@@ -28,3 +28,22 @@ mix phx.server                # https://localhost:4443
 Тесты: `mix test` (БД из того же docker compose). Перед коммитом: `mix precommit`.
 
 Phoenix-специфичные правила для ИИ-агентов — [`AGENTS.md`](AGENTS.md) (сгенерирован Phoenix).
+
+## Сервер на Linux (Docker Compose)
+
+Бастион и PostgreSQL в контейнерах; бастион — в сети машины (`network_mode: host`),
+чтобы в его сертификат попали настоящие IP, а устройства подключались к ним напрямую.
+
+```bash
+cd bastion
+cp .env.example .env          # пароли, SECRET_KEY_BASE (mix phx.gen.secret), PHX_HOST, BASTION_HOSTS
+docker compose --profile server up -d --build
+docker compose --profile server run --rm bastion /app/bin/bastion eval "Bastion.Release.admin()"
+```
+
+Порты: 443 — веб-интерфейс, 80 — перенаправление на HTTPS, 7443 — устройства.
+Ключ корневого сертификата и сертификаты — в томе `bastion_data`: потеря тома или
+`BASTION_CA_PASSPHRASE` = все устройства регистрировать заново.
+
+На macOS/Windows host-сеть Docker работает ограниченно — там бастион запускают без
+Docker (`mix phx.server` или собранный релиз), а в Docker оставляют только БД.
