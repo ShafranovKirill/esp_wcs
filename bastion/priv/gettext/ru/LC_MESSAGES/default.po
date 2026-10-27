@@ -29,45 +29,45 @@ msgstr "Устройство %{name} одобрено"
 msgid "Actions"
 msgstr "Действия"
 
-#: lib/bastion_web/live/connect_live.ex:62
+#: lib/bastion_web/live/connect_live.ex:66
 #, elixir-autogen, elixir-format
 msgid "After “Check” the wizard shows the bastion code. It must match the code on the right — otherwise do not continue."
 msgstr "После «Проверить» мастер покажет код бастиона. Он должен совпасть с кодом справа — иначе не продолжайте."
 
-#: lib/bastion_web/live/device_live.ex:271
+#: lib/bastion_web/live/device_live.ex:289
 #, elixir-autogen, elixir-format
 msgid "All devices"
 msgstr "Все устройства"
 
-#: lib/bastion_web/live/connect_live.ex:67
+#: lib/bastion_web/live/connect_live.ex:71
 #, elixir-autogen, elixir-format
 msgid "Apply the settings. The device sends a request — approve it on the Devices page after comparing the device code with the last step of the wizard."
 msgstr "Примените настройки. Устройство пришлёт заявку — одобрите её на странице «Устройства», сверив код устройства с последним шагом мастера."
 
 #: lib/bastion_web/live/dashboard_live.ex:227
-#: lib/bastion_web/live/device_live.ex:308
+#: lib/bastion_web/live/device_live.ex:326
 #, elixir-autogen, elixir-format
 msgid "Approve"
 msgstr "Одобрить"
 
 #: lib/bastion_web/live/dashboard_live.ex:271
-#: lib/bastion_web/live/device_live.ex:343
+#: lib/bastion_web/live/device_live.ex:363
 #, elixir-autogen, elixir-format
 msgid "Approve the device?"
 msgstr "Одобрить устройство?"
 
-#: lib/bastion_web/live/connect_live.ex:66
+#: lib/bastion_web/live/connect_live.ex:70
 #, elixir-autogen, elixir-format
 msgid "Approve the request"
 msgstr "Одобрите заявку"
 
 #: lib/bastion_web/components/ui_components.ex:26
-#: lib/bastion_web/live/device_live.ex:702
+#: lib/bastion_web/live/device_live.ex:786
 #, elixir-autogen, elixir-format
 msgid "Approved"
 msgstr "Одобрено"
 
-#: lib/bastion_web/live/device_live.ex:796
+#: lib/bastion_web/live/device_live.ex:880
 #, elixir-autogen, elixir-format
 msgid "Approved, certificate issued"
 msgstr "Одобрено, сертификат выдан"
@@ -78,13 +78,13 @@ msgstr "Одобрено, сертификат выдан"
 msgid "Attempting to reconnect"
 msgstr "Переподключение"
 
-#: lib/bastion_web/live/device_live.ex:559
-#: lib/bastion_web/live/device_live.ex:572
+#: lib/bastion_web/live/device_live.ex:596
+#: lib/bastion_web/live/device_live.ex:610
 #, elixir-autogen, elixir-format
 msgid "Available when the device is online"
 msgstr "Доступно, когда устройство на связи"
 
-#: lib/bastion_web/live/device_live.ex:586
+#: lib/bastion_web/live/device_live.ex:660
 #, elixir-autogen, elixir-format
 msgid "Available when the device is online."
 msgstr "Доступно, когда устройство на связи."
@@ -94,41 +94,41 @@ msgstr "Доступно, когда устройство на связи."
 msgid "Awaiting approval"
 msgstr "Ждёт одобрения"
 
-#: lib/bastion_web/live/connect_live.ex:76
+#: lib/bastion_web/live/connect_live.ex:80
 #, elixir-autogen, elixir-format
 msgid "Bastion address"
 msgstr "Адрес бастиона"
 
-#: lib/bastion_web/live/connect_live.ex:95
+#: lib/bastion_web/controllers/ca_html/page.html.heex:19
+#: lib/bastion_web/live/connect_live.ex:99
 #: lib/bastion_web/live/dashboard_live.ex:174
 #, elixir-autogen, elixir-format
 msgid "Bastion code"
 msgstr "Код бастиона"
 
-#: lib/bastion_web/live/device_live.ex:396
-#: lib/bastion_web/live/device_live.ex:562
+#: lib/bastion_web/live/device_live.ex:496
 #, elixir-autogen, elixir-format
 msgid "Baud rate"
 msgstr "Скорость"
 
 #: lib/bastion_web/live/dashboard_live.ex:289
 #: lib/bastion_web/live/dashboard_live.ex:319
-#: lib/bastion_web/live/device_live.ex:352
+#: lib/bastion_web/live/device_live.ex:372
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "Отмена"
 
-#: lib/bastion_web/live/device_live.ex:708
+#: lib/bastion_web/live/device_live.ex:792
 #, elixir-autogen, elixir-format
 msgid "Certificate serial"
 msgstr "Серийный номер сертификата"
 
-#: lib/bastion_web/live/device_live.ex:711
+#: lib/bastion_web/live/device_live.ex:795
 #, elixir-autogen, elixir-format
 msgid "Certificate valid until"
 msgstr "Сертификат действует до"
 
-#: lib/bastion_web/live/connect_live.ex:51
+#: lib/bastion_web/live/connect_live.ex:52
 #, elixir-autogen, elixir-format
 msgid "Choose Bastion connection"
 msgstr "Выберите Bastion connection"
@@ -140,22 +140,22 @@ msgid "Close"
 msgstr "Закрыть"
 
 #: lib/bastion_web/live/dashboard_live.ex:301
-#: lib/bastion_web/live/device_live.ex:361
+#: lib/bastion_web/live/device_live.ex:381
 #, elixir-autogen, elixir-format
 msgid "Codes match, approve"
 msgstr "Коды совпадают, одобрить"
 
-#: lib/bastion_web/live/device_live.ex:812
+#: lib/bastion_web/live/device_live.ex:896
 #, elixir-autogen, elixir-format
 msgid "Command: %{op}"
 msgstr "Команда: %{op}"
 
-#: lib/bastion_web/live/connect_live.ex:61
+#: lib/bastion_web/live/connect_live.ex:65
 #, elixir-autogen, elixir-format
 msgid "Compare the bastion code"
 msgstr "Сверьте код бастиона"
 
-#: lib/bastion_web/live/device_live.ex:289
+#: lib/bastion_web/live/device_live.ex:307
 #, elixir-autogen, elixir-format
 msgid "Compare the device code with the last step of the setup wizard:"
 msgstr "Сверьте код устройства с последним шагом мастера настройки:"
@@ -165,32 +165,32 @@ msgstr "Сверьте код устройства с последним шаг�
 msgid "Connect a device"
 msgstr "Подключить устройство"
 
-#: lib/bastion_web/live/connect_live.ex:47
+#: lib/bastion_web/live/connect_live.ex:48
 #, elixir-autogen, elixir-format
 msgid "Connect your phone or laptop to the “ESP-WCS-XXXX” network and open https://192.168.4.1 — the browser warns about the certificate once."
 msgstr "Подключите телефон или ноутбук к сети «ESP-WCS-XXXX» и откройте https://192.168.4.1 — браузер один раз предупредит о сертификате."
 
-#: lib/bastion_web/live/device_live.ex:808
+#: lib/bastion_web/live/device_live.ex:892
 #, elixir-autogen, elixir-format
 msgid "Connected"
 msgstr "Подключилось"
 
-#: lib/bastion_web/live/device_live.ex:772
+#: lib/bastion_web/live/device_live.ex:856
 #, elixir-autogen, elixir-format
 msgid "Console"
 msgstr "Консоль"
 
-#: lib/bastion_web/live/device_live.ex:559
+#: lib/bastion_web/live/device_live.ex:595
 #, elixir-autogen, elixir-format
 msgid "Console port"
 msgstr "Консольный порт"
 
-#: lib/bastion_web/live/device_live.ex:811
+#: lib/bastion_web/live/device_live.ex:895
 #, elixir-autogen, elixir-format
 msgid "Console released"
 msgstr "Консоль освобождена"
 
-#: lib/bastion_web/live/device_live.ex:810
+#: lib/bastion_web/live/device_live.ex:894
 #, elixir-autogen, elixir-format
 msgid "Console taken"
 msgstr "Консоль занята"
@@ -206,24 +206,24 @@ msgstr "Скопировано"
 msgid "Copy"
 msgstr "Копировать"
 
-#: lib/bastion_web/live/connect_live.ex:57
+#: lib/bastion_web/live/connect_live.ex:58
 #, elixir-autogen, elixir-format
 msgid "Copy one of the addresses on the right. bastion.local works if mDNS is available in the network, otherwise use the IP address."
 msgstr "Скопируйте один из адресов справа. bastion.local работает, если в сети есть mDNS, иначе используйте IP-адрес."
 
-#: lib/bastion_web/live/device_live.ex:582
+#: lib/bastion_web/live/device_live.ex:653
 #, elixir-autogen, elixir-format
 msgid "Danger zone"
 msgstr "Опасные действия"
 
 #: lib/bastion_web/live/dashboard_live.ex:393
-#: lib/bastion_web/live/device_live.ex:615
-#: lib/bastion_web/live/device_live.ex:628
+#: lib/bastion_web/live/device_live.ex:699
+#: lib/bastion_web/live/device_live.ex:712
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Удалить"
 
-#: lib/bastion_web/live/device_live.ex:625
+#: lib/bastion_web/live/device_live.ex:709
 #, elixir-autogen, elixir-format
 msgid "Delete %{name} and its journal permanently?"
 msgstr "Удалить %{name} вместе с журналом навсегда?"
@@ -233,33 +233,33 @@ msgstr "Удалить %{name} вместе с журналом навсегда
 msgid "Delete folder “%{name}”? Devices will move to “No folder”."
 msgstr "Удалить папку «%{name}»? Устройства перейдут в «Без папки»."
 
-#: lib/bastion_web/live/device_live.ex:774
+#: lib/bastion_web/live/device_live.ex:858
 #, elixir-autogen, elixir-format
 msgid "Details"
 msgstr "Сведения"
 
-#: lib/bastion_web/live/device_live.ex:677
+#: lib/bastion_web/live/device_live.ex:761
 #, elixir-autogen, elixir-format
 msgid "Device ID (MAC)"
 msgstr "ID устройства (MAC)"
 
-#: lib/bastion_web/live/device_live.ex:572
+#: lib/bastion_web/live/device_live.ex:609
 #, elixir-autogen, elixir-format
 msgid "Device Wi-Fi"
 msgstr "Wi-Fi устройства"
 
-#: lib/bastion_web/live/device_live.ex:208
+#: lib/bastion_web/live/device_live.ex:209
 #, elixir-autogen, elixir-format
 msgid "Device approved"
 msgstr "Устройство одобрено"
 
 #: lib/bastion_web/live/dashboard_live.ex:204
-#: lib/bastion_web/live/device_live.ex:680
+#: lib/bastion_web/live/device_live.ex:764
 #, elixir-autogen, elixir-format
 msgid "Device code"
 msgstr "Код устройства"
 
-#: lib/bastion_web/live/device_live.ex:220
+#: lib/bastion_web/live/device_live.ex:238
 #, elixir-autogen, elixir-format
 msgid "Device deleted"
 msgstr "Устройство удалено"
@@ -269,7 +269,7 @@ msgstr "Устройство удалено"
 msgid "Device not found — it may have been deleted"
 msgstr "Устройство не найдено — возможно, его удалили"
 
-#: lib/bastion_web/live/device_live.ex:214
+#: lib/bastion_web/live/device_live.ex:215
 #, elixir-autogen, elixir-format
 msgid "Device revoked"
 msgstr "Устройство отозвано"
@@ -281,12 +281,12 @@ msgstr "Устройство отозвано"
 msgid "Devices"
 msgstr "Устройства"
 
-#: lib/bastion_web/live/device_live.ex:809
+#: lib/bastion_web/live/device_live.ex:893
 #, elixir-autogen, elixir-format
 msgid "Disconnected"
 msgstr "Отключилось"
 
-#: lib/bastion_web/live/connect_live.ex:124
+#: lib/bastion_web/live/connect_live.ex:128
 #, elixir-autogen, elixir-format
 msgid "Download"
 msgstr "Скачать"
@@ -302,17 +302,17 @@ msgstr "Бастион ESP WCS"
 msgid "Enter a name"
 msgstr "Введите имя"
 
-#: lib/bastion_web/live/connect_live.ex:56
+#: lib/bastion_web/live/connect_live.ex:57
 #, elixir-autogen, elixir-format
 msgid "Enter the bastion address"
 msgstr "Введите адрес бастиона"
 
-#: lib/bastion_web/live/device_live.ex:694
+#: lib/bastion_web/live/device_live.ex:778
 #, elixir-autogen, elixir-format
 msgid "Firmware"
 msgstr "Прошивка"
 
-#: lib/bastion_web/live/device_live.ex:549
+#: lib/bastion_web/live/device_live.ex:584
 #, elixir-autogen, elixir-format
 msgid "Folder"
 msgstr "Папка"
@@ -322,7 +322,7 @@ msgstr "Папка"
 msgid "Folder actions"
 msgstr "Действия с папкой"
 
-#: lib/bastion_web/live/device_live.ex:202
+#: lib/bastion_web/live/device_live.ex:203
 #, elixir-autogen, elixir-format
 msgid "Folder changed"
 msgstr "Папка изменена"
@@ -337,12 +337,7 @@ msgstr "Папка удалена, её устройства перенесен�
 msgid "Folder not found"
 msgstr "Папка не найдена"
 
-#: lib/bastion_web/live/device_live.ex:566
-#, elixir-autogen, elixir-format
-msgid "Format"
-msgstr "Формат"
-
-#: lib/bastion_web/live/connect_live.ex:42
+#: lib/bastion_web/live/connect_live.ex:43
 #, elixir-autogen, elixir-format
 msgid "Hold the button on the device for 5 seconds and release it. The LED starts breathing blue."
 msgstr "Удерживайте кнопку на устройстве 5 секунд и отпустите. Светодиод начнёт «дышать» синим."
@@ -354,12 +349,12 @@ msgstr "Удерживайте кнопку на устройстве 5 секу
 msgid "How to connect"
 msgstr "Как подключить"
 
-#: lib/bastion_web/live/connect_live.ex:31
+#: lib/bastion_web/live/connect_live.ex:32
 #, elixir-autogen, elixir-format
 msgid "How to connect a device"
 msgstr "Как подключить устройство"
 
-#: lib/bastion_web/live/device_live.ex:693
+#: lib/bastion_web/live/device_live.ex:777
 #, elixir-autogen, elixir-format
 msgid "IP address"
 msgstr "IP-адрес"
@@ -369,7 +364,7 @@ msgstr "IP-адрес"
 msgid "If the codes differ, someone else may be posing as your device — reject the request."
 msgstr "Если коды не совпадают, кто-то может выдавать себя за ваше устройство — отклоните заявку."
 
-#: lib/bastion_web/live/connect_live.ex:114
+#: lib/bastion_web/live/connect_live.ex:118
 #, elixir-autogen, elixir-format
 msgid "Install it as a trusted root on your computer so the browser stops warning about this bastion."
 msgstr "Установите его как доверенный корневой сертификат на компьютере, чтобы браузер перестал предупреждать об этом бастионе."
@@ -379,44 +374,44 @@ msgstr "Установите его как доверенный корневой
 msgid "Invalid username or password"
 msgstr "Неверный логин или пароль"
 
-#: lib/bastion_web/live/connect_live.ex:46
+#: lib/bastion_web/live/connect_live.ex:47
 #, elixir-autogen, elixir-format
 msgid "Join the setup Wi-Fi"
 msgstr "Подключитесь к Wi-Fi настройки"
 
-#: lib/bastion_web/live/device_live.ex:775
+#: lib/bastion_web/live/device_live.ex:859
 #, elixir-autogen, elixir-format
 msgid "Journal"
 msgstr "Журнал"
 
-#: lib/bastion_web/live/device_live.ex:695
+#: lib/bastion_web/live/device_live.ex:779
 #, elixir-autogen, elixir-format
 msgid "Last seen"
 msgstr "Последний раз на связи"
 
 #: lib/bastion_web/live/dashboard_live.ex:274
-#: lib/bastion_web/live/device_live.ex:345
+#: lib/bastion_web/live/device_live.ex:365
 #, elixir-autogen, elixir-format
 msgid "Make sure the code below matches the device code on the last step of the setup wizard of %{name}."
 msgstr "Убедитесь, что код ниже совпадает с кодом устройства на последнем шаге мастера настройки %{name}."
 
-#: lib/bastion_web/live/device_live.ex:803
+#: lib/bastion_web/live/device_live.ex:887
 #, elixir-autogen, elixir-format
 msgid "Moved out of folders"
 msgstr "Перенесено в «Без папки»"
 
-#: lib/bastion_web/live/device_live.ex:806
+#: lib/bastion_web/live/device_live.ex:890
 #, elixir-autogen, elixir-format
 msgid "Moved to folder “%{folder}”"
 msgstr "Перенесено в папку «%{folder}»"
 
 #: lib/bastion_web/live/dashboard_live.ex:313
-#: lib/bastion_web/live/device_live.ex:535
+#: lib/bastion_web/live/device_live.ex:570
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr "Имя"
 
-#: lib/bastion_web/live/device_live.ex:187
+#: lib/bastion_web/live/device_live.ex:188
 #, elixir-autogen, elixir-format
 msgid "Name saved"
 msgstr "Имя сохранено"
@@ -437,18 +432,18 @@ msgstr "Новая папка"
 msgid "No devices yet"
 msgstr "Устройств пока нет"
 
-#: lib/bastion_web/live/device_live.ex:737
+#: lib/bastion_web/live/device_live.ex:821
 #, elixir-autogen, elixir-format
 msgid "No events yet"
 msgstr "Событий пока нет"
 
 #: lib/bastion_web/live/dashboard_live.ex:358
-#: lib/bastion_web/live/device_live.ex:554
+#: lib/bastion_web/live/device_live.ex:589
 #, elixir-autogen, elixir-format
 msgid "No folder"
 msgstr "Без папки"
 
-#: lib/bastion_web/live/connect_live.ex:87
+#: lib/bastion_web/live/connect_live.ex:91
 #, elixir-autogen, elixir-format
 msgid "No network addresses found. Set BASTION_HOSTS in .env."
 msgstr "Сетевые адреса не найдены. Задайте BASTION_HOSTS в .env."
@@ -458,7 +453,7 @@ msgstr "Сетевые адреса не найдены. Задайте BASTION_
 msgid "Nothing found"
 msgstr "Ничего не найдено"
 
-#: lib/bastion_web/live/device_live.ex:616
+#: lib/bastion_web/live/device_live.ex:700
 #, elixir-autogen, elixir-format
 msgid "Only a revoked device can be deleted. The journal is deleted too."
 msgstr "Удалить можно только отозванное устройство. Журнал удаляется вместе с ним."
@@ -468,30 +463,31 @@ msgstr "Удалить можно только отозванное устрой
 msgid "Only an approved device can be revoked"
 msgstr "Отозвать можно только одобренное устройство"
 
-#: lib/bastion_web/live/connect_live.ex:41
+#: lib/bastion_web/live/connect_live.ex:42
 #, elixir-autogen, elixir-format
 msgid "Open the device setup"
 msgstr "Откройте настройку устройства"
 
 #: lib/bastion_web/controllers/session_html/new.html.heex:25
+#: lib/bastion_web/live/device_live.ex:624
 #, elixir-autogen, elixir-format
 msgid "Password"
 msgstr "Пароль"
 
-#: lib/bastion_web/live/device_live.ex:585
-#: lib/bastion_web/live/device_live.ex:588
+#: lib/bastion_web/live/device_live.ex:656
+#: lib/bastion_web/live/device_live.ex:671
 #, elixir-autogen, elixir-format
 msgid "Reboot"
 msgstr "Перезагрузить"
 
 #: lib/bastion_web/live/dashboard_live.ex:216
-#: lib/bastion_web/live/device_live.ex:300
+#: lib/bastion_web/live/device_live.ex:318
 #, elixir-autogen, elixir-format
 msgid "Reject"
 msgstr "Отклонить"
 
 #: lib/bastion_web/live/dashboard_live.ex:214
-#: lib/bastion_web/live/device_live.ex:298
+#: lib/bastion_web/live/device_live.ex:316
 #, elixir-autogen, elixir-format
 msgid "Reject the request from %{name}?"
 msgstr "Отклонить заявку от %{name}?"
@@ -506,24 +502,24 @@ msgstr "Переименовать"
 msgid "Rename folder"
 msgstr "Переименовать папку"
 
-#: lib/bastion_web/live/device_live.ex:801
+#: lib/bastion_web/live/device_live.ex:885
 #, elixir-autogen, elixir-format
 msgid "Renamed from “%{from}” to “%{to}”"
 msgstr "Переименовано: «%{from}» → «%{to}»"
 
-#: lib/bastion_web/live/device_live.ex:794
+#: lib/bastion_web/live/device_live.ex:878
 #, elixir-autogen, elixir-format
 msgid "Request received, device code %{code}"
 msgstr "Получена заявка, код устройства %{code}"
 
 #: lib/bastion_web/live/dashboard_live.ex:69
-#: lib/bastion_web/live/device_live.ex:211
-#: lib/bastion_web/live/device_live.ex:797
+#: lib/bastion_web/live/device_live.ex:212
+#: lib/bastion_web/live/device_live.ex:881
 #, elixir-autogen, elixir-format
 msgid "Request rejected"
 msgstr "Заявка отклонена"
 
-#: lib/bastion_web/live/device_live.ex:699
+#: lib/bastion_web/live/device_live.ex:783
 #, elixir-autogen, elixir-format
 msgid "Request sent"
 msgstr "Заявка отправлена"
@@ -533,13 +529,13 @@ msgstr "Заявка отправлена"
 msgid "Requests"
 msgstr "Заявки"
 
-#: lib/bastion_web/live/device_live.ex:591
-#: lib/bastion_web/live/device_live.ex:611
+#: lib/bastion_web/live/device_live.ex:675
+#: lib/bastion_web/live/device_live.ex:695
 #, elixir-autogen, elixir-format
 msgid "Revoke"
 msgstr "Отозвать"
 
-#: lib/bastion_web/live/device_live.ex:605
+#: lib/bastion_web/live/device_live.ex:689
 #, elixir-autogen, elixir-format
 msgid "Revoke %{name}? It will disconnect and will not be able to reconnect without a new approval."
 msgstr "Отозвать %{name}? Устройство отключится и не сможет подключиться без нового одобрения."
@@ -550,24 +546,25 @@ msgid "Revoke the device before deleting it"
 msgstr "Сначала отзовите устройство"
 
 #: lib/bastion_web/components/ui_components.ex:27
-#: lib/bastion_web/live/device_live.ex:705
-#: lib/bastion_web/live/device_live.ex:798
+#: lib/bastion_web/live/device_live.ex:789
+#: lib/bastion_web/live/device_live.ex:882
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "Отозвано"
 
-#: lib/bastion_web/live/connect_live.ex:112
+#: lib/bastion_web/controllers/ca_controller.ex:23
+#: lib/bastion_web/live/connect_live.ex:116
 #, elixir-autogen, elixir-format
 msgid "Root certificate"
 msgstr "Корневой сертификат"
 
 #: lib/bastion_web/live/dashboard_live.ex:322
-#: lib/bastion_web/live/device_live.ex:545
+#: lib/bastion_web/live/device_live.ex:580
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr "Сохранить"
 
-#: lib/bastion_web/live/device_live.ex:450
+#: lib/bastion_web/live/device_live.ex:423
 #, elixir-autogen, elixir-format
 msgid "Send BREAK"
 msgstr "Отправить BREAK"
@@ -577,7 +574,7 @@ msgstr "Отправить BREAK"
 msgid "Set up an ESP WCS device in Bastion mode with this bastion's address — its request will appear here."
 msgstr "Настройте устройство ESP WCS в режиме Bastion с адресом этого бастиона — его заявка появится здесь."
 
-#: lib/bastion_web/live/device_live.ex:773
+#: lib/bastion_web/live/device_live.ex:857
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Настройки"
@@ -592,7 +589,7 @@ msgstr "Войти"
 msgid "Sign in to manage devices"
 msgstr "Войдите, чтобы управлять устройствами"
 
-#: lib/bastion_web/live/connect_live.ex:52
+#: lib/bastion_web/live/connect_live.ex:53
 #, elixir-autogen, elixir-format
 msgid "Sign in, choose Bastion connection and connect the device to a Wi-Fi network from which this bastion is reachable."
 msgstr "Войдите, выберите Bastion connection и подключите устройство к сети Wi-Fi, из которой доступен этот бастион."
@@ -608,17 +605,17 @@ msgstr "Выйти"
 msgid "Something went wrong!"
 msgstr "Что-то пошло не так!"
 
-#: lib/bastion_web/errors.ex:40
+#: lib/bastion_web/errors.ex:42
 #, elixir-autogen, elixir-format
 msgid "Something went wrong, try again"
 msgstr "Что-то пошло не так, попробуйте ещё раз"
 
-#: lib/bastion_web/live/device_live.ex:676
+#: lib/bastion_web/live/device_live.ex:760
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Статус"
 
-#: lib/bastion_web/live/device_live.ex:478
+#: lib/bastion_web/live/device_live.ex:451
 #, elixir-autogen, elixir-format
 msgid "Take the console"
 msgstr "Забрать консоль"
@@ -628,22 +625,22 @@ msgstr "Забрать консоль"
 msgid "The certificate request does not match the device ID"
 msgstr "Запрос сертификата не соответствует ID устройства"
 
-#: lib/bastion_web/live/device_live.ex:593
+#: lib/bastion_web/live/device_live.ex:677
 #, elixir-autogen, elixir-format
 msgid "The device certificate stops being accepted. The device stays in the list with its journal and can send a new request."
 msgstr "Сертификат устройства перестаёт приниматься. Устройство остаётся в списке с журналом и может подать новую заявку."
 
-#: lib/bastion_web/live/connect_live.ex:33
+#: lib/bastion_web/live/connect_live.ex:34
 #, elixir-autogen, elixir-format
 msgid "The device connects to the bastion itself over Wi-Fi; the connection is encrypted and mutually authenticated."
 msgstr "Устройство само подключается к бастиону по Wi-Fi; соединение зашифровано, стороны проверяют друг друга."
 
-#: lib/bastion_web/live/device_live.ex:287
+#: lib/bastion_web/live/device_live.ex:305
 #, elixir-autogen, elixir-format
 msgid "The device is waiting for approval"
 msgstr "Устройство ждёт одобрения"
 
-#: lib/bastion_web/live/connect_live.ex:103
+#: lib/bastion_web/live/connect_live.ex:107
 #, elixir-autogen, elixir-format
 msgid "The device remembers the bastion by this code and will not connect to anything else."
 msgstr "Устройство запоминает бастион по этому коду и ни к чему другому не подключится."
@@ -653,7 +650,7 @@ msgstr "Устройство запоминает бастион по этому
 msgid "The device sent an invalid certificate request"
 msgstr "Устройство прислало неверный запрос сертификата"
 
-#: lib/bastion_web/live/device_live.ex:104
+#: lib/bastion_web/live/device_live.ex:105
 #, elixir-autogen, elixir-format
 msgid "The device was deleted"
 msgstr "Устройство удалено"
@@ -698,7 +695,7 @@ msgstr "Логин"
 msgid "We can't find the internet"
 msgstr "Нет связи с бастионом"
 
-#: lib/bastion_web/live/device_live.ex:575
+#: lib/bastion_web/live/device_live.ex:631
 #, elixir-autogen, elixir-format
 msgid "With a wrong password the device loses its connection and can only be recovered with the button on site."
 msgstr "При неверном пароле устройство потеряет связь, и вернуть его можно будет только кнопкой на месте."
@@ -713,7 +710,7 @@ msgstr "закрыть"
 msgid "compare it with the code shown in the device setup wizard"
 msgstr "сверьте с кодом в мастере настройки устройства"
 
-#: lib/bastion_web/live/device_live.ex:697
+#: lib/bastion_web/live/device_live.ex:781
 #, elixir-autogen, elixir-format
 msgid "never"
 msgstr "никогда"
@@ -728,12 +725,12 @@ msgstr "ещё не подключалось"
 msgid "offline"
 msgstr "офлайн"
 
-#: lib/bastion_web/live/device_live.ex:761
+#: lib/bastion_web/live/device_live.ex:845
 #, elixir-autogen, elixir-format
 msgid "%{d} d %{h} h"
 msgstr "%{d} д %{h} ч"
 
-#: lib/bastion_web/live/device_live.ex:762
+#: lib/bastion_web/live/device_live.ex:846
 #, elixir-autogen, elixir-format
 msgid "%{h} h %{m} min"
 msgstr "%{h} ч %{m} мин"
@@ -743,17 +740,17 @@ msgstr "%{h} ч %{m} мин"
 msgid "%{ms} ms"
 msgstr "%{ms} мс"
 
-#: lib/bastion_web/live/device_live.ex:763
+#: lib/bastion_web/live/device_live.ex:847
 #, elixir-autogen, elixir-format
 msgid "%{m} min"
 msgstr "%{m} мин"
 
-#: lib/bastion_web/live/device_live.ex:684
+#: lib/bastion_web/live/device_live.ex:768
 #, elixir-autogen, elixir-format
 msgid "Connected since"
 msgstr "На связи с"
 
-#: lib/bastion_web/live/device_live.ex:681
+#: lib/bastion_web/live/device_live.ex:765
 #, elixir-autogen, elixir-format
 msgid "Connection"
 msgstr "Связь"
@@ -763,12 +760,12 @@ msgstr "Связь"
 msgid "Signal %{bars} of 4"
 msgstr "Сигнал %{bars} из 4"
 
-#: lib/bastion_web/live/device_live.ex:690
+#: lib/bastion_web/live/device_live.ex:774
 #, elixir-autogen, elixir-format
 msgid "Uptime"
 msgstr "Время работы"
 
-#: lib/bastion_web/live/device_live.ex:687
+#: lib/bastion_web/live/device_live.ex:771
 #, elixir-autogen, elixir-format
 msgid "Wi-Fi signal"
 msgstr "Сигнал Wi-Fi"
@@ -788,22 +785,22 @@ msgstr "Достигнут предел устройств (%{max})"
 msgid "The device sent a new request with a different code — compare the code again"
 msgstr "Устройство прислало новую заявку с другим кодом — сверьте код ещё раз"
 
-#: lib/bastion_web/live/device_live.ex:230
+#: lib/bastion_web/live/device_live.ex:254
 #, elixir-autogen, elixir-format
 msgid "BREAK sent"
 msgstr "BREAK отправлен"
 
-#: lib/bastion_web/live/device_live.ex:410
+#: lib/bastion_web/live/device_live.ex:510
 #, elixir-autogen, elixir-format
 msgid "Data bits"
 msgstr "Биты данных"
 
-#: lib/bastion_web/live/device_live.ex:463
+#: lib/bastion_web/live/device_live.ex:436
 #, elixir-autogen, elixir-format
 msgid "Device busy"
 msgstr "Устройство занято"
 
-#: lib/bastion_web/live/device_live.ex:525
+#: lib/bastion_web/live/device_live.ex:555
 #, elixir-autogen, elixir-format
 msgid "Even"
 msgstr "Чётность (E)"
@@ -813,42 +810,42 @@ msgstr "Чётность (E)"
 msgid "Invalid port settings"
 msgstr "Неверные параметры порта"
 
-#: lib/bastion_web/live/device_live.ex:525
+#: lib/bastion_web/live/device_live.ex:555
 #, elixir-autogen, elixir-format
 msgid "No parity"
 msgstr "Без чётности (N)"
 
-#: lib/bastion_web/live/device_live.ex:525
+#: lib/bastion_web/live/device_live.ex:555
 #, elixir-autogen, elixir-format
 msgid "Odd"
 msgstr "Нечётность (O)"
 
-#: lib/bastion_web/live/device_live.ex:420
+#: lib/bastion_web/live/device_live.ex:520
 #, elixir-autogen, elixir-format
 msgid "Parity"
 msgstr "Чётность"
 
-#: lib/bastion_web/live/device_live.ex:230
+#: lib/bastion_web/live/device_live.ex:255
 #, elixir-autogen, elixir-format
 msgid "Port settings applied"
 msgstr "Параметры порта применены"
 
-#: lib/bastion_web/live/device_live.ex:467
+#: lib/bastion_web/live/device_live.ex:440
 #, elixir-autogen, elixir-format
 msgid "Since"
 msgstr "С"
 
-#: lib/bastion_web/live/device_live.ex:434
+#: lib/bastion_web/live/device_live.ex:534
 #, elixir-autogen, elixir-format
 msgid "Stop bits"
 msgstr "Стоп-биты"
 
-#: lib/bastion_web/live/device_live.ex:476
+#: lib/bastion_web/live/device_live.ex:449
 #, elixir-autogen, elixir-format
 msgid "Take the console? The other tab will lose control."
 msgstr "Забрать консоль? Другая вкладка потеряет управление."
 
-#: lib/bastion_web/live/device_live.ex:497
+#: lib/bastion_web/live/device_live.ex:470
 #, elixir-autogen, elixir-format
 msgid "The console is available for approved devices only."
 msgstr "Консоль доступна только для одобренных устройств."
@@ -858,7 +855,7 @@ msgstr "Консоль доступна только для одобренных
 msgid "The console is controlled by another tab"
 msgstr "Консолью управляет другая вкладка"
 
-#: lib/bastion_web/live/device_live.ex:465
+#: lib/bastion_web/live/device_live.ex:438
 #, elixir-autogen, elixir-format
 msgid "The console is open in another tab or browser."
 msgstr "Консоль открыта в другой вкладке или браузере."
@@ -868,7 +865,7 @@ msgstr "Консоль открыта в другой вкладке или бр
 msgid "The device did not respond in time"
 msgstr "Устройство не ответило вовремя"
 
-#: lib/bastion_web/errors.ex:38
+#: lib/bastion_web/errors.ex:40
 #, elixir-autogen, elixir-format
 msgid "The device firmware does not support this command"
 msgstr "Прошивка устройства не поддерживает эту команду"
@@ -878,12 +875,12 @@ msgstr "Прошивка устройства не поддерживает эт
 msgid "The device is offline"
 msgstr "Устройство не в сети"
 
-#: lib/bastion_web/live/device_live.ex:488
+#: lib/bastion_web/live/device_live.ex:461
 #, elixir-autogen, elixir-format
 msgid "The device is offline. The console will open when it connects."
 msgstr "Устройство не в сети. Консоль откроется, когда оно подключится."
 
-#: lib/bastion_web/errors.ex:37
+#: lib/bastion_web/errors.ex:39
 #, elixir-autogen, elixir-format
 msgid "The device rejected the parameters"
 msgstr "Устройство отклонило параметры"
@@ -892,3 +889,108 @@ msgstr "Устройство отклонило параметры"
 #, elixir-autogen, elixir-format
 msgid "Too many commands, wait a second"
 msgstr "Слишком много команд, подождите секунду"
+
+#: lib/bastion_web/errors.ex:37
+#, elixir-autogen, elixir-format
+msgid "Enter a network name of 1–32 characters"
+msgstr "Введите имя сети длиной 1–32 символа"
+
+#: lib/bastion_web/live/device_live.ex:615
+#, elixir-autogen, elixir-format
+msgid "Network name (SSID)"
+msgstr "Имя сети (SSID)"
+
+#: lib/bastion_web/live/device_live.ex:669
+#, elixir-autogen, elixir-format
+msgid "Reboot %{name}?"
+msgstr "Перезагрузить %{name}?"
+
+#: lib/bastion_web/live/device_live.ex:641
+#, elixir-autogen, elixir-format
+msgid "Switch %{name} to the new network? The device reboots. If the name or password is wrong, it can only be recovered with the button on site."
+msgstr "Перевести %{name} на новую сеть? Устройство перезагрузится. Если имя или пароль неверны, вернуть его можно будет только кнопкой на месте."
+
+#: lib/bastion_web/live/device_live.ex:647
+#, elixir-autogen, elixir-format
+msgid "Switch network"
+msgstr "Сменить сеть"
+
+#: lib/bastion_web/live/device_live.ex:659
+#, elixir-autogen, elixir-format
+msgid "The console and the connection are interrupted for a few seconds."
+msgstr "Консоль и связь прервутся на несколько секунд."
+
+#: lib/bastion_web/live/device_live.ex:256
+#, elixir-autogen, elixir-format
+msgid "The device is rebooting"
+msgstr "Устройство перезагружается"
+
+#: lib/bastion_web/live/device_live.ex:257
+#, elixir-autogen, elixir-format
+msgid "The device saved the new network and is rebooting"
+msgstr "Устройство сохранило новую сеть и перезагружается"
+
+#: lib/bastion_web/errors.ex:38
+#, elixir-autogen, elixir-format
+msgid "The password must be empty or 8–63 characters"
+msgstr "Пароль должен быть пустым или длиной 8–63 символа"
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:72
+#, elixir-autogen, elixir-format
+msgid "Android: Settings → Security → Encryption & credentials → Install a certificate → CA certificate. iOS: open the file, install the profile in Settings → General → VPN & Device Management, then enable it in Settings → General → About → Certificate Trust Settings."
+msgstr "Android: Настройки → Безопасность → Шифрование и учётные данные → Установить сертификат → Сертификат ЦС. iOS: откройте файл, установите профиль в Настройки → Основные → VPN и управление устройством, затем включите его в Настройки → Основные → Об этом устройстве → Доверие сертификатам."
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:4
+#, elixir-autogen, elixir-format
+msgid "Bastion root certificate"
+msgstr "Корневой сертификат бастиона"
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:26
+#, elixir-autogen, elixir-format
+msgid "Before installing, compare the SHA-256 fingerprint with the one shown by your system. A trusted root certificate lets its owner impersonate any site for this computer — install only the certificate of your own bastion."
+msgstr "Перед установкой сверьте отпечаток SHA-256 с тем, что покажет система. Доверенный корневой сертификат позволяет его владельцу выдавать себя за любой сайт на этом компьютере — устанавливайте только сертификат своего бастиона."
+
+#: lib/bastion_web/controllers/session_html/new.html.heex:35
+#, elixir-autogen, elixir-format
+msgid "Browser warns about the certificate? Install the root certificate"
+msgstr "Браузер предупреждает о сертификате? Установите корневой сертификат"
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:56
+#, elixir-autogen, elixir-format
+msgid "Chrome and Chromium on Linux use their own store: Settings → Privacy and security → Security → Manage certificates → Authorities → Import."
+msgstr "Chrome и Chromium на Linux используют своё хранилище: Настройки → Конфиденциальность и безопасность → Безопасность → Настроить сертификаты → Центры сертификации → Импорт."
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:34
+#, elixir-autogen, elixir-format
+msgid "Double-click the file → Install Certificate → Local Machine → Place all certificates in the following store → Trusted Root Certification Authorities. Or in an administrator terminal:"
+msgstr "Дважды щёлкните файл → Установить сертификат → Локальный компьютер → Поместить все сертификаты в следующее хранилище → Доверенные корневые центры сертификации. Или в терминале администратора:"
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:14
+#, elixir-autogen, elixir-format
+msgid "Download %{file}"
+msgstr "Скачать %{file}"
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:64
+#, elixir-autogen, elixir-format
+msgid "Firefox keeps its own list: Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import, and tick “Trust this CA to identify websites”."
+msgstr "У Firefox свой список: Настройки → Приватность и защита → Сертификаты → Просмотр сертификатов → Центры сертификации → Импортировать, и отметьте «Доверять при идентификации веб-сайтов»."
+
+#: lib/bastion_web/live/connect_live.ex:131
+#, elixir-autogen, elixir-format
+msgid "How to install it"
+msgstr "Как установить"
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:43
+#, elixir-autogen, elixir-format
+msgid "Open the file in Keychain Access, add it to the System keychain and set “Always Trust”. Or in the terminal:"
+msgstr "Откройте файл в «Связке ключей», добавьте в связку «Система» и выберите «Всегда доверять». Или в терминале:"
+
+#: lib/bastion_web/controllers/ca_html/page.html.heex:6
+#, elixir-autogen, elixir-format
+msgid "The bastion signs its own HTTPS certificate. Install the root certificate as trusted once — and the browser stops warning about the bastion."
+msgstr "Бастион сам подписывает свой HTTPS-сертификат. Один раз установите корневой сертификат как доверенный — и браузер перестанет предупреждать о бастионе."
+
+#: lib/bastion_web/live/connect_live.ex:62
+#, elixir-autogen, elixir-format
+msgid "mDNS is turned off on this bastion (BASTION_MDNS=off)."
+msgstr "На этом бастионе mDNS выключен (BASTION_MDNS=off)."

@@ -46,19 +46,19 @@ server_room = folder.("Серверная 1")
 warehouse = folder.("Склад")
 
 for {id, name, room} <- [
-      {"7c2c678c8580", "core-sw-01", server_room},
-      {"7c2c678c8590", "edge-rt-02", server_room},
-      {"7c2c678c85a0", "access-sw-07", server_room},
-      {"7c2c678c85b0", "wh-sw-01", warehouse},
-      {"7c2c678c85c0", "lab-esp", nil}
+      {"aabbcc000080", "core-sw-01", server_room},
+      {"aabbcc000090", "edge-rt-02", server_room},
+      {"aabbcc0000a0", "access-sw-07", server_room},
+      {"aabbcc0000b0", "wh-sw-01", warehouse},
+      {"aabbcc0000c0", "lab-esp", nil}
     ] do
   d = id |> device.(name) |> approve.()
   if room && d.folder_id != room.id, do: Fleet.move(d.id, room.id)
 end
 
-old = "7c2c678c85d0" |> device.("decommissioned-sw") |> approve.()
+old = "aabbcc0000d0" |> device.("decommissioned-sw") |> approve.()
 if old.status == :approved, do: Fleet.revoke(old.id)
 
-device.("7c2c678c85e0", "esp-wcs-85e1")
+device.("aabbcc0000e0", "esp-wcs-85e1")
 
 IO.puts("seeds: готово — 2 папки, 7 устройств (одна заявка, одно отозванное)")

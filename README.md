@@ -76,6 +76,18 @@ idf.py build
 idf.py -p /dev/ttyACM0 flash monitor
 ```
 
+## Быстрый запуск (Makefile)
+
+Из корня репозитория, `make` без аргументов — список команд:
+
+```sh
+make setup      # бастион: БД, зависимости, администратор из bastion/.env (один раз)
+make run        # бастион: https://localhost:4443, устройства — порт 7443
+make device     # тестовое устройство WCS Link, ARGS="--id … --name …"
+make fw-build   # прошивка (после get_idf)
+make fw-flash   # PORT=/dev/ttyACM0
+```
+
 ## Документация
 
 - [Техническое задание](docs/tz.md)

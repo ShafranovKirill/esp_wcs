@@ -6,7 +6,9 @@ defmodule BastionWeb do
       Bastion.Accounts,
       Bastion.Fleet,
       Bastion.Link,
-      Bastion.Console
+      Bastion.Console,
+      Bastion.Control,
+      Bastion.Discovery
     ],
     exports: [Endpoint, Telemetry, TLS]
 

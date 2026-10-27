@@ -370,6 +370,9 @@ static void factory_reset(void)
     if (wcs_storage_erase() != ESP_OK) {
         ESP_LOGE(TAG, "settings erase failed");
     }
+    if (wcs_link_forget_identity() != ESP_OK) {
+        ESP_LOGE(TAG, "device identity erase failed");
+    }
     vTaskDelay(pdMS_TO_TICKS(FACTORY_RESET_DELAY_MS));
     esp_restart();
 }

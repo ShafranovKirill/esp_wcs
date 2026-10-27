@@ -30,6 +30,15 @@ defmodule Bastion.AccountsTest do
       assert {:error, :missing} = Accounts.ensure_admin("admin", nil)
       assert {:error, :invalid_username} = Accounts.ensure_admin("ad min", @password)
     end
+
+    test "в разработке принимает слабый пароль, но не пустой" do
+      Application.put_env(:bastion, :weak_admin_password, true)
+      on_exit(fn -> Application.delete_env(:bastion, :weak_admin_password) end)
+
+      assert {:error, :missing} = Accounts.ensure_admin("admin", "")
+      assert {:ok, :created} = Accounts.ensure_admin("admin", "admin")
+      assert {:ok, _} = Accounts.login("admin", "admin", ip())
+    end
   end
 
   describe "login/3 и сессии" do

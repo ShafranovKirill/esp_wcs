@@ -32,3 +32,5 @@ config :bastion, Bastion.PKI,
 config :argon2_elixir, t_cost: 1, m_cost: 8
 
 config :bastion, Bastion.Link, listen: false
+
+config :bastion, Bastion.Discovery, mode: :off

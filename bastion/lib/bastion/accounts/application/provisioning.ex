@@ -10,12 +10,24 @@ defmodule Bastion.Accounts.Application.Provisioning do
     reset? = Keyword.get(opts, :reset, false)
 
     with :ok <- check_username(username),
-         :ok <- PasswordPolicy.check(password) do
+         :ok <- check_password(password) do
       case Repo.all(Admin) do
         [] -> create(username, password)
         _ when reset? -> replace(username, password)
         _ -> {:ok, :unchanged}
       end
+    end
+  end
+
+  defp check_password(password) do
+    case PasswordPolicy.check(password) do
+      {:error, reason} when reason in [:too_short, :placeholder] ->
+        if Application.get_env(:bastion, :weak_admin_password, false),
+          do: :ok,
+          else: {:error, reason}
+
+      result ->
+        result
     end
   end
 

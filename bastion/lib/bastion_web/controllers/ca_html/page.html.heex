@@ -1,0 +1,78 @@
+<Layouts.auth flash={@flash} locale={@locale} current_path={~p"/ca"}>
+  <div class="w-full max-w-3xl space-y-4 py-16" id="ca-page">
+    <div>
+      <h1 class="text-2xl font-semibold">{gettext("Bastion root certificate")}</h1>
+      <p class="text-sm text-base-content/60">
+        {gettext(
+          "The bastion signs its own HTTPS certificate. Install the root certificate as trusted once — and the browser stops warning about the bastion."
+        )}
+      </p>
+    </div>
+
+    <div class="rounded-box border border-success/40 bg-base-100 p-4 space-y-3">
+      <a href={~p"/ca.crt"} download={@filename} class="btn btn-primary btn-sm" id="download-ca">
+        <.icon name="hero-arrow-down-tray" class="size-4" /> {gettext("Download %{file}",
+          file: @filename
+        )}
+      </a>
+      <dl class="grid gap-2 text-sm sm:grid-cols-[10rem_1fr]">
+        <dt class="text-base-content/60">{gettext("Bastion code")}</dt>
+        <dd><.code code={@bastion_code} /></dd>
+        <dt class="text-base-content/60">SHA-256</dt>
+        <dd class="break-all font-mono text-xs" id="ca-fingerprint">{@fingerprint}</dd>
+      </dl>
+      <p class="flex items-start gap-2 text-sm text-warning">
+        <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
+        {gettext(
+          "Before installing, compare the SHA-256 fingerprint with the one shown by your system. A trusted root certificate lets its owner impersonate any site for this computer — install only the certificate of your own bastion."
+        )}
+      </p>
+    </div>
+
+    <.os id="ca-windows" title="Windows" icon="hero-computer-desktop">
+      <p>
+        {gettext(
+          "Double-click the file → Install Certificate → Local Machine → Place all certificates in the following store → Trusted Root Certification Authorities. Or in an administrator terminal:"
+        )}
+      </p>
+      <.cmd text={"certutil -addstore -f Root #{@filename}"} />
+    </.os>
+
+    <.os id="ca-macos" title="macOS" icon="hero-computer-desktop">
+      <p>
+        {gettext(
+          "Open the file in Keychain Access, add it to the System keychain and set “Always Trust”. Or in the terminal:"
+        )}
+      </p>
+      <.cmd text={"sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain #{@filename}"} />
+    </.os>
+
+    <.os id="ca-linux" title="Linux" icon="hero-command-line">
+      <p>Fedora, RHEL:</p>
+      <.cmd text={"sudo cp #{@filename} /etc/pki/ca-trust/source/anchors/\nsudo update-ca-trust"} />
+      <p>Debian, Ubuntu:</p>
+      <.cmd text={"sudo cp #{@filename} /usr/local/share/ca-certificates/\nsudo update-ca-certificates"} />
+      <p>
+        {gettext(
+          "Chrome and Chromium on Linux use their own store: Settings → Privacy and security → Security → Manage certificates → Authorities → Import."
+        )}
+      </p>
+    </.os>
+
+    <.os id="ca-firefox" title="Firefox" icon="hero-globe-alt">
+      <p>
+        {gettext(
+          "Firefox keeps its own list: Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import, and tick “Trust this CA to identify websites”."
+        )}
+      </p>
+    </.os>
+
+    <.os id="ca-mobile" title="Android, iOS" icon="hero-device-phone-mobile">
+      <p>
+        {gettext(
+          "Android: Settings → Security → Encryption & credentials → Install a certificate → CA certificate. iOS: open the file, install the profile in Settings → General → VPN & Device Management, then enable it in Settings → General → About → Certificate Trust Settings."
+        )}
+      </p>
+    </.os>
+  </div>
+</Layouts.auth>
