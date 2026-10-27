@@ -94,7 +94,8 @@ defmodule BastionWeb.DeviceLive do
 
     assign(socket,
       name_form: to_form(%{"name" => device.name}, as: :device),
-      folder_form: to_form(%{"folder_id" => device.folder_id || ""}, as: :device)
+      folder_form: to_form(%{"folder_id" => device.folder_id || ""}, as: :device),
+      wifi_form: to_form(%{"ssid" => "", "password" => ""}, as: :wifi)
     )
   end
 
@@ -213,6 +214,23 @@ defmodule BastionWeb.DeviceLive do
   def handle_event("revoke", _params, socket),
     do: lifecycle(socket, &Fleet.revoke/1, gettext("Device revoked"))
 
+  def handle_event("reboot", _params, socket) do
+    id = socket.assigns.device.id
+    {:noreply, start_async(socket, :reboot, fn -> Bastion.Control.reboot(id) end)}
+  end
+
+  def handle_event("wifi", %{"wifi" => params}, socket) do
+    id = socket.assigns.device.id
+    params = Map.take(params, ["ssid", "password"])
+
+    socket =
+      socket
+      |> assign(wifi_form: to_form(Map.put(params, "password", ""), as: :wifi))
+      |> start_async(:wifi, fn -> Bastion.Control.set_wifi(id, params) end)
+
+    {:noreply, socket}
+  end
+
   def handle_event("delete", _params, socket) do
     case Fleet.delete(socket.assigns.device.id) do
       {:ok, :deleted} ->
@@ -225,18 +243,18 @@ defmodule BastionWeb.DeviceLive do
   end
 
   @impl true
-  def handle_async(op, {:ok, :ok}, socket) when op in [:console_break, :console_line] do
-    message =
-      if op == :console_break, do: gettext("BREAK sent"), else: gettext("Port settings applied")
-
-    {:noreply, put_flash(socket, :info, message)}
-  end
+  def handle_async(op, {:ok, :ok}, socket), do: {:noreply, put_flash(socket, :info, done(op))}
 
   def handle_async(_op, {:ok, {:error, reason}}, socket),
     do: {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
 
   def handle_async(_op, {:exit, _reason}, socket),
     do: {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(:failed))}
+
+  defp done(:console_break), do: gettext("BREAK sent")
+  defp done(:console_line), do: gettext("Port settings applied")
+  defp done(:reboot), do: gettext("The device is rebooting")
+  defp done(:wifi), do: gettext("The device saved the new network and is rebooting")
 
   defp lifecycle(socket, fun, success) do
     socket = push_event(socket, "close-dialog", %{id: "approve-dialog"})
@@ -333,6 +351,8 @@ defmodule BastionWeb.DeviceLive do
       <.settings_tab
         :if={@tab == :settings}
         device={@device}
+        online={@online}
+        wifi_form={@wifi_form}
         name_form={@name_form}
         folder_form={@folder_form}
         folders={@folders}
@@ -389,54 +409,7 @@ defmodule BastionWeb.DeviceLive do
         phx-change="console-line"
         class="flex flex-wrap items-center gap-2"
       >
-        <select
-          name="line[baud]"
-          class="select select-sm w-32"
-          disabled={!@online}
-          aria-label={gettext("Baud rate")}
-        >
-          <option
-            :for={baud <- Console.bauds()}
-            value={baud}
-            selected={@line_form[:baud].value == baud}
-          >
-            {baud}
-          </option>
-        </select>
-        <select
-          name="line[data_bits]"
-          class="select select-sm w-20"
-          disabled={!@online}
-          aria-label={gettext("Data bits")}
-        >
-          <option :for={bits <- 8..5//-1} value={bits} selected={@line_form[:data_bits].value == bits}>
-            {bits}
-          </option>
-        </select>
-        <select
-          name="line[parity]"
-          class="select select-sm w-28"
-          disabled={!@online}
-          aria-label={gettext("Parity")}
-        >
-          <option
-            :for={{label, value} <- parity_options()}
-            value={value}
-            selected={@line_form[:parity].value == value}
-          >
-            {label}
-          </option>
-        </select>
-        <select
-          name="line[stop_bits]"
-          class="select select-sm w-20"
-          disabled={!@online}
-          aria-label={gettext("Stop bits")}
-        >
-          <option :for={stop <- [1, 2]} value={stop} selected={@line_form[:stop_bits].value == stop}>
-            {stop}
-          </option>
-        </select>
+        <.line_fields form={@line_form} disabled={!@online} />
         <span :if={@line} class="text-sm text-base-content/50" id="console-line-current">
           {Console.format_line(@line)}
         </span>
@@ -510,6 +483,63 @@ defmodule BastionWeb.DeviceLive do
     """
   end
 
+  attr :form, :map, required: true
+  attr :disabled, :boolean, default: false
+  attr :class, :string, default: "select select-sm"
+
+  defp line_fields(assigns) do
+    ~H"""
+    <select
+      name="line[baud]"
+      class={[@class, "w-32"]}
+      disabled={@disabled}
+      aria-label={gettext("Baud rate")}
+    >
+      <option
+        :for={baud <- Console.bauds()}
+        value={baud}
+        selected={@form[:baud].value == baud}
+      >
+        {baud}
+      </option>
+    </select>
+    <select
+      name="line[data_bits]"
+      class={[@class, "w-20"]}
+      disabled={@disabled}
+      aria-label={gettext("Data bits")}
+    >
+      <option :for={bits <- 8..5//-1} value={bits} selected={@form[:data_bits].value == bits}>
+        {bits}
+      </option>
+    </select>
+    <select
+      name="line[parity]"
+      class={[@class, "w-28"]}
+      disabled={@disabled}
+      aria-label={gettext("Parity")}
+    >
+      <option
+        :for={{label, value} <- parity_options()}
+        value={value}
+        selected={@form[:parity].value == value}
+      >
+        {label}
+      </option>
+    </select>
+    <select
+      name="line[stop_bits]"
+      class={[@class, "w-20"]}
+      disabled={@disabled}
+      aria-label={gettext("Stop bits")}
+    >
+      <option :for={stop <- [1, 2]} value={stop} selected={@form[:stop_bits].value == stop}>
+        {stop}
+      </option>
+    </select>
+    """
+  end
+
   defp line_params(nil),
     do: %{"baud" => 9600, "data_bits" => 8, "parity" => "none", "stop_bits" => 1}
 
@@ -525,11 +555,16 @@ defmodule BastionWeb.DeviceLive do
     do: [{gettext("No parity"), "none"}, {gettext("Even"), "even"}, {gettext("Odd"), "odd"}]
 
   attr :device, :map, required: true
+  attr :online, :map, default: nil
   attr :name_form, :map, required: true
   attr :folder_form, :map, required: true
+  attr :wifi_form, :map, required: true
   attr :folders, :list, required: true
 
   defp settings_tab(assigns) do
+    line = assigns.online && assigns.online[:console]
+    assigns = assign(assigns, :line_form, to_form(line_params(line), as: :line))
+
     ~H"""
     <section class="grid gap-4 lg:grid-cols-2" id="settings">
       <.card title={gettext("Name")}>
@@ -556,26 +591,62 @@ defmodule BastionWeb.DeviceLive do
         </.form>
       </.card>
 
-      <.card title={gettext("Console port")} note={gettext("Available when the device is online")}>
-        <div class="grid grid-cols-2 gap-3 opacity-60">
-          <label class="text-sm">
-            {gettext("Baud rate")}
-            <select class="select select-sm mt-1 w-full" disabled><option>9600</option></select>
-          </label>
-          <label class="text-sm">
-            {gettext("Format")}
-            <select class="select select-sm mt-1 w-full" disabled><option>8N1</option></select>
-          </label>
-        </div>
+      <.card
+        title={gettext("Console port")}
+        note={!@online && gettext("Available when the device is online")}
+      >
+        <.form
+          for={@line_form}
+          id="settings-line"
+          phx-change="console-line"
+          class="flex flex-wrap items-center gap-2"
+        >
+          <.line_fields form={@line_form} disabled={!@online} />
+        </.form>
       </.card>
 
-      <.card title={gettext("Device Wi-Fi")} note={gettext("Available when the device is online")}>
-        <p class="flex items-start gap-2 text-sm text-warning">
-          <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
-          {gettext(
-            "With a wrong password the device loses its connection and can only be recovered with the button on site."
-          )}
-        </p>
+      <.card
+        title={gettext("Device Wi-Fi")}
+        note={!@online && gettext("Available when the device is online")}
+      >
+        <.form for={@wifi_form} id="wifi-form" phx-submit="wifi" class="space-y-2">
+          <.input
+            field={@wifi_form[:ssid]}
+            label={gettext("Network name (SSID)")}
+            maxlength={Bastion.Control.ssid_max_length()}
+            autocomplete="off"
+            disabled={!@online}
+            required
+          />
+          <.input
+            field={@wifi_form[:password]}
+            type="password"
+            label={gettext("Password")}
+            maxlength="63"
+            autocomplete="new-password"
+            disabled={!@online}
+          />
+          <p class="flex items-start gap-2 text-sm text-warning">
+            <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
+            {gettext(
+              "With a wrong password the device loses its connection and can only be recovered with the button on site."
+            )}
+          </p>
+          <button
+            type="submit"
+            class="btn btn-warning btn-sm"
+            id="wifi-submit"
+            disabled={!@online}
+            data-confirm={
+              gettext(
+                "Switch %{name} to the new network? The device reboots. If the name or password is wrong, it can only be recovered with the button on site.",
+                name: @device.name
+              )
+            }
+          >
+            {gettext("Switch network")}
+          </button>
+        </.form>
       </.card>
 
       <div class="rounded-box border border-error/40 bg-base-100 p-4 lg:col-span-2" id="danger-zone">
@@ -583,9 +654,22 @@ defmodule BastionWeb.DeviceLive do
         <div class="mt-3 divide-y divide-base-300">
           <.danger_action
             title={gettext("Reboot")}
-            description={gettext("Available when the device is online.")}
+            description={
+              if @online,
+                do: gettext("The console and the connection are interrupted for a few seconds."),
+                else: gettext("Available when the device is online.")
+            }
           >
-            <button type="button" class="btn btn-sm" disabled>{gettext("Reboot")}</button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              id="reboot"
+              disabled={!@online}
+              phx-click="reboot"
+              data-confirm={gettext("Reboot %{name}?", name: @device.name)}
+            >
+              {gettext("Reboot")}
+            </button>
           </.danger_action>
           <.danger_action
             title={gettext("Revoke")}
