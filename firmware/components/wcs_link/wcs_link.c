@@ -11,6 +11,9 @@
 #include "esp_netif.h"
 #include "esp_random.h"
 #include "esp_system.h"
+#include "esp_transport.h"
+#include "esp_transport_ssl.h"
+#include "esp_transport_ws.h"
 #include "esp_websocket_client.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -550,6 +553,39 @@ static esp_err_t ca_code_of(const char *ca_pem, char code[WCS_BASTION_CODE_LEN +
     return err;
 }
 
+static esp_transport_list_handle_t make_transport(const char *ca_pem, const char *cert_pem, const char *key_pem,
+                                                  esp_transport_handle_t *out)
+{
+    esp_transport_list_handle_t list = esp_transport_list_init();
+    esp_transport_handle_t ssl = list ? esp_transport_ssl_init() : NULL;
+    if (!ssl) {
+        if (list) {
+            esp_transport_list_destroy(list);
+        }
+        return NULL;
+    }
+    esp_transport_list_add(list, ssl, "_ssl");
+    esp_transport_ssl_set_tls_version(ssl, ESP_TLS_VER_TLS_1_3);
+    esp_transport_ssl_set_cert_data(ssl, ca_pem, strlen(ca_pem));
+    esp_transport_ssl_skip_common_name_check(ssl);
+    if (cert_pem && key_pem) {
+        esp_transport_ssl_set_client_cert_data(ssl, cert_pem, strlen(cert_pem));
+        esp_transport_ssl_set_client_key_data(ssl, key_pem, strlen(key_pem));
+    }
+
+    esp_transport_handle_t ws = esp_transport_ws_init(ssl);
+    const esp_transport_ws_config_t ws_cfg = {
+        .ws_path = "/link",
+        .propagate_control_frames = true,
+    };
+    if (!ws || esp_transport_list_add(list, ws, "wss") != ESP_OK || esp_transport_ws_set_config(ws, &ws_cfg) != ESP_OK) {
+        esp_transport_list_destroy(list);
+        return NULL;
+    }
+    *out = ws;
+    return list;
+}
+
 static outcome_t run_session(const char *ca_pem, const char *ca_code, const char *device_id, bool *was_online)
 {
     wcs_bastion_addr_t addr;
@@ -565,12 +601,17 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
     char uri[64];
     snprintf(uri, sizeof(uri), "wss://" IPSTR ":%u/link", IP2STR(&ip), addr.port);
 
+    esp_transport_handle_t transport = NULL;
+    esp_transport_list_handle_t transports =
+        make_transport(ca_pem, device_session ? cert_pem : NULL, device_session ? link_key_pem() : NULL, &transport);
+    if (!transports) {
+        free(cert_pem);
+        return OUTCOME_RETRY;
+    }
+
     esp_websocket_client_config_t cfg = {
         .uri = uri,
-        .cert_pem = ca_pem,
-        .skip_cert_common_name_check = true,
-        .client_cert = device_session ? cert_pem : NULL,
-        .client_key = device_session ? link_key_pem() : NULL,
+        .ext_transport = transport,
         .disable_auto_reconnect = true,
         .buffer_size = WS_BUFFER_SIZE,
         .network_timeout_ms = NETWORK_TIMEOUT_MS,
@@ -579,6 +620,7 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
 
     esp_websocket_client_handle_t client = esp_websocket_client_init(&cfg);
     if (!client) {
+        esp_transport_list_destroy(transports);
         free(cert_pem);
         return OUTCOME_RETRY;
     }
@@ -638,6 +680,7 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
         esp_websocket_client_close(client, pdMS_TO_TICKS(2000));
     }
     esp_websocket_client_destroy(client);
+    esp_transport_list_destroy(transports);
 
     link_msg_t msg;
     while (xQueueReceive(s_queue, &msg, 0) == pdTRUE) {
