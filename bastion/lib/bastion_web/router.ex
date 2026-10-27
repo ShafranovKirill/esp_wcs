@@ -38,6 +38,7 @@ defmodule BastionWeb.Router do
 
     post "/locale", LocaleController, :update
 
+    get "/ca", CAController, :page
     get "/ca.crt", CAController, :show
   end
 
