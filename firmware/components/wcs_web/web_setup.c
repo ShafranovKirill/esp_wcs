@@ -10,12 +10,14 @@
 #include "wcs_wifi.h"
 #include "web_priv.h"
 
-#define BODY_MAX         640
+#define BODY_MAX         1024
 #define SCAN_MAX         24
 #define SCAN_ITEM_JSON   (WCS_SSID_MAX_LEN * 6 + 64)
 #define FORM_SSID_MAX    (WCS_SSID_MAX_LEN * 3 + 1)
 #define FORM_PASS_MAX    (WCS_WIFI_PASSWORD_MAX_LEN * 3 + 1)
 #define FORM_ADDR_MAX    (WCS_BASTION_ADDR_MAX_LEN * 3 + 1)
+#define AP_PASSWORD_MIN  8
+#define AP_PASSWORD_MAX  63
 
 static const char *TAG = "wcs_web_setup";
 
@@ -225,7 +227,25 @@ static esp_err_t apply_post(httpd_req_t *req)
     }
 
     if (strcmp(mode, "direct") == 0) {
+        char ssid[FORM_SSID_MAX] = "";
+        char password[FORM_PASS_MAX] = "";
+        web_form_value(body, "direct_ssid", ssid, sizeof(ssid));
+        web_form_value(body, "direct_password", password, sizeof(password));
+        memset(body, 0, sizeof(body));
+        size_t ssid_len = strlen(ssid);
+        size_t pass_len = strlen(password);
+        if (ssid_len == 0 || ssid_len > WCS_SSID_MAX_LEN) {
+            memset(password, 0, sizeof(password));
+            return web_send_json(req, "400 Bad Request", "{\"error\":\"invalid_ssid\"}");
+        }
+        if (pass_len < AP_PASSWORD_MIN || pass_len > AP_PASSWORD_MAX) {
+            memset(password, 0, sizeof(password));
+            return web_send_json(req, "400 Bad Request", "{\"error\":\"invalid_ap_password\"}");
+        }
         settings.mode = WCS_MODE_DIRECT;
+        strlcpy(settings.direct_ssid, ssid, sizeof(settings.direct_ssid));
+        strlcpy(settings.direct_password, password, sizeof(settings.direct_password));
+        memset(password, 0, sizeof(password));
     } else if (strcmp(mode, "bastion") == 0) {
         char ssid[FORM_SSID_MAX];
         char password[FORM_PASS_MAX] = "";

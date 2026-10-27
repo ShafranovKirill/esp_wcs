@@ -13,6 +13,7 @@ void web_set_security_headers(httpd_req_t *req);
 esp_err_t web_send_file(httpd_req_t *req, const char *path);
 esp_err_t web_redirect(httpd_req_t *req, const char *location);
 bool web_is_authorized(httpd_req_t *req);
+const char *web_ws_session_token(httpd_req_t *req);
 
 typedef enum {
     WEB_ACCESS_API = 0,
@@ -25,6 +26,7 @@ typedef struct {
     httpd_method_t method;
     esp_err_t (*handler)(httpd_req_t *req);
     web_access_t access;
+    bool websocket;
 } web_route_t;
 
 esp_err_t web_register_routes(httpd_handle_t server, const web_route_t *routes, size_t count);
@@ -42,3 +44,5 @@ bool web_json_escape(const char *in, char *out, size_t out_size);
 
 esp_err_t web_setup_register(httpd_handle_t server);
 esp_err_t web_direct_register(httpd_handle_t server);
+void web_direct_stop(void);
+void web_direct_socket_closed(int fd);

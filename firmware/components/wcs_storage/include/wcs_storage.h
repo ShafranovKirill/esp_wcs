@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "esp_err.h"
 
@@ -19,12 +20,24 @@ typedef struct {
     char sta_ssid[WCS_SSID_MAX_LEN + 1];
     char sta_password[WCS_WIFI_PASSWORD_MAX_LEN + 1];
     char bastion_addr[WCS_BASTION_ADDR_MAX_LEN + 1];
+    char direct_ssid[WCS_SSID_MAX_LEN + 1];
+    char direct_password[WCS_WIFI_PASSWORD_MAX_LEN + 1];
 } wcs_settings_t;
+
+typedef struct {
+    uint32_t baud;
+    uint8_t data_bits;
+    uint8_t parity;
+    uint8_t stop_bits;
+} wcs_console_settings_t;
 
 esp_err_t wcs_storage_load(wcs_settings_t *settings);
 esp_err_t wcs_storage_save(const wcs_settings_t *settings);
 
 esp_err_t wcs_storage_save_bastion_ca(const char *pem);
 esp_err_t wcs_storage_load_bastion_ca(char *pem, size_t size);
+
+esp_err_t wcs_storage_save_console(const wcs_console_settings_t *console);
+esp_err_t wcs_storage_load_console(wcs_console_settings_t *console);
 
 esp_err_t wcs_storage_erase(void);

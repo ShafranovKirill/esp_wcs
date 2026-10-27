@@ -5,16 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ESP WCS — консоль</title>
   <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/xterm/xterm.css">
+  <script type="module" src="/assets/console.js"></script>
 </head>
-<body>
-  <main class="card">
-    <header class="row">
-      <h1>Консоль</h1>
-      <form method="post" action="/logout">
-        <button type="submit" class="secondary">Выйти</button>
-      </form>
-    </header>
-    <p class="muted">Direct connection. Веб-терминал появится в следующей версии.</p>
-  </main>
+<body class="console">
+  <header class="toolbar">
+    <strong class="title">Консоль</strong>
+    <span id="link" class="badge">Подключение…</span>
+    <label class="field">Скорость
+      <select id="baud" disabled></select>
+    </label>
+    <label class="field">Формат
+      <select id="format" disabled></select>
+    </label>
+    <button type="button" id="break" class="secondary small" disabled title="Удержать линию в нуле ~300 мс">BREAK</button>
+    <span class="spacer"></span>
+    <form method="post" action="/logout">
+      <button type="submit" class="secondary small">Выйти</button>
+    </form>
+  </header>
+  <div id="message" class="message" hidden></div>
+  <main id="terminal" class="terminal"></main>
+
+  <div id="busy" class="overlay" hidden>
+    <div class="card narrow">
+      <h2 id="busy-title">Устройство занято</h2>
+      <p id="busy-text" class="muted">Консолью сейчас управляют в другой вкладке или с другого ноутбука.</p>
+      <button type="button" id="take">Забрать консоль</button>
+    </div>
+  </div>
 </body>
 </html>

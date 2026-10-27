@@ -2,6 +2,8 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include "esp_app_desc.h"
 #include "esp_check.h"
@@ -21,8 +23,9 @@
 #define PASSWORD_MAX      128
 #define SERVER_STACK_SIZE 10240
 #define MAX_URI_HANDLERS  24
-#define MAX_OPEN_SOCKETS  5
+#define MAX_OPEN_SOCKETS  7
 #define HOST_MAX          64
+#define ORIGIN_MAX        (sizeof("https://") + HOST_MAX)
 
 #define REDIRECT_CTRL_PORT    ESP_HTTPD_DEF_CTRL_PORT
 #define REDIRECT_MAX_SOCKETS  2
@@ -35,6 +38,7 @@ wcs_web_config_t web_config;
 static httpd_handle_t s_server;
 static httpd_handle_t s_redirect_server;
 static char s_host[HOST_MAX];
+static char s_csp[160 + HOST_MAX];
 
 void web_set_security_headers(httpd_req_t *req)
 {
@@ -42,7 +46,7 @@ void web_set_security_headers(httpd_req_t *req)
     httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
     httpd_resp_set_hdr(req, "X-Frame-Options", "DENY");
     httpd_resp_set_hdr(req, "Referrer-Policy", "no-referrer");
-    httpd_resp_set_hdr(req, "Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'");
+    httpd_resp_set_hdr(req, "Content-Security-Policy", s_csp);
 }
 
 esp_err_t web_send_file(httpd_req_t *req, const char *path)
@@ -272,9 +276,40 @@ static const web_route_t s_routes[] = {
     { .uri = "/assets/*", .method = HTTP_GET, .handler = asset_get, .access = WEB_ACCESS_PUBLIC },
 };
 
+const char *web_ws_session_token(httpd_req_t *req)
+{
+    return req->sess_ctx;
+}
+
+static esp_err_t ws_authorize(httpd_req_t *req)
+{
+    char origin[ORIGIN_MAX];
+    char expected[ORIGIN_MAX];
+    snprintf(expected, sizeof(expected), "https://%s", s_host);
+    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) != ESP_OK ||
+        strcmp(origin, expected) != 0) {
+        ESP_LOGW(TAG, "websocket %s: bad origin", req->uri);
+        return ESP_FAIL;
+    }
+
+    char token[WCS_AUTH_TOKEN_LEN + 1];
+    if (!get_session_token(req, token) || !wcs_auth_session_check(token)) {
+        ESP_LOGW(TAG, "websocket %s: not authorized", req->uri);
+        return ESP_FAIL;
+    }
+    char *copy = strdup(token);
+    ESP_RETURN_ON_FALSE(copy, ESP_ERR_NO_MEM, TAG, "no memory");
+    req->sess_ctx = copy;
+    req->free_ctx = free;
+    return ESP_OK;
+}
+
 static esp_err_t dispatch(httpd_req_t *req)
 {
     const web_route_t *route = req->user_ctx;
+    if (route->websocket) {
+        return route->handler(req);
+    }
     if (route->access != WEB_ACCESS_PUBLIC && !web_is_authorized(req)) {
         return route->access == WEB_ACCESS_PAGE ? web_redirect(req, "/login") : web_send_unauthorized(req);
     }
@@ -289,6 +324,8 @@ esp_err_t web_register_routes(httpd_handle_t server, const web_route_t *routes, 
             .method = routes[i].method,
             .handler = dispatch,
             .user_ctx = (void *)&routes[i],
+            .is_websocket = routes[i].websocket,
+            .ws_pre_handshake_cb = routes[i].websocket ? ws_authorize : NULL,
         };
         esp_err_t err = httpd_register_uri_handler(server, &uri);
         if (err != ESP_OK) {
@@ -331,6 +368,14 @@ static esp_err_t start_redirect_server(void)
     return ESP_OK;
 }
 
+static void on_socket_close(httpd_handle_t hd, int fd)
+{
+    if (web_config.mode == WCS_WEB_MODE_DIRECT) {
+        web_direct_socket_closed(fd);
+    }
+    close(fd);
+}
+
 esp_err_t wcs_web_start(const wcs_web_config_t *config)
 {
     ESP_RETURN_ON_FALSE(config, ESP_ERR_INVALID_ARG, TAG, "config is NULL");
@@ -344,6 +389,10 @@ esp_err_t wcs_web_start(const wcs_web_config_t *config)
 
     web_config = *config;
     strlcpy(s_host, config->host, sizeof(s_host));
+    snprintf(s_csp, sizeof(s_csp),
+             "default-src 'self'; connect-src 'self' wss://%s; style-src 'self' 'unsafe-inline'; "
+             "frame-ancestors 'none'",
+             s_host);
 
     httpd_ssl_config_t cfg = HTTPD_SSL_CONFIG_DEFAULT();
     cfg.servercert = (const uint8_t *)cred.cert_pem;
@@ -355,6 +404,7 @@ esp_err_t wcs_web_start(const wcs_web_config_t *config)
     cfg.httpd.max_open_sockets = MAX_OPEN_SOCKETS;
     cfg.httpd.lru_purge_enable = true;
     cfg.httpd.uri_match_fn = httpd_uri_match_wildcard;
+    cfg.httpd.close_fn = on_socket_close;
 
     ESP_RETURN_ON_ERROR(httpd_ssl_start(&s_server, &cfg), TAG, "httpd_ssl_start failed");
     esp_err_t err = WEB_REGISTER_ROUTES(s_server, s_routes);
@@ -382,6 +432,9 @@ esp_err_t wcs_web_stop(void)
     }
     if (!s_server) {
         return ESP_OK;
+    }
+    if (web_config.mode == WCS_WEB_MODE_DIRECT) {
+        web_direct_stop();
     }
     esp_err_t err = httpd_ssl_stop(s_server);
     s_server = NULL;

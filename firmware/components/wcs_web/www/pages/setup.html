@@ -44,10 +44,16 @@
 
     <section class="step" data-step="direct" hidden>
       <h2>Direct connection</h2>
-      <p>Интерфейс настройки закроется, и устройство поднимет новую точку доступа:</p>
+      <p>Интерфейс настройки закроется, и устройство поднимет свою точку доступа:</p>
+      <form id="direct-form">
+        <label>Сеть Wi-Fi
+          <input id="direct-ssid" maxlength="32" autocomplete="off" required>
+        </label>
+        <label>Пароль (от 8 до 63 символов)
+          <input id="direct-password" minlength="8" maxlength="63" autocomplete="off" required>
+        </label>
+      </form>
       <dl>
-        <dt>Сеть Wi-Fi</dt><dd data-direct="ssid">…</dd>
-        <dt>Пароль</dt><dd data-direct="password">…</dd>
         <dt>Адрес</dt><dd data-direct="url">…</dd>
       </dl>
       <p class="muted">Подключитесь к этой сети и откройте адрес в браузере.</p>

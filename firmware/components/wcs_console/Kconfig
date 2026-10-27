@@ -1,0 +1,23 @@
+menu "ESP WCS: консоль"
+
+    config WCS_CONSOLE_HISTORY_KB
+        int "История вывода консоли, КиБ (в PSRAM)"
+        range 4 1024
+        default 64
+
+    config WCS_CONSOLE_RX_BUFFER
+        int "Буфер приёма UART, байт"
+        range 1024 32768
+        default 4096
+
+    config WCS_CONSOLE_TX_BUFFER
+        int "Буфер передачи UART, байт"
+        range 1024 65536
+        default 8192
+
+    config WCS_CONSOLE_MAX_LISTENERS
+        int "Подписчиков на вывод консоли, не больше"
+        range 1 8
+        default 2
+
+endmenu
