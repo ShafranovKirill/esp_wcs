@@ -12,6 +12,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 
 #define SCAN_MAX_RECORDS       32
 #define STA_CHECK_ATTEMPTS     3
@@ -29,6 +30,7 @@ static esp_netif_t *s_ap_netif;
 static esp_netif_t *s_sta_netif;
 static esp_timer_handle_t s_retry_timer;
 static EventGroupHandle_t s_events;
+static SemaphoreHandle_t s_lock;
 static bool s_started;
 static bool s_ap_running;
 static bool s_sta_enabled;
@@ -152,6 +154,25 @@ static void on_ip_event(void *arg, esp_event_base_t base, int32_t id, void *data
     ESP_LOGI(TAG, "STA connected, ip " IPSTR, IP2STR(&e->ip_info.ip));
 }
 
+static void lock(void)
+{
+    if (!s_lock) {
+        static StaticSemaphore_t buf;
+        static portMUX_TYPE init_lock = portMUX_INITIALIZER_UNLOCKED;
+        portENTER_CRITICAL(&init_lock);
+        if (!s_lock) {
+            s_lock = xSemaphoreCreateRecursiveMutexStatic(&buf);
+        }
+        portEXIT_CRITICAL(&init_lock);
+    }
+    xSemaphoreTakeRecursive(s_lock, portMAX_DELAY);
+}
+
+static void unlock(void)
+{
+    xSemaphoreGiveRecursive(s_lock);
+}
+
 static esp_err_t wifi_init_once(void)
 {
     if (s_ap_netif) {
@@ -189,6 +210,10 @@ static esp_err_t apply_mode(void)
         mode = WIFI_MODE_STA;
     }
 
+    if (s_started) {
+        esp_wifi_scan_stop();
+    }
+
     if (mode == WIFI_MODE_NULL) {
         if (s_started) {
             ESP_RETURN_ON_ERROR(esp_wifi_stop(), TAG, "wifi stop failed");
@@ -205,7 +230,7 @@ static esp_err_t apply_mode(void)
     return ESP_OK;
 }
 
-esp_err_t wcs_wifi_ap_start(const wcs_wifi_ap_config_t *config)
+static esp_err_t ap_start(const wcs_wifi_ap_config_t *config)
 {
     ESP_RETURN_ON_FALSE(config && config->ssid && config->password, ESP_ERR_INVALID_ARG, TAG, "invalid config");
     size_t ssid_len = strlen(config->ssid);
@@ -229,11 +254,22 @@ esp_err_t wcs_wifi_ap_start(const wcs_wifi_ap_config_t *config)
     memcpy(wifi_config.ap.ssid, config->ssid, ssid_len);
     memcpy(wifi_config.ap.password, config->password, pass_len);
 
+    if (s_started) {
+        esp_wifi_scan_stop();
+        ESP_RETURN_ON_ERROR(esp_wifi_stop(), TAG, "wifi stop failed");
+        s_started = false;
+    }
+
     s_ap_running = true;
-    esp_err_t err = apply_mode();
+    esp_err_t err = esp_wifi_set_mode(s_sta_enabled ? WIFI_MODE_APSTA : WIFI_MODE_AP);
     if (err == ESP_OK) {
         err = esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
     }
+    if (err == ESP_OK) {
+        err = esp_wifi_start();
+        s_started = err == ESP_OK;
+    }
+    memset(&wifi_config, 0, sizeof(wifi_config));
     if (err != ESP_OK) {
         s_ap_running = false;
         apply_mode();
@@ -245,13 +281,26 @@ esp_err_t wcs_wifi_ap_start(const wcs_wifi_ap_config_t *config)
     return ESP_OK;
 }
 
+esp_err_t wcs_wifi_ap_start(const wcs_wifi_ap_config_t *config)
+{
+    lock();
+    esp_err_t err = ap_start(config);
+    unlock();
+    return err;
+}
+
 esp_err_t wcs_wifi_ap_stop(void)
 {
+    lock();
     if (!s_ap_running) {
+        unlock();
         return ESP_OK;
     }
+    esp_wifi_deauth_sta(0);
     s_ap_running = false;
-    ESP_RETURN_ON_ERROR(apply_mode(), TAG, "mode change failed");
+    esp_err_t err = apply_mode();
+    unlock();
+    ESP_RETURN_ON_ERROR(err, TAG, "AP stop failed");
     ESP_LOGI(TAG, "AP stopped");
     return ESP_OK;
 }
@@ -277,7 +326,7 @@ static int compare_rssi(const void *a, const void *b)
     return ((const wcs_wifi_network_t *)b)->rssi - ((const wcs_wifi_network_t *)a)->rssi;
 }
 
-esp_err_t wcs_wifi_scan(wcs_wifi_network_t *networks, size_t max, size_t *count)
+static esp_err_t scan(wcs_wifi_network_t *networks, size_t max, size_t *count)
 {
     ESP_RETURN_ON_FALSE(networks && count, ESP_ERR_INVALID_ARG, TAG, "invalid args");
     ESP_RETURN_ON_FALSE(s_started, ESP_ERR_INVALID_STATE, TAG, "wifi not started");
@@ -339,7 +388,7 @@ esp_err_t wcs_wifi_scan(wcs_wifi_network_t *networks, size_t max, size_t *count)
     return ESP_OK;
 }
 
-esp_err_t wcs_wifi_sta_connect(const char *ssid, const char *password, bool auto_reconnect)
+static esp_err_t sta_connect(const char *ssid, const char *password, bool auto_reconnect)
 {
     ESP_RETURN_ON_FALSE(ssid && password, ESP_ERR_INVALID_ARG, TAG, "invalid args");
     size_t ssid_len = strlen(ssid);
@@ -382,7 +431,7 @@ esp_err_t wcs_wifi_sta_connect(const char *ssid, const char *password, bool auto
     return ESP_OK;
 }
 
-esp_err_t wcs_wifi_sta_disconnect(void)
+static esp_err_t sta_disconnect(void)
 {
     if (!s_sta_enabled) {
         return ESP_OK;
@@ -402,4 +451,28 @@ void wcs_wifi_sta_get_status(wcs_wifi_sta_status_t *status)
     portENTER_CRITICAL(&s_sta_lock);
     *status = s_sta;
     portEXIT_CRITICAL(&s_sta_lock);
+}
+
+esp_err_t wcs_wifi_scan(wcs_wifi_network_t *networks, size_t max, size_t *count)
+{
+    lock();
+    esp_err_t err = scan(networks, max, count);
+    unlock();
+    return err;
+}
+
+esp_err_t wcs_wifi_sta_connect(const char *ssid, const char *password, bool auto_reconnect)
+{
+    lock();
+    esp_err_t err = sta_connect(ssid, password, auto_reconnect);
+    unlock();
+    return err;
+}
+
+esp_err_t wcs_wifi_sta_disconnect(void)
+{
+    lock();
+    esp_err_t err = sta_disconnect();
+    unlock();
+    return err;
 }
