@@ -199,6 +199,18 @@ esp_err_t wcs_link_forget_certificate(void)
     return nvs_write(keys, values, 2);
 }
 
+esp_err_t wcs_link_forget_identity(void)
+{
+    nvs_handle_t nvs;
+    ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs), TAG, "nvs_open failed");
+    esp_err_t err = nvs_erase_all(nvs);
+    if (err == ESP_OK) {
+        err = nvs_commit(nvs);
+    }
+    nvs_close(nvs);
+    return err;
+}
+
 const char *link_key_pem(void)
 {
     return s_key_pem;

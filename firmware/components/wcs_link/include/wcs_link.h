@@ -28,6 +28,8 @@ esp_err_t wcs_link_device_code(char out[WCS_LINK_CODE_LEN + 1]);
 
 esp_err_t wcs_link_forget_certificate(void);
 
+esp_err_t wcs_link_forget_identity(void);
+
 typedef struct {
     const char *bastion_addr;
     const char *name;
