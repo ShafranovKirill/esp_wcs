@@ -14,6 +14,7 @@ defmodule Bastion.Link.Application.Presence do
           optional(:ip) => String.t() | nil,
           optional(:fw) => String.t() | nil,
           optional(:connected_at) => DateTime.t(),
+          optional(:console) => map(),
           optional(:last_hb) => DateTime.t()
         }
 
@@ -41,6 +42,14 @@ defmodule Bastion.Link.Application.Presence do
   def get(id) do
     case :ets.lookup(@table, id) do
       [{^id, _pid, info}] -> info
+      [] -> nil
+    end
+  end
+
+  @spec pid(String.t()) :: pid() | nil
+  def pid(id) do
+    case :ets.lookup(@table, id) do
+      [{^id, pid, _info}] -> pid
       [] -> nil
     end
   end

@@ -1,6 +1,13 @@
 defmodule BastionWeb do
   use Boundary,
-    deps: [Bastion.Events, Bastion.PKI, Bastion.Accounts, Bastion.Fleet, Bastion.Link],
+    deps: [
+      Bastion.Events,
+      Bastion.PKI,
+      Bastion.Accounts,
+      Bastion.Fleet,
+      Bastion.Link,
+      Bastion.Console
+    ],
     exports: [Endpoint, Telemetry, TLS]
 
   def static_paths, do: ~w(assets fonts images js favicon.ico robots.txt)

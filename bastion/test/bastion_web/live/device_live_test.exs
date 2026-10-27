@@ -4,9 +4,49 @@ defmodule BastionWeb.DeviceLiveTest do
   import Phoenix.LiveViewTest
   import Bastion.FleetFixtures
 
+  alias Bastion.FakeDevice
   alias Bastion.Fleet
 
   setup :log_in_admin
+
+  describe "консоль" do
+    test "владелец вводит команды, вторая вкладка видит «Устройство занято» и забирает консоль",
+         %{conn: conn} do
+      device = approved_device()
+      fake = device |> FakeDevice.start() |> FakeDevice.stop_on_exit()
+      FakeDevice.send_binary(fake, <<1, "Switch>">>)
+      FakeDevice.send_text(fake, %{t: "credit", bytes: 1000})
+
+      {:ok, first, _} = live(conn, ~p"/devices/#{device.id}")
+      assert_push_event(first, "console-reset", %{data: history})
+      assert Base.decode64!(history) == "Switch>"
+      assert_push_event(first, "console-state", %{owner: true})
+      refute has_element?(first, "#console-busy")
+
+      render_hook(first, "console-input", %{"data" => "en\r"})
+      assert_receive {:fake_frame, ^fake, {:binary, <<2, "en\r">>}}
+
+      FakeDevice.send_binary(fake, <<1, "Switch#">>)
+      assert_push_event(first, "console-output", %{data: data})
+      assert Base.decode64!(data) == "Switch#"
+
+      {:ok, second, _} = live(conn, ~p"/devices/#{device.id}")
+      assert has_element?(second, "#console-busy")
+
+      second |> element("#console-take") |> render_click()
+      assert_push_event(second, "console-state", %{owner: true})
+      assert render(first) =~ ~s(id="console-busy")
+      refute has_element?(second, "#console-busy")
+    end
+
+    test "офлайн-устройство — предупреждение, неодобренное — консоль недоступна", %{conn: conn} do
+      {:ok, view, _} = live(conn, ~p"/devices/#{approved_device().id}")
+      assert has_element?(view, "#console-offline")
+
+      {:ok, view, _} = live(conn, ~p"/devices/#{pending_device().id}")
+      assert has_element?(view, "#console-unavailable")
+    end
+  end
 
   test "вкладки: консоль нарисована, сведения, журнал", %{conn: conn} do
     device = approved_device(%{name: "core-sw-01"})

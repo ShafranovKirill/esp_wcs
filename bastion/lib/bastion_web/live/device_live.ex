@@ -1,7 +1,10 @@
 defmodule BastionWeb.DeviceLive do
   use BastionWeb, :live_view
 
+  alias Bastion.Console
+  alias Bastion.Console.Events.{ConsoleTaken, LockChanged}
   alias Bastion.Fleet
+  alias Bastion.Link.Events.{ConsoleOutput, PresenceChanged}
 
   @tabs [:console, :settings, :info, :journal]
 
@@ -18,6 +21,7 @@ defmodule BastionWeb.DeviceLive do
         if connected?(socket) do
           Fleet.subscribe(device.id)
           Fleet.subscribe()
+          Console.subscribe(device.id)
         end
 
         {:ok,
@@ -25,7 +29,9 @@ defmodule BastionWeb.DeviceLive do
          |> assign(
            device: device,
            folders: Fleet.list_folders(),
-           online: Bastion.Link.presence(device.id)
+           online: Bastion.Link.presence(device.id),
+           console: :idle,
+           console_since: nil
          )
          |> assign_forms()}
     end
@@ -41,8 +47,46 @@ defmodule BastionWeb.DeviceLive do
       |> then(fn s ->
         if tab == :journal, do: assign(s, events: Fleet.list_events(s.assigns.device.id)), else: s
       end)
+      |> sync_console()
 
     {:noreply, socket}
+  end
+
+  defp sync_console(socket) do
+    %{device: device, tab: tab, console: console} = socket.assigns
+    wanted? = connected?(socket) and tab == :console and device.status == :approved
+
+    cond do
+      wanted? and console != :owner -> attach_console(socket)
+      not wanted? and console == :owner -> release_console(socket)
+      not wanted? -> assign(socket, console: :idle)
+      true -> socket
+    end
+  end
+
+  defp attach_console(socket) do
+    case Console.attach(socket.assigns.device.id) do
+      {:ok, history} -> owner(socket, history)
+      {:busy, since} -> busy(socket, since)
+    end
+  end
+
+  defp release_console(socket) do
+    Console.release(socket.assigns.device.id)
+    socket |> assign(console: :idle) |> push_event("console-state", %{owner: false})
+  end
+
+  defp owner(socket, history) do
+    socket
+    |> assign(console: :owner, console_since: nil)
+    |> push_event("console-reset", %{data: Base.encode64(history)})
+    |> push_event("console-state", %{owner: true})
+  end
+
+  defp busy(socket, since) do
+    socket
+    |> assign(console: :busy, console_since: since)
+    |> push_event("console-state", %{owner: false})
   end
 
   defp assign_forms(socket) do
@@ -70,17 +114,73 @@ defmodule BastionWeb.DeviceLive do
 
   @impl true
   def handle_info(
-        {:event, %Bastion.Link.Events.PresenceChanged{id: id}},
+        {:event, %PresenceChanged{id: id}},
         %{assigns: %{device: %{id: id}}} = socket
       ),
       do: {:noreply, assign(socket, online: Bastion.Link.presence(id))}
 
-  def handle_info({:event, %Bastion.Link.Events.PresenceChanged{}}, socket),
-    do: {:noreply, socket}
+  def handle_info({:event, %PresenceChanged{}}, socket), do: {:noreply, socket}
 
-  def handle_info({:event, _event}, socket), do: {:noreply, reload(socket)}
+  def handle_info({:event, %ConsoleOutput{data: data}}, %{assigns: %{console: :owner}} = socket),
+    do: {:noreply, push_event(socket, "console-output", %{data: Base.encode64(data)})}
+
+  def handle_info({:event, %ConsoleOutput{}}, socket), do: {:noreply, socket}
+
+  def handle_info({:event, %ConsoleTaken{id: id}}, socket) do
+    Console.lost(id)
+
+    since =
+      case Console.lock(id) do
+        {:owned, _pid, since} -> since
+        :free -> DateTime.utc_now(:second)
+      end
+
+    {:noreply, busy(socket, since)}
+  end
+
+  def handle_info({:event, %LockChanged{owned: false}}, %{assigns: %{console: :busy}} = socket),
+    do: {:noreply, sync_console(socket)}
+
+  def handle_info({:event, %LockChanged{owned: true}}, %{assigns: %{console: :busy}} = socket) do
+    case Console.lock(socket.assigns.device.id) do
+      {:owned, pid, since} when pid != self() -> {:noreply, assign(socket, console_since: since)}
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_info({:event, %LockChanged{}}, socket), do: {:noreply, socket}
+
+  def handle_info({:event, _event}, socket), do: {:noreply, socket |> reload() |> sync_console()}
 
   @impl true
+  def handle_event("console-input", %{"data" => data}, %{assigns: %{console: :owner}} = socket)
+      when is_binary(data) do
+    Console.input(socket.assigns.device.id, data)
+    {:noreply, socket}
+  end
+
+  def handle_event("console-input", _params, socket), do: {:noreply, socket}
+
+  def handle_event("console-ping", _params, socket), do: {:noreply, socket}
+
+  def handle_event("console-take", _params, socket) do
+    {:ok, history} = Console.take(socket.assigns.device.id)
+    {:noreply, owner(socket, history)}
+  end
+
+  def handle_event("console-break", _params, %{assigns: %{console: :owner}} = socket) do
+    id = socket.assigns.device.id
+    lv = self()
+    {:noreply, start_async(socket, :console_break, fn -> Console.send_break(id, lv) end)}
+  end
+
+  def handle_event("console-break", _params, socket), do: {:noreply, socket}
+
+  def handle_event("console-line", %{"line" => params}, socket) do
+    id = socket.assigns.device.id
+    {:noreply, start_async(socket, :console_line, fn -> Console.configure(id, params) end)}
+  end
+
   def handle_event("rename", %{"device" => %{"name" => name}}, socket) do
     case Fleet.rename(socket.assigns.device.id, name) do
       {:ok, _} ->
@@ -123,6 +223,20 @@ defmodule BastionWeb.DeviceLive do
         {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
     end
   end
+
+  @impl true
+  def handle_async(op, {:ok, :ok}, socket) when op in [:console_break, :console_line] do
+    message =
+      if op == :console_break, do: gettext("BREAK sent"), else: gettext("Port settings applied")
+
+    {:noreply, put_flash(socket, :info, message)}
+  end
+
+  def handle_async(_op, {:ok, {:error, reason}}, socket),
+    do: {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
+
+  def handle_async(_op, {:exit, _reason}, socket),
+    do: {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(:failed))}
 
   defp lifecycle(socket, fun, success) do
     socket = push_event(socket, "close-dialog", %{id: "approve-dialog"})
@@ -209,7 +323,13 @@ defmodule BastionWeb.DeviceLive do
         </.link>
       </div>
 
-      <.console_tab :if={@tab == :console} device={@device} />
+      <.console_tab
+        :if={@tab == :console}
+        device={@device}
+        online={@online}
+        console={@console}
+        since={@console_since}
+      />
       <.settings_tab
         :if={@tab == :settings}
         device={@device}
@@ -246,36 +366,137 @@ defmodule BastionWeb.DeviceLive do
   end
 
   attr :device, :map, required: true
+  attr :online, :map, default: nil
+  attr :console, :atom, required: true
+  attr :since, :any, default: nil
 
   defp console_tab(assigns) do
-    banner = [
-      "\e[1;36mESP WCS\e[0m · #{assigns.device.name}",
-      "",
-      "\e[33m" <>
-        gettext("The console will be available once the device connects to the bastion.") <>
-        "\e[0m",
-      gettext("Live console over WCS Link is the next step of stage 2.")
-    ]
+    banner = ["\e[1;36mESP WCS\e[0m · #{assigns.device.name}", ""]
+    line = assigns.online && assigns.online[:console]
 
-    assigns = assign(assigns, :banner, JSON.encode!(banner))
+    assigns =
+      assign(assigns,
+        banner: JSON.encode!(banner),
+        line: line,
+        line_form: to_form(line_params(line), as: :line)
+      )
 
     ~H"""
     <section class="space-y-3" id="console">
-      <div class="flex flex-wrap items-center gap-2">
-        <select class="select select-sm w-36" disabled aria-label={gettext("Baud rate")}>
-          <option :for={baud <- ~w(9600 19200 38400 57600 115200)} selected={baud == "9600"}>
+      <.form
+        for={@line_form}
+        id="console-line"
+        phx-change="console-line"
+        class="flex flex-wrap items-center gap-2"
+      >
+        <select
+          name="line[baud]"
+          class="select select-sm w-32"
+          disabled={!@online}
+          aria-label={gettext("Baud rate")}
+        >
+          <option
+            :for={baud <- Console.bauds()}
+            value={baud}
+            selected={@line_form[:baud].value == baud}
+          >
             {baud}
           </option>
         </select>
-        <span class="text-sm text-base-content/50">8N1</span>
+        <select
+          name="line[data_bits]"
+          class="select select-sm w-20"
+          disabled={!@online}
+          aria-label={gettext("Data bits")}
+        >
+          <option :for={bits <- 8..5//-1} value={bits} selected={@line_form[:data_bits].value == bits}>
+            {bits}
+          </option>
+        </select>
+        <select
+          name="line[parity]"
+          class="select select-sm w-28"
+          disabled={!@online}
+          aria-label={gettext("Parity")}
+        >
+          <option
+            :for={{label, value} <- parity_options()}
+            value={value}
+            selected={@line_form[:parity].value == value}
+          >
+            {label}
+          </option>
+        </select>
+        <select
+          name="line[stop_bits]"
+          class="select select-sm w-20"
+          disabled={!@online}
+          aria-label={gettext("Stop bits")}
+        >
+          <option :for={stop <- [1, 2]} value={stop} selected={@line_form[:stop_bits].value == stop}>
+            {stop}
+          </option>
+        </select>
+        <span :if={@line} class="text-sm text-base-content/50" id="console-line-current">
+          {Console.format_line(@line)}
+        </span>
         <span class="flex-1"></span>
-        <button type="button" class="btn btn-sm" disabled title={gettext("Send BREAK")}>
+        <button
+          type="button"
+          class="btn btn-sm"
+          id="console-break"
+          phx-click="console-break"
+          disabled={@console != :owner}
+          title={gettext("Send BREAK")}
+        >
           <.icon name="hero-bolt" class="size-4" /> BREAK
         </button>
-        <button type="button" class="btn btn-sm btn-primary" disabled>
+      </.form>
+
+      <div
+        :if={@console == :busy}
+        id="console-busy"
+        class="alert alert-warning alert-soft items-start"
+      >
+        <.icon name="hero-lock-closed" class="size-6" />
+        <div class="flex-1 space-y-1">
+          <p class="font-medium">{gettext("Device busy")}</p>
+          <p class="text-sm">
+            {gettext("The console is open in another tab or browser.")}
+            <span :if={@since}>
+              {gettext("Since")} <.time at={@since} format="relative" id="console-busy-since" />
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          id="console-take"
+          phx-click="console-take"
+          data-confirm={gettext("Take the console? The other tab will lose control.")}
+        >
           <.icon name="hero-hand-raised" class="size-4" /> {gettext("Take the console")}
         </button>
       </div>
+
+      <div
+        :if={@device.status == :approved and !@online}
+        id="console-offline"
+        class="alert alert-soft"
+      >
+        <.icon name="hero-signal-slash" class="size-6" />
+        <span>{gettext("The device is offline. The console will open when it connects.")}</span>
+      </div>
+
+      <div
+        :if={@device.status != :approved}
+        id="console-unavailable"
+        class="alert alert-soft"
+      >
+        <.icon name="hero-information-circle" class="size-6" />
+        <span>{gettext("The console is available for approved devices only.")}</span>
+      </div>
+
       <div
         id={"terminal-#{@device.id}"}
         phx-hook="Terminal"
@@ -288,6 +509,20 @@ defmodule BastionWeb.DeviceLive do
     </section>
     """
   end
+
+  defp line_params(nil),
+    do: %{"baud" => 9600, "data_bits" => 8, "parity" => "none", "stop_bits" => 1}
+
+  defp line_params(line),
+    do: %{
+      "baud" => line.baud,
+      "data_bits" => line.data_bits,
+      "parity" => to_string(line.parity),
+      "stop_bits" => line.stop_bits
+    }
+
+  defp parity_options,
+    do: [{gettext("No parity"), "none"}, {gettext("Even"), "even"}, {gettext("Odd"), "odd"}]
 
   attr :device, :map, required: true
   attr :name_form, :map, required: true

@@ -1,7 +1,7 @@
 defmodule Bastion.Application do
   use Boundary,
     top_level?: true,
-    deps: [Bastion.Repo, Bastion.PKI, Bastion.Accounts, Bastion.Link, BastionWeb]
+    deps: [Bastion.Repo, Bastion.PKI, Bastion.Accounts, Bastion.Link, Bastion.Console, BastionWeb]
 
   use Application
 
@@ -14,6 +14,7 @@ defmodule Bastion.Application do
       Bastion.PKI,
       Bastion.Accounts,
       Bastion.Link,
+      Bastion.Console,
       BastionWeb.TLS.endpoint_child_spec(),
       BastionWeb.TLS
     ]
