@@ -170,7 +170,11 @@ static void on_ws_event(void *arg, esp_event_base_t base, int32_t id, void *data
         } else if (ev->op_code == 0x2 || (ev->op_code == 0x0 && ev->payload_offset > 0 && s_input_frame)) {
             on_binary(ev);
         } else if (ev->op_code == 0x8) {
-            post(MSG_CLOSED, ev->close_status_code, NULL);
+            int code = 0;
+            if (ev->payload_offset == 0 && ev->data_len >= 2) {
+                code = ((uint8_t)ev->data_ptr[0] << 8) | (uint8_t)ev->data_ptr[1];
+            }
+            post(MSG_CLOSED, code, NULL);
         }
         break;
     case WEBSOCKET_EVENT_CLOSED:

@@ -16,7 +16,7 @@ config :bastion, BastionWeb.Endpoint,
     tailwind: {Tailwind, :install_and_run, [:bastion, ~w(--watch)]}
   ]
 
-config :bastion, dev_routes: true
+config :bastion, dev_routes: true, weak_admin_password: true
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 

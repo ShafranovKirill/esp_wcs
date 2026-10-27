@@ -355,8 +355,9 @@
     $('direct-ssid').value = info.direct.ssid;
     $('direct-password').value = info.direct.password;
     var port = info.bastion_default_port;
-    $('bastion-hint').textContent = 'Порт по умолчанию — ' + port + '. Другой укажите через двоеточие: bastion.local:8443';
-    $('bastion').value = info.saved.bastion || '';
+    $('bastion-hint').textContent = 'Порт по умолчанию — ' + port + '. Другой укажите через двоеточие: bastion.local:8443. ' +
+      'Если mDNS в сети не работает, введите IP со страницы «Как подключить» на бастионе';
+    $('bastion').value = info.saved.bastion || 'bastion.local:' + port;
     updateBastion();
     var radio = document.querySelector('input[name=mode][value="' + info.saved.mode + '"]');
     if (radio) {
