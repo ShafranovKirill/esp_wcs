@@ -4,7 +4,7 @@
 #include "esp_event.h"
 
 #define WCS_LINK_DEVICE_ID_LEN 12
-#define WCS_LINK_CODE_LEN      14
+#define WCS_LINK_CODE_LEN      24
 
 ESP_EVENT_DECLARE_BASE(WCS_LINK_EVENT);
 

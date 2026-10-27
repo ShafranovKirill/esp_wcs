@@ -104,8 +104,8 @@ defmodule BastionWeb.DeviceLive do
     end
   end
 
-  def handle_event("approve", _params, socket),
-    do: lifecycle(socket, &Fleet.approve/1, gettext("Device approved"))
+  def handle_event("approve", %{"code" => code}, socket),
+    do: lifecycle(socket, &Fleet.approve(&1, code), gettext("Device approved"))
 
   def handle_event("reject", _params, socket),
     do: lifecycle(socket, &Fleet.reject/1, gettext("Request rejected"))
@@ -232,9 +232,13 @@ defmodule BastionWeb.DeviceLive do
           <button type="button" class="btn btn-ghost" phx-click={close_dialog("approve-dialog")}>{gettext(
             "Cancel"
           )}</button>
-          <button type="button" class="btn btn-success" phx-click="approve" id="approve-confirm">{gettext(
-            "Codes match, approve"
-          )}</button>
+          <button
+            type="button"
+            class="btn btn-success"
+            phx-click="approve"
+            phx-value-code={@device.device_code}
+            id="approve-confirm"
+          >{gettext("Codes match, approve")}</button>
         </:actions>
       </.dialog>
     </Layouts.app>

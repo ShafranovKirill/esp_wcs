@@ -18,9 +18,16 @@ defmodule Bastion.Link.Infrastructure.Listener do
     Bastion.PKI.server_ssl_options() ++
       [
         versions: [:"tlsv1.3"],
+        ciphers: ciphers(),
         verify: :verify_peer,
         fail_if_no_peer_cert: false,
         session_tickets: :stateless
       ]
+  end
+
+  defp ciphers do
+    :ssl.filter_cipher_suites(:ssl.cipher_suites(:all, :"tlsv1.3"),
+      cipher: &(&1 in [:aes_128_gcm, :chacha20_poly1305])
+    )
   end
 end

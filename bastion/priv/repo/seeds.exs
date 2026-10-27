@@ -38,7 +38,9 @@ device = fn device_id, name ->
   end
 end
 
-approve = fn d -> if d.status == :pending, do: elem(Fleet.approve(d.id), 1), else: d end
+approve = fn d ->
+  if d.status == :pending, do: elem(Fleet.approve(d.id, d.device_code), 1), else: d
+end
 
 server_room = folder.("Серверная 1")
 warehouse = folder.("Склад")

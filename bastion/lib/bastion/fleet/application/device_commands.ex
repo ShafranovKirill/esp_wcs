@@ -36,8 +36,32 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
 
   defp do_submit(req) do
     record = lock_by_device_id(req.device_id)
-    now = now()
 
+    with :ok <- check_capacity(record) do
+      request(record, req, now())
+    end
+  end
+
+  defp check_capacity(nil) do
+    cond do
+      Repo.aggregate(DeviceRecord, :count) >= Device.max_devices() -> {:error, :fleet_full}
+      pending_count() >= Device.max_pending() -> {:error, :too_many_requests}
+      true -> :ok
+    end
+  end
+
+  defp check_capacity(%DeviceRecord{status: :pending}), do: :ok
+
+  defp check_capacity(_record) do
+    if pending_count() >= Device.max_pending(), do: {:error, :too_many_requests}, else: :ok
+  end
+
+  defp pending_count do
+    status = :pending
+    Repo.aggregate(from(d in DeviceRecord, where: d.status == ^status), :count)
+  end
+
+  defp request(record, req, now) do
     case Device.request(record && DeviceRecord.to_domain(record), req, now) do
       {:ok, device} ->
         with {:ok, saved} <- save_request(record, device) do
@@ -77,11 +101,12 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end
   end
 
-  @spec approve(String.t()) :: {:ok, Device.t()} | {:error, atom()}
-  def approve(id) do
+  @spec approve(String.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
+  def approve(id, device_code) do
     UnitOfWork.run(fn ->
       with {:ok, record} <- lock(id),
            device = DeviceRecord.to_domain(record),
+           true <- device.device_code == device_code || {:error, :code_changed},
            {:ok, cert} <- sign(device),
            {:ok, device} <- Device.approve(device, cert, now()),
            {:ok, saved} <- persist(record, device) do

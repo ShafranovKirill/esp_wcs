@@ -27,7 +27,7 @@ defmodule Bastion.Fleet do
   def subscribe(id), do: Bastion.Events.subscribe({:device, id})
 
   defdelegate submit_request(attrs), to: DeviceCommands
-  defdelegate approve(id), to: DeviceCommands
+  defdelegate approve(id, device_code), to: DeviceCommands
   defdelegate reject(id), to: DeviceCommands
   defdelegate revoke(id), to: DeviceCommands
   defdelegate delete(id), to: DeviceCommands
@@ -43,4 +43,5 @@ defmodule Bastion.Fleet do
 
   defdelegate format_mac(device_id), to: DeviceId
   defdelegate name_max_length(), to: Name, as: :max_length
+  defdelegate max_devices(), to: Bastion.Fleet.Device
 end

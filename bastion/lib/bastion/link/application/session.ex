@@ -93,7 +93,7 @@ defmodule Bastion.Link.Application.Session do
       {:ok, {:approved, cert_pem}} ->
         {:push, {:text, Protocol.enroll_approved(cert_pem)}, %{state | phase: :done}}
 
-      {:error, :rate_limited} ->
+      {:error, reason} when reason in [:rate_limited, :too_many_requests, :fleet_full] ->
         close(:rate_limited, "too many requests", state)
 
       {:error, :key_mismatch} ->

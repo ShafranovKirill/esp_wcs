@@ -7,7 +7,7 @@ defmodule Bastion.Fleet.DeviceTest do
   @req %{
     device_id: "7c2c678c8580",
     name: "esp",
-    device_code: "AAAA-BBBB-CCCC",
+    device_code: "AAAA-BBBB-CCCC-DDDD-EEEE",
     csr_pem: "csr",
     firmware_version: "1",
     ip: "1.2.3.4"
@@ -23,12 +23,21 @@ defmodule Bastion.Fleet.DeviceTest do
 
   test "повторная заявка — не чаще раза в минуту" do
     {:ok, d} = Device.request(nil, @req, @t0)
-    assert {:error, :rate_limited} = Device.request(d, %{@req | device_code: "NEW"}, at(59))
-
-    assert {:ok, %{device_code: "NEW", requested_at: requested}} =
-             Device.request(d, %{@req | device_code: "NEW"}, at(60))
-
+    assert {:error, :rate_limited} = Device.request(d, @req, at(59))
+    assert {:ok, %{requested_at: requested}} = Device.request(d, @req, at(60))
     assert requested == at(60)
+  end
+
+  test "заявку на рассмотрении нельзя подменить другим ключом" do
+    {:ok, d} = Device.request(nil, @req, @t0)
+    assert {:error, :key_mismatch} = Device.request(d, %{@req | device_code: "NEW"}, at(600))
+  end
+
+  test "после отзыва можно подать заявку с новым ключом" do
+    {:ok, d} = Device.request(nil, @req, @t0)
+    {:ok, d} = Device.approve(d, @cert, at(1))
+    {:ok, d} = Device.revoke(d, at(2))
+    assert {:ok, %{device_code: "NEW"}} = Device.request(d, %{@req | device_code: "NEW"}, at(100))
   end
 
   test "одобрение: сертификат сохранён, CSR больше не нужен" do

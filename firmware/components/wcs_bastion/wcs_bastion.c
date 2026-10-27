@@ -228,8 +228,8 @@ esp_err_t wcs_bastion_code(const uint8_t *spki_der, size_t len, char out[WCS_BAS
     if (psa_hash_compute(PSA_ALG_SHA_256, spki_der, len, hash, sizeof(hash), &hash_len) != PSA_SUCCESS) {
         return ESP_FAIL;
     }
-    snprintf(out, WCS_BASTION_CODE_LEN + 1, "%02X%02X-%02X%02X-%02X%02X", hash[0], hash[1], hash[2], hash[3],
-             hash[4], hash[5]);
+    snprintf(out, WCS_BASTION_CODE_LEN + 1, "%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X", hash[0], hash[1],
+             hash[2], hash[3], hash[4], hash[5], hash[6], hash[7], hash[8], hash[9]);
     return ESP_OK;
 }
 

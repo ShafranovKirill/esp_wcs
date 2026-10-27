@@ -27,7 +27,7 @@ defmodule Bastion.FleetTest do
 
       assert %{requests: [device], folders: [], unfiled: []} = Fleet.overview()
       assert device.status == :pending
-      assert device.device_code =~ ~r/\A[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}\z/
+      assert device.device_code =~ ~r/\A[0-9A-F]{4}(-[0-9A-F]{4}){4}\z/
       assert [%{type: :requested}] = Fleet.list_events(device.id)
     end
 
@@ -45,7 +45,7 @@ defmodule Bastion.FleetTest do
 
     test "одобрение подписывает сертификат и сообщает о нём" do
       device = pending_device()
-      assert {:ok, approved} = Fleet.approve(device.id)
+      assert {:ok, approved} = Fleet.approve(device.id, device.device_code)
       assert approved.status == :approved
       assert approved.certificate_pem =~ "BEGIN CERTIFICATE"
       assert_receive {:event, %DeviceApproved{certificate_pem: pem}}
@@ -71,8 +71,32 @@ defmodule Bastion.FleetTest do
 
     test "частые заявки — отказ" do
       id = device_id()
-      pending_device(%{device_id: id})
-      assert {:error, :rate_limited} = Fleet.submit_request(request_attrs(%{device_id: id}))
+      key = X509.PrivateKey.new_ec(:secp256r1)
+      pending_device(%{device_id: id, csr_pem: csr(id, key)})
+
+      assert {:error, :rate_limited} =
+               Fleet.submit_request(request_attrs(%{device_id: id, csr_pem: csr(id, key)}))
+    end
+
+    test "заявку на рассмотрении нельзя подменить другим ключом" do
+      id = device_id()
+      device = pending_device(%{device_id: id})
+      assert {:error, :key_mismatch} = Fleet.submit_request(request_attrs(%{device_id: id}))
+      assert Fleet.get_device(device.id).device_code == device.device_code
+    end
+
+    test "одобрение только с тем кодом, который видел администратор" do
+      device = pending_device()
+
+      assert {:error, :code_changed} =
+               Fleet.approve(device.id, "AAAA-BBBB-CCCC-DDDD-EEEE")
+
+      assert Fleet.get_device(device.id).status == :pending
+    end
+
+    test "заявок на рассмотрении не больше лимита" do
+      for _ <- 1..Bastion.Fleet.Device.max_pending(), do: pending_device()
+      assert {:error, :too_many_requests} = Fleet.submit_request(request_attrs())
     end
 
     test "отклонение новой заявки удаляет устройство" do
@@ -105,7 +129,9 @@ defmodule Bastion.FleetTest do
     end
 
     test "несуществующее устройство" do
-      assert {:error, :not_found} = Fleet.approve(Ecto.UUID.generate())
+      assert {:error, :not_found} =
+               Fleet.approve(Ecto.UUID.generate(), "AAAA-BBBB-CCCC-DDDD-EEEE")
+
       assert {:error, :not_found} = Fleet.revoke("garbage")
     end
   end

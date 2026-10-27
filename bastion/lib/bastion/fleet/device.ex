@@ -1,5 +1,7 @@
 defmodule Bastion.Fleet.Device do
   @request_interval_s 60
+  @max_devices 100
+  @max_pending 10
 
   @type status :: :pending | :approved | :revoked
 
@@ -55,6 +57,12 @@ defmodule Bastion.Fleet.Device do
   @spec request_interval_s() :: pos_integer()
   def request_interval_s, do: @request_interval_s
 
+  @spec max_devices() :: pos_integer()
+  def max_devices, do: @max_devices
+
+  @spec max_pending() :: pos_integer()
+  def max_pending, do: @max_pending
+
   @spec request(t() | nil, request(), DateTime.t()) ::
           {:ok, t()} | {:already_approved, t()} | {:error, :rate_limited | :key_mismatch}
   def request(nil, req, now) do
@@ -76,6 +84,10 @@ defmodule Bastion.Fleet.Device do
       do: {:already_approved, device},
       else: {:error, :key_mismatch}
   end
+
+  def request(%__MODULE__{status: :pending, device_code: code}, %{device_code: other}, _now)
+      when code != other,
+      do: {:error, :key_mismatch}
 
   def request(%__MODULE__{status: status} = device, req, now)
       when status in [:pending, :revoked] do

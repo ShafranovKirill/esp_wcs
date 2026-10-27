@@ -28,7 +28,8 @@ defmodule Bastion.FleetFixtures do
   end
 
   def approved_device(attrs \\ %{}) do
-    {:ok, device} = attrs |> pending_device() |> Map.fetch!(:id) |> Bastion.Fleet.approve()
+    pending = pending_device(attrs)
+    {:ok, device} = Bastion.Fleet.approve(pending.id, pending.device_code)
     device
   end
 end

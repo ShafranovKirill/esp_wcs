@@ -49,10 +49,10 @@ defmodule BastionWeb.DashboardLive do
     {:noreply, assign(socket, approving: device)}
   end
 
-  def handle_event("approve", %{"id" => id}, socket) do
+  def handle_event("approve", %{"id" => id, "code" => code}, socket) do
     socket = push_event(socket, "close-dialog", %{id: "approve-dialog"})
 
-    case Fleet.approve(id) do
+    case Fleet.approve(id, code) do
       {:ok, device} ->
         {:noreply,
          socket
@@ -295,6 +295,7 @@ defmodule BastionWeb.DashboardLive do
             class="btn btn-success"
             phx-click="approve"
             phx-value-id={@approving.id}
+            phx-value-code={@approving.device_code}
             id="approve-confirm"
           >
             {gettext("Codes match, approve")}

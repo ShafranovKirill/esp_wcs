@@ -1,5 +1,5 @@
 defmodule Bastion.PKI.Domain.Code do
-  @bytes 6
+  @bytes 10
 
   @type t :: String.t()
 
@@ -15,6 +15,6 @@ defmodule Bastion.PKI.Domain.Code do
   end
 
   @spec valid?(term()) :: boolean()
-  def valid?(code) when is_binary(code), do: code =~ ~r/\A[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}\z/
+  def valid?(code) when is_binary(code), do: code =~ ~r/\A[0-9A-F]{4}(-[0-9A-F]{4}){4}\z/
   def valid?(_), do: false
 end

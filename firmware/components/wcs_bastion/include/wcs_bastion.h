@@ -8,7 +8,7 @@
 #include "esp_netif_ip_addr.h"
 #include "wcs_storage.h"
 
-#define WCS_BASTION_CODE_LEN    14
+#define WCS_BASTION_CODE_LEN    24
 #define WCS_BASTION_CA_PEM_MAX  1536
 
 typedef struct {
