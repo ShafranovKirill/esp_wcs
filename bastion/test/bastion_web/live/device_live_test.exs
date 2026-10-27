@@ -88,6 +88,42 @@ defmodule BastionWeb.DeviceLiveTest do
     assert Fleet.get_device(device.id).folder_id == folder.id
   end
 
+  test "настройки онлайн-устройства: порт, Wi-Fi, перезагрузка", %{conn: conn} do
+    device = approved_device()
+    fake = device |> FakeDevice.start() |> FakeDevice.stop_on_exit()
+    {:ok, view, _} = live(conn, ~p"/devices/#{device.id}/settings")
+
+    refute has_element?(view, "#reboot[disabled]")
+
+    view
+    |> element("#wifi-form")
+    |> render_submit(%{wifi: %{ssid: "lab", password: "secret123"}})
+
+    assert_receive {:fake_frame, ^fake, {:text, frame}}
+    assert %{"op" => "wifi_config", "id" => id} = JSON.decode!(frame)
+    FakeDevice.send_text(fake, %{t: "cmd_result", id: id, ok: true})
+    assert render_async(view) =~ "сохранило новую сеть"
+
+    view |> element("#reboot") |> render_click()
+    assert_receive {:fake_frame, ^fake, {:text, frame}}
+    assert %{"op" => "reboot", "id" => id} = JSON.decode!(frame)
+    FakeDevice.send_text(fake, %{t: "cmd_result", id: id, ok: true})
+    assert render_async(view) =~ "перезагружается"
+
+    view
+    |> element("#settings-line")
+    |> render_change(%{line: %{baud: "115200", data_bits: "8", parity: "none", stop_bits: "1"}})
+
+    assert_receive {:fake_frame, ^fake, {:text, frame}}
+    assert %{"op" => "console_config", "args" => %{"baud" => 115_200}} = JSON.decode!(frame)
+  end
+
+  test "настройки офлайн-устройства недоступны", %{conn: conn} do
+    {:ok, view, _} = live(conn, ~p"/devices/#{approved_device().id}/settings")
+    assert has_element?(view, "#reboot[disabled]")
+    assert has_element?(view, "#wifi-submit[disabled]")
+  end
+
   test "удалить можно только после отзыва", %{conn: conn} do
     device = approved_device()
     {:ok, view, _} = live(conn, ~p"/devices/#{device.id}/settings")

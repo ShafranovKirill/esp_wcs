@@ -12,7 +12,7 @@ defmodule BastionWeb.ConnectLiveTest do
     assert html =~ ~s(id="download-ca")
   end
 
-  test "корневой сертификат скачивается без входа", %{conn: conn} do
+  test "корневой сертификат скачивается без входа", %{conn: _conn} do
     conn = get(build_conn(), ~p"/ca.crt")
     assert response(conn, 200) =~ "BEGIN CERTIFICATE"
     assert [ct] = get_resp_header(conn, "content-type")

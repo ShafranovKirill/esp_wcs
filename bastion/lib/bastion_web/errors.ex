@@ -34,6 +34,8 @@ defmodule BastionWeb.Errors do
   def message(:rate_limited), do: gettext("Too many commands, wait a second")
   def message(:not_owner), do: gettext("The console is controlled by another tab")
   def message(:invalid_line), do: gettext("Invalid port settings")
+  def message(:invalid_ssid), do: gettext("Enter a network name of 1–32 characters")
+  def message(:invalid_password), do: gettext("The password must be empty or 8–63 characters")
   def message("invalid_args"), do: gettext("The device rejected the parameters")
   def message("unknown_op"), do: gettext("The device firmware does not support this command")
 
