@@ -98,6 +98,9 @@ mix bastion.admin --reset    # перезаписать пароль из .env
 
 В релизе то же: `bin/bastion eval "Bastion.Release.admin()"` / `"Bastion.Release.admin(reset: true)"`.
 
+Пароль — не короче 12 символов и не из шаблона. В разработке (`config/dev.exs`,
+`weak_admin_password`) проверка снята, чтобы работал `admin / admin` из `.env.example`.
+
 Сессия заканчивается после 30 минут бездействия; открытая консоль считается
 активностью. После 5 неверных паролей — нарастающая пауза.
 

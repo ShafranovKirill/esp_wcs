@@ -6,6 +6,7 @@
 | [roadmap.md](roadmap.md) | план работ и статус |
 | [bastion.md](bastion.md) | бастион: архитектура (DDD), центр сертификации, интерфейс, запуск |
 | [protocol.md](protocol.md) | WCS Link — протокол ESP ↔ бастион |
+| [security.md](security.md) | безопасность: активы, модель нарушителя, STRIDE, ограничения, проверка |
 | [led.md](led.md) | индикация RGB-светодиода: цвета, свечение, подсказки кнопки |
 | [setup.md](setup.md) | установка ESP-IDF, сборка, прошивка, таблица разделов |
 | [hardware/esp32-s3-n16r8-board.md](hardware/esp32-s3-n16r8-board.md) | справочник по плате, распиновка, проверка экземпляра |
