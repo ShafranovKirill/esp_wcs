@@ -8,22 +8,27 @@
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "esp_random.h"
+#include "esp_system.h"
 #include "esp_websocket_client.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "freertos/stream_buffer.h"
 #include "freertos/task.h"
 #include "link_priv.h"
 #include "mbedtls/x509_crt.h"
 #include "wcs_bastion.h"
+#include "wcs_console.h"
 #include "wcs_storage.h"
 
 #define PROTOCOL_VERSION    1
-#define TASK_STACK          6144
+#define TASK_STACK          8192
 #define TASK_PRIORITY       5
-#define QUEUE_LEN           8
+#define QUEUE_LEN           16
 #define WS_BUFFER_SIZE      4096
 #define NETWORK_TIMEOUT_MS  10000
 #define WELCOME_TIMEOUT_MS  20000
@@ -32,6 +37,15 @@
 #define BACKOFF_MIN_MS      1000
 #define BACKOFF_MAX_MS      60000
 #define RETRY_LATER_MS      60000
+
+#define OUTPUT_BUFFER_SIZE  (16 * 1024)
+#define OUTPUT_FRAME_MAX    1024
+#define INPUT_CREDIT        2048
+#define CREDIT_RETURN_MIN   512
+#define REBOOT_DELAY_MS     500
+
+#define CHANNEL_OUTPUT      0x01
+#define CHANNEL_INPUT       0x02
 
 #define CLOSE_FORBIDDEN     4003
 #define CLOSE_RATE_LIMITED  4008
@@ -43,6 +57,8 @@ static const char *TAG = "wcs_link";
 typedef enum {
     MSG_CONNECTED,
     MSG_TEXT,
+    MSG_INPUT,
+    MSG_OUTPUT,
     MSG_CLOSED,
 } msg_type_t;
 
@@ -50,6 +66,7 @@ typedef struct {
     msg_type_t type;
     int close_code;
     char *text;
+    size_t len;
 } link_msg_t;
 
 typedef enum {
@@ -71,6 +88,9 @@ static SemaphoreHandle_t s_wake;
 static SemaphoreHandle_t s_done;
 static volatile bool s_stop;
 static volatile wcs_link_state_t s_state = WCS_LINK_STATE_STOPPED;
+static StreamBufferHandle_t s_output;
+static volatile bool s_output_signalled;
+static bool s_input_frame;
 
 static void set_state(wcs_link_state_t state)
 {
@@ -81,11 +101,48 @@ static void set_state(wcs_link_state_t state)
     esp_event_post(WCS_LINK_EVENT, WCS_LINK_EVENT_STATE, &state, sizeof(state), 0);
 }
 
-static void post(msg_type_t type, int close_code, char *text)
+static bool post_data(msg_type_t type, int close_code, char *text, size_t len)
 {
-    link_msg_t msg = { .type = type, .close_code = close_code, .text = text };
+    link_msg_t msg = { .type = type, .close_code = close_code, .text = text, .len = len };
     if (xQueueSend(s_queue, &msg, 0) != pdTRUE) {
         free(text);
+        return false;
+    }
+    return true;
+}
+
+static void post(msg_type_t type, int close_code, char *text)
+{
+    post_data(type, close_code, text, 0);
+}
+
+static void on_console_output(const uint8_t *data, size_t len, void *ctx)
+{
+    xStreamBufferSend(s_output, data, len, 0);
+    if (!s_output_signalled) {
+        s_output_signalled = true;
+        if (!post_data(MSG_OUTPUT, 0, NULL, 0)) {
+            s_output_signalled = false;
+        }
+    }
+}
+
+static void on_binary(const esp_websocket_event_data_t *ev)
+{
+    const uint8_t *data = (const uint8_t *)ev->data_ptr;
+    size_t len = ev->data_len;
+    if (ev->payload_offset == 0) {
+        s_input_frame = len > 0 && data[0] == CHANNEL_INPUT;
+        data++;
+        len = len > 0 ? len - 1 : 0;
+    }
+    if (!s_input_frame || len == 0) {
+        return;
+    }
+    char *copy = malloc(len);
+    if (copy) {
+        memcpy(copy, data, len);
+        post_data(MSG_INPUT, 0, copy, len);
     }
 }
 
@@ -107,6 +164,8 @@ static void on_ws_event(void *arg, esp_event_base_t base, int32_t id, void *data
                     post(MSG_TEXT, 0, text);
                 }
             }
+        } else if (ev->op_code == 0x2 || (ev->op_code == 0x0 && ev->payload_offset > 0 && s_input_frame)) {
+            on_binary(ev);
         } else if (ev->op_code == 0x8) {
             post(MSG_CLOSED, ev->close_status_code, NULL);
         }
@@ -149,6 +208,7 @@ static void send_hello(esp_websocket_client_handle_t client, const char *device_
     cJSON_AddStringToObject(json, "fw", s_config.firmware);
     cJSON *caps = cJSON_AddArrayToObject(json, "caps");
     cJSON_AddItemToArray(caps, cJSON_CreateString("console"));
+    cJSON_AddItemToArray(caps, cJSON_CreateString("credit"));
     send_json(client, json);
 }
 
@@ -207,7 +267,201 @@ typedef struct {
     int rtt;
     outcome_t outcome;
     bool done;
+    bool reboot;
+    size_t input_used;
 } session_t;
+
+static const char *parity_name(wcs_console_parity_t parity)
+{
+    switch (parity) {
+    case WCS_CONSOLE_PARITY_EVEN:
+        return "even";
+    case WCS_CONSOLE_PARITY_ODD:
+        return "odd";
+    default:
+        return "none";
+    }
+}
+
+static bool parity_parse(const char *name, wcs_console_parity_t *parity)
+{
+    if (strcmp(name, "none") == 0) {
+        *parity = WCS_CONSOLE_PARITY_NONE;
+    } else if (strcmp(name, "even") == 0) {
+        *parity = WCS_CONSOLE_PARITY_EVEN;
+    } else if (strcmp(name, "odd") == 0) {
+        *parity = WCS_CONSOLE_PARITY_ODD;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+static void send_credit(esp_websocket_client_handle_t client, size_t bytes)
+{
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "t", "credit");
+    cJSON_AddNumberToObject(json, "bytes", (double)bytes);
+    send_json(client, json);
+}
+
+static void send_status(esp_websocket_client_handle_t client)
+{
+    wcs_console_line_t line;
+    wcs_console_get_line(&line);
+
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "t", "status");
+    cJSON *console = cJSON_AddObjectToObject(json, "console");
+    cJSON_AddNumberToObject(console, "baud", line.baud);
+    cJSON_AddNumberToObject(console, "data_bits", line.data_bits);
+    cJSON_AddStringToObject(console, "parity", parity_name(line.parity));
+    cJSON_AddNumberToObject(console, "stop_bits", line.stop_bits);
+
+    esp_netif_ip_info_t ip;
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif && esp_netif_get_ip_info(netif, &ip) == ESP_OK) {
+        char addr[16];
+        snprintf(addr, sizeof(addr), IPSTR, IP2STR(&ip.ip));
+        cJSON_AddStringToObject(json, "ip", addr);
+    }
+    send_json(client, json);
+}
+
+static void send_result(esp_websocket_client_handle_t client, double id, const char *error)
+{
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "t", "cmd_result");
+    cJSON_AddNumberToObject(json, "id", id);
+    cJSON_AddBoolToObject(json, "ok", error == NULL);
+    if (error) {
+        cJSON_AddStringToObject(json, "error", error);
+    }
+    send_json(client, json);
+}
+
+static const char *cmd_console_config(const cJSON *args)
+{
+    const cJSON *baud = cJSON_GetObjectItem(args, "baud");
+    const cJSON *data_bits = cJSON_GetObjectItem(args, "data_bits");
+    const cJSON *parity = cJSON_GetObjectItem(args, "parity");
+    const cJSON *stop_bits = cJSON_GetObjectItem(args, "stop_bits");
+
+    wcs_console_line_t line;
+    wcs_console_get_line(&line);
+    if (cJSON_IsNumber(baud)) {
+        line.baud = (uint32_t)baud->valuedouble;
+    }
+    if (cJSON_IsNumber(data_bits)) {
+        line.data_bits = (uint8_t)data_bits->valueint;
+    }
+    if (cJSON_IsNumber(stop_bits)) {
+        line.stop_bits = (uint8_t)stop_bits->valueint;
+    }
+    if (cJSON_IsString(parity) && !parity_parse(parity->valuestring, &line.parity)) {
+        return "invalid_args";
+    }
+    if (!wcs_console_line_valid(&line)) {
+        return "invalid_args";
+    }
+    return wcs_console_set_line(&line) == ESP_OK ? NULL : "failed";
+}
+
+static const char *cmd_wifi_config(const cJSON *args)
+{
+    const cJSON *ssid = cJSON_GetObjectItem(args, "ssid");
+    const cJSON *password = cJSON_GetObjectItem(args, "password");
+    if (!cJSON_IsString(ssid) || !cJSON_IsString(password)) {
+        return "invalid_args";
+    }
+    size_t ssid_len = strlen(ssid->valuestring);
+    size_t pass_len = strlen(password->valuestring);
+    if (ssid_len < 1 || ssid_len > WCS_SSID_MAX_LEN || (pass_len != 0 && (pass_len < 8 || pass_len > 63))) {
+        return "invalid_args";
+    }
+
+    wcs_settings_t settings;
+    if (wcs_storage_load(&settings) != ESP_OK) {
+        return "failed";
+    }
+    strlcpy(settings.sta_ssid, ssid->valuestring, sizeof(settings.sta_ssid));
+    strlcpy(settings.sta_password, password->valuestring, sizeof(settings.sta_password));
+    esp_err_t err = wcs_storage_save(&settings);
+    memset(&settings, 0, sizeof(settings));
+    return err == ESP_OK ? NULL : "failed";
+}
+
+static void handle_cmd(session_t *s, const cJSON *json)
+{
+    const cJSON *id = cJSON_GetObjectItem(json, "id");
+    const cJSON *op = cJSON_GetObjectItem(json, "op");
+    const cJSON *args = cJSON_GetObjectItem(json, "args");
+    if (!cJSON_IsNumber(id) || !cJSON_IsString(op)) {
+        return;
+    }
+
+    const char *error = NULL;
+    if (strcmp(op->valuestring, "console_config") == 0) {
+        error = cmd_console_config(args);
+        send_result(s->client, id->valuedouble, error);
+        if (!error) {
+            send_status(s->client);
+        }
+        return;
+    }
+    if (strcmp(op->valuestring, "console_break") == 0) {
+        error = wcs_console_send_break() == ESP_OK ? NULL : "failed";
+    } else if (strcmp(op->valuestring, "wifi_config") == 0) {
+        error = cmd_wifi_config(args);
+        if (!error) {
+            ESP_LOGW(TAG, "Wi-Fi network changed by the bastion, rebooting");
+            s->reboot = true;
+            s->done = true;
+        }
+    } else if (strcmp(op->valuestring, "reboot") == 0) {
+        ESP_LOGW(TAG, "reboot requested by the bastion");
+        s->reboot = true;
+        s->done = true;
+    } else if (strcmp(op->valuestring, "revoke") == 0) {
+        ESP_LOGW(TAG, "revoked by the bastion, will send a new request");
+        error = wcs_link_forget_certificate() == ESP_OK ? NULL : "failed";
+        s->outcome = OUTCOME_NOW;
+        s->done = true;
+    } else {
+        error = "unknown_op";
+    }
+    send_result(s->client, id->valuedouble, error);
+}
+
+static void handle_input(session_t *s, const uint8_t *data, size_t len)
+{
+    if (!s->device_session || !s->welcomed) {
+        return;
+    }
+    wcs_console_write(data, len);
+    s->input_used += len;
+    if (s->input_used >= CREDIT_RETURN_MIN) {
+        send_credit(s->client, s->input_used);
+        s->input_used = 0;
+    }
+}
+
+static void flush_output(session_t *s)
+{
+    s_output_signalled = false;
+    if (!s->device_session || !s->welcomed) {
+        return;
+    }
+    uint8_t frame[OUTPUT_FRAME_MAX + 1];
+    frame[0] = CHANNEL_OUTPUT;
+    size_t n;
+    while ((n = xStreamBufferReceive(s_output, frame + 1, OUTPUT_FRAME_MAX, 0)) > 0) {
+        if (esp_websocket_client_send_bin(s->client, (const char *)frame, n + 1,
+                                          pdMS_TO_TICKS(NETWORK_TIMEOUT_MS)) < 0) {
+            break;
+        }
+    }
+}
 
 static void handle_text(session_t *s, const char *text)
 {
@@ -231,6 +485,10 @@ static void handle_text(session_t *s, const char *text)
             ESP_LOGI(TAG, "online");
             set_state(WCS_LINK_STATE_ONLINE);
             s->next_hb = now_ms();
+            s->input_used = 0;
+            send_credit(s->client, INPUT_CREDIT);
+            send_status(s->client);
+            flush_output(s);
         } else if (send_enroll(s->client, s->device_id) != ESP_OK) {
             s->done = true;
         }
@@ -251,6 +509,8 @@ static void handle_text(session_t *s, const char *text)
             s->outcome = OUTCOME_LATER;
             s->done = true;
         }
+    } else if (strcmp(t->valuestring, "cmd") == 0 && s->device_session && s->welcomed) {
+        handle_cmd(s, json);
     } else if (strcmp(t->valuestring, "hb_ack") == 0) {
         const cJSON *ts = cJSON_GetObjectItem(json, "ts");
         const cJSON *time = cJSON_GetObjectItem(json, "time");
@@ -360,6 +620,13 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
                 handle_text(&s, msg.text);
                 free(msg.text);
                 break;
+            case MSG_INPUT:
+                handle_input(&s, (const uint8_t *)msg.text, msg.len);
+                free(msg.text);
+                break;
+            case MSG_OUTPUT:
+                flush_output(&s);
+                break;
             case MSG_CLOSED:
                 handle_close(&s, msg.close_code);
                 break;
@@ -378,6 +645,10 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
     }
     free(cert_pem);
     *was_online = s.device_session && s.welcomed;
+    if (s.reboot) {
+        vTaskDelay(pdMS_TO_TICKS(REBOOT_DELAY_MS));
+        esp_restart();
+    }
     return s.outcome;
 }
 
@@ -399,6 +670,10 @@ static void link_task(void *arg)
         set_state(WCS_LINK_STATE_OFFLINE);
         s_stop = true;
     }
+
+    xStreamBufferReset(s_output);
+    s_output_signalled = false;
+    wcs_console_add_listener(on_console_output, NULL);
 
     uint32_t backoff = BACKOFF_MIN_MS;
     bool ever_online = false;
@@ -433,6 +708,7 @@ static void link_task(void *arg)
         }
     }
 
+    wcs_console_remove_listener(on_console_output, NULL);
     free(ca_pem);
     set_state(WCS_LINK_STATE_STOPPED);
     xSemaphoreGive(s_done);
@@ -449,7 +725,8 @@ esp_err_t wcs_link_start(const wcs_link_config_t *config)
         s_queue = xQueueCreate(QUEUE_LEN, sizeof(link_msg_t));
         s_wake = xSemaphoreCreateBinary();
         s_done = xSemaphoreCreateBinary();
-        ESP_RETURN_ON_FALSE(s_queue && s_wake && s_done, ESP_ERR_NO_MEM, TAG, "no memory");
+        s_output = xStreamBufferCreateWithCaps(OUTPUT_BUFFER_SIZE, 1, MALLOC_CAP_SPIRAM);
+        ESP_RETURN_ON_FALSE(s_queue && s_wake && s_done && s_output, ESP_ERR_NO_MEM, TAG, "no memory");
     }
     strlcpy(s_config.addr, config->bastion_addr, sizeof(s_config.addr));
     strlcpy(s_config.name, config->name ? config->name : "esp-wcs", sizeof(s_config.name));

@@ -6,11 +6,17 @@ defmodule Bastion.Link.Application.Session do
   alias Bastion.Fleet.Events.{DeviceApproved, DeviceChanged, DeviceRevoked}
   alias Bastion.Link.Application.Presence
   alias Bastion.Link.Domain.Protocol
+  alias Bastion.Link.Events.ConsoleOutput
 
   @hb_interval_s 15
   @hb_timeout :timer.seconds(45)
   @hello_timeout :timer.seconds(10)
   @ping_interval :timer.seconds(30)
+  @cmd_timeout :timer.seconds(10)
+  @cmd_rate 10
+  @history_size 64 * 1024
+  @input_buffer_max 16 * 1024
+  @uncredited_chunk 256
 
   @impl true
   def init(%{ip: ip} = opts) do
@@ -21,7 +27,14 @@ defmodule Bastion.Link.Application.Session do
       device: nil,
       device_id: nil,
       fw: nil,
-      hb_timer: nil
+      caps: [],
+      hb_timer: nil,
+      credit: 0,
+      input: <<>>,
+      history: <<>>,
+      next_cmd: 1,
+      cmds: %{},
+      cmd_times: []
     }
 
     Process.send_after(self(), :hello_timeout, @hello_timeout)
@@ -52,7 +65,13 @@ defmodule Bastion.Link.Application.Session do
     end
   end
 
-  def handle_in({_data, opcode: :binary}, %{phase: :device} = state), do: {:ok, state}
+  def handle_in({frame, opcode: :binary}, %{phase: :device} = state) do
+    case Protocol.decode_binary(frame) do
+      {:ok, {:output, data}} -> {:ok, output(data, state)}
+      {:error, :too_big} -> close(:too_big, "frame too big", state)
+      {:error, :protocol} -> close(:protocol, "unexpected channel", state)
+    end
+  end
 
   def handle_in({_data, opcode: :binary}, state),
     do: close(:protocol, "unexpected binary frame", state)
@@ -62,7 +81,7 @@ defmodule Bastion.Link.Application.Session do
 
   defp handle_message({:hello, hello}, %{phase: :hello, cert: %{device_id: cn}} = state) do
     if hello.device_id == cn,
-      do: start_device(hello, state),
+      do: start_device(hello, %{state | caps: hello.caps}),
       else: close(:forbidden, "device_id mismatch", state)
   end
 
@@ -117,7 +136,96 @@ defmodule Bastion.Link.Application.Session do
     {:push, {:text, Protocol.hb_ack(hb.seq, hb.ts, now_ms())}, reset_hb_timer(state)}
   end
 
+  defp handle_message({:status, status}, %{phase: :device, device: device} = state) do
+    info = %{console: status.console, ip: status.ip} |> Map.reject(fn {_, v} -> is_nil(v) end)
+    Presence.update(device.id, info)
+    {:ok, state}
+  end
+
+  defp handle_message({:credit, %{bytes: bytes}}, %{phase: :device} = state),
+    do: flush_input(%{state | credit: state.credit + bytes})
+
+  defp handle_message({:cmd_result, result}, %{phase: :device} = state) do
+    case Map.pop(state.cmds, result.id) do
+      {nil, _} ->
+        {:ok, state}
+
+      {{caller, ref, timer}, cmds} ->
+        Process.cancel_timer(timer)
+        reply = if result.ok, do: :ok, else: {:error, result.error || "failed"}
+        send(caller, {ref, reply})
+        {:ok, %{state | cmds: cmds}}
+    end
+  end
+
   defp handle_message(_message, state), do: close(:protocol, "unexpected message", state)
+
+  defp output(data, state) do
+    Bastion.Events.publish({:console, state.device.id}, %ConsoleOutput{
+      id: state.device.id,
+      data: data
+    })
+
+    history = state.history <> data
+    excess = byte_size(history) - @history_size
+
+    history =
+      if excess > 0, do: binary_part(history, excess, @history_size), else: history
+
+    %{state | history: history}
+  end
+
+  defp credit_flow?(state), do: "credit" in state.caps
+
+  defp flush_input(%{input: <<>>} = state), do: {:ok, state}
+
+  defp flush_input(state) do
+    {allowed, credit} =
+      if credit_flow?(state),
+        do: {min(state.credit, byte_size(state.input)), state.credit},
+        else: {byte_size(state.input), nil}
+
+    if allowed == 0 do
+      {:ok, state}
+    else
+      <<send_now::binary-size(^allowed), rest::binary>> = state.input
+      chunk = if credit, do: Protocol.max_input_chunk(), else: @uncredited_chunk
+      frames = for part <- chunks(send_now, chunk), do: {:binary, Protocol.input(part)}
+      credit = if credit, do: credit - allowed, else: 0
+      {:push, frames, %{state | input: rest, credit: credit}}
+    end
+  end
+
+  defp chunks(<<>>, _size), do: []
+
+  defp chunks(data, size) when byte_size(data) <= size, do: [data]
+
+  defp chunks(data, size) do
+    <<part::binary-size(^size), rest::binary>> = data
+    [part | chunks(rest, size)]
+  end
+
+  defp start_command(caller, ref, op, args, state) do
+    now = System.monotonic_time(:millisecond)
+    recent = Enum.filter(state.cmd_times, &(now - &1 < 1000))
+
+    if length(recent) >= @cmd_rate do
+      send(caller, {ref, {:error, :rate_limited}})
+      {:ok, %{state | cmd_times: recent}}
+    else
+      id = state.next_cmd
+      timer = Process.send_after(self(), {:cmd_timeout, id}, @cmd_timeout)
+
+      state = %{
+        state
+        | next_cmd: id + 1,
+          cmds: Map.put(state.cmds, id, {caller, ref, timer}),
+          cmd_times: [now | recent]
+      }
+
+      {:push, {:text, Protocol.cmd(id, op, args)}, state}
+    end
+  end
 
   defp start_device(hello, %{device: device} = state) do
     Presence.register(device.id, %{
@@ -172,11 +280,39 @@ defmodule Bastion.Link.Application.Session do
     {:push, {:ping, ""}, state}
   end
 
+  def handle_info({:console_input, data}, %{phase: :device} = state) do
+    room = @input_buffer_max - byte_size(state.input)
+    data = if byte_size(data) > room, do: binary_part(data, 0, max(room, 0)), else: data
+    flush_input(%{state | input: state.input <> data})
+  end
+
+  def handle_info({:console_history, caller, ref}, %{phase: :device} = state) do
+    send(caller, {ref, {:ok, state.history}})
+    {:ok, state}
+  end
+
+  def handle_info({:command, caller, ref, op, args}, %{phase: :device} = state),
+    do: start_command(caller, ref, op, args, state)
+
+  def handle_info({:cmd_timeout, id}, state) do
+    case Map.pop(state.cmds, id) do
+      {nil, _} ->
+        {:ok, state}
+
+      {{caller, ref, _timer}, cmds} ->
+        send(caller, {ref, {:error, :timeout}})
+        {:ok, %{state | cmds: cmds}}
+    end
+  end
+
   def handle_info(:replaced, state), do: close(:normal, "replaced by a new connection", state)
   def handle_info(_message, state), do: {:ok, state}
 
   @impl true
-  def terminate(_reason, _state), do: :ok
+  def terminate(_reason, state) do
+    for {_id, {caller, ref, _timer}} <- state.cmds, do: send(caller, {ref, {:error, :offline}})
+    :ok
+  end
 
   defp reset_hb_timer(state) do
     if state.hb_timer, do: Process.cancel_timer(state.hb_timer)
