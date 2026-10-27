@@ -26,13 +26,10 @@
 #include "wcs_web.h"
 #include "wcs_wifi.h"
 
-/* Адрес точки доступа ESP-IDF по умолчанию; веб-интерфейс — только HTTPS */
 #define WEB_HOST                "192.168.4.1"
 #define WEB_URL                 "https://" WEB_HOST "/"
-/* Имя устройства в сертификате HTTPS: esp-wcs-8581 */
 #define DEVICE_NAME_PREFIX      "esp-wcs-"
 
-/* Пауза перед сменой режима, чтобы браузер успел получить ответ */
 #define APPLY_DELAY_MS          1500
 #define FACTORY_RESET_DELAY_MS  1000
 #define CMD_QUEUE_LEN           8
@@ -50,7 +47,6 @@ typedef enum {
     CMD_LINK_STATE,
 } app_cmd_t;
 
-/* Что показывает светодиод (docs/led.md) */
 typedef enum {
     INDICATION_FACTORY,
     INDICATION_SETUP_WAITING,
@@ -79,7 +75,6 @@ static const wcs_led_indication_t s_indications[] = {
     [INDICATION_ERROR] = { WCS_LED_RED, WCS_LED_BLINK_FAST },
 };
 
-/* Подсказки при удержании кнопки */
 static const wcs_led_indication_t s_hint_setup = { WCS_LED_BLUE, WCS_LED_BLINK_FAST };
 static const wcs_led_indication_t s_hint_reset = { WCS_LED_RED, WCS_LED_BLINK_FAST };
 
@@ -92,10 +87,7 @@ static int s_ap_clients;
 static bool s_error;
 static char s_setup_ssid[33];
 static char s_direct_ssid[33];
-/* Имя устройства: в сертификате HTTPS и в заявке на бастион (esp-wcs-8581) */
 static char s_device_name[33];
-
-/* ---- индикация ---- */
 
 static void update_led(void)
 {
@@ -138,8 +130,6 @@ static void update_led(void)
     wcs_led_set_base(s_indications[ind]);
 }
 
-/* ---- команды из других задач ---- */
-
 static void send_cmd(app_cmd_t cmd)
 {
     if (xQueueSend(s_cmd_queue, &cmd, 0) != pdTRUE) {
@@ -164,7 +154,7 @@ static void on_button(void *arg, esp_event_base_t base, int32_t id, void *data)
         send_cmd(CMD_BUTTON_LONG);
         break;
     case WCS_BUTTON_EVENT_VERY_LONG:
-        send_cmd(CMD_BUTTON_VERY_LONG); /* подсказка горит до перезагрузки */
+        send_cmd(CMD_BUTTON_VERY_LONG);
         break;
     case WCS_BUTTON_EVENT_TRIPLE_CLICK:
         send_cmd(CMD_BUTTON_TRIPLE_CLICK);
@@ -193,7 +183,6 @@ static void on_ap_idle_timer(void *arg)
     send_cmd(CMD_AP_IDLE_TIMEOUT);
 }
 
-/* Вызывается веб-сервером из своей задачи */
 static esp_err_t on_web_apply(const wcs_settings_t *settings)
 {
     esp_err_t err = wcs_storage_save(settings);
@@ -203,8 +192,6 @@ static esp_err_t on_web_apply(const wcs_settings_t *settings)
     return err;
 }
 
-/* ---- переходы ---- */
-
 static void make_ssid(const char *prefix, char out[33])
 {
     uint8_t mac[6];
@@ -212,7 +199,6 @@ static void make_ssid(const char *prefix, char out[33])
     snprintf(out, 33, "%s%02X%02X", prefix, mac[4], mac[5]);
 }
 
-/* Отсчёт бездействия идёт, пока точка доступа поднята и к ней никто не подключён */
 static void update_ap_idle_timer(void)
 {
     esp_timer_stop(s_ap_idle_timer);
@@ -221,7 +207,6 @@ static void update_ap_idle_timer(void)
     }
 }
 
-/* Останавливает точку доступа и веб-сервер, завершает сессии прежнего режима */
 static void stop_access_point(void)
 {
     esp_timer_stop(s_ap_idle_timer);
@@ -274,7 +259,6 @@ static void start_direct_access_point(void)
     start_access_point(s_direct_ssid, wcs_defaults.direct_ap_password, &web);
 }
 
-/* raise_ap — сразу поднять точку доступа (после настройки), иначе ждать нажатия */
 static void enter_direct(bool raise_ap)
 {
     ESP_LOGI(TAG, "-> direct");
@@ -299,7 +283,6 @@ static void enter_bastion(const wcs_settings_t *settings)
         return;
     }
 
-    /* Сеанс с бастионом сам дождётся Wi-Fi: пока сети нет, подключение просто повторяется */
     wcs_link_stop();
     const wcs_link_config_t link = {
         .bastion_addr = settings->bastion_addr,
@@ -311,7 +294,6 @@ static void enter_bastion(const wcs_settings_t *settings)
     }
 }
 
-/* Тройное нажатие: сохранить режим Direct и сразу поднять точку доступа */
 static void switch_to_direct(void)
 {
     if (s_state == WCS_FSM_STATE_DIRECT) {
@@ -336,7 +318,6 @@ static void switch_to_direct(void)
     enter_direct(true);
 }
 
-/* Режим по сохранённым настройкам */
 static void enter_saved_mode(bool raise_direct_ap)
 {
     wcs_settings_t settings;
@@ -379,7 +360,6 @@ static void handle(app_cmd_t cmd)
 {
     switch (cmd) {
     case CMD_BUTTON_CLICK:
-        /* Direct: короткое нажатие поднимает точку доступа */
         if (s_state == WCS_FSM_STATE_DIRECT && !wcs_wifi_ap_is_running()) {
             start_direct_access_point();
         }
@@ -406,7 +386,6 @@ static void handle(app_cmd_t cmd)
         update_ap_idle_timer();
         break;
     case CMD_AP_IDLE_TIMEOUT:
-        /* Таймер мог сработать до смены режима или подключения — проверяем заново */
         if (!wcs_wifi_ap_is_running() || s_ap_clients > 0) {
             break;
         }
@@ -418,7 +397,6 @@ static void handle(app_cmd_t cmd)
         }
         break;
     case CMD_LINK_STATE:
-        /* Только индикация: update_led() ниже */
         break;
     case CMD_APPLY:
         if (s_state == WCS_FSM_STATE_SETUP) {
@@ -430,8 +408,6 @@ static void handle(app_cmd_t cmd)
     update_led();
 }
 
-/* ---- запуск ---- */
-
 static void fsm_task(void *arg)
 {
     for (;;) {
@@ -442,7 +418,6 @@ static void fsm_task(void *arg)
     }
 }
 
-/* Сертификат HTTPS: при первом запуске создаётся, дальше берётся из NVS */
 static void init_tls(void)
 {
     wcs_tls_identity_t tls = { .common_name = s_device_name };
@@ -465,7 +440,6 @@ esp_err_t wcs_fsm_start(const wcs_fsm_config_t *config)
         *p = (char)tolower((unsigned char)*p);
     }
     init_tls();
-    /* Ключ устройства для бастиона: при первом запуске создаётся, дальше из NVS */
     if (wcs_link_identity_init() != ESP_OK) {
         ESP_LOGE(TAG, "device identity init failed, Bastion mode unavailable");
         s_error = true;
@@ -482,7 +456,6 @@ esp_err_t wcs_fsm_start(const wcs_fsm_config_t *config)
     const esp_timer_create_args_t idle_timer = { .callback = on_ap_idle_timer, .name = "ap_idle" };
     ESP_RETURN_ON_ERROR(esp_timer_create(&idle_timer, &s_ap_idle_timer), TAG, "timer create failed");
 
-    /* Первый переход — здесь же, до запуска задачи; события пока копятся в очереди */
     enter_saved_mode(false);
     update_led();
 

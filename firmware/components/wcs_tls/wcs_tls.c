@@ -20,16 +20,14 @@
 #define NVS_NAMESPACE  "wcs_tls"
 #define NVS_KEY_KEY    "key"
 #define NVS_KEY_CERT   "cert"
-#define NVS_KEY_ID     "id" /* для чего выпущен сертификат: "имя|адрес" */
+#define NVS_KEY_ID     "id"
 
 #define KEY_PEM_MAX    512
 #define CERT_PEM_MAX   2048
 #define ID_MAX         96
 #define SERIAL_LEN     16
-/* Подпись ECDSA и запись X.509 требуют больше стека, чем есть у вызывающей задачи */
 #define GEN_TASK_STACK 12288
 
-/* Часов у устройства нет: начало срока фиксированное, конец — по ТЗ */
 #define VALID_FROM     "20250101000000"
 #define VALID_TO       "20991231235959"
 
@@ -37,8 +35,6 @@ static const char *TAG = "wcs_tls";
 
 static char *s_key_pem;
 static char *s_cert_pem;
-
-/* ---- хранение ---- */
 
 static char *load_str(nvs_handle_t nvs, const char *key, size_t max)
 {
@@ -57,7 +53,6 @@ static char *load_str(nvs_handle_t nvs, const char *key, size_t max)
     return buf;
 }
 
-/* Сохранённые ключ и сертификат, если они выпущены для этого же имени и адреса и разбираются */
 static bool load(const char *id)
 {
     nvs_handle_t nvs;
@@ -113,8 +108,6 @@ static esp_err_t save(const char *id)
     return err;
 }
 
-/* ---- генерация ---- */
-
 static esp_err_t generate_key(mbedtls_pk_context *pk)
 {
     psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
@@ -130,7 +123,6 @@ static esp_err_t generate_key(mbedtls_pk_context *pk)
         ESP_LOGE(TAG, "psa_generate_key: %d", (int)st);
         return ESP_FAIL;
     }
-    /* Ключ копируется в pk, временный ключ PSA больше не нужен */
     int ret = mbedtls_pk_copy_from_psa(key_id, pk);
     psa_destroy_key(key_id);
     if (ret != 0) {
@@ -149,14 +141,13 @@ static esp_err_t write_cert(mbedtls_pk_context *pk, const wcs_tls_identity_t *id
     if (psa_generate_random(serial, sizeof(serial)) != PSA_SUCCESS) {
         return ESP_FAIL;
     }
-    serial[0] &= 0x7f; /* положительное число */
-    serial[0] |= 0x01; /* без ведущего нуля */
+    serial[0] &= 0x7f;
+    serial[0] |= 0x01;
 
-    /* SAN: адрес и имя .local — по ним браузер сверяет сертификат */
     char dns[80];
     snprintf(dns, sizeof(dns), "%s.local", identity->common_name);
     uint8_t ip[4];
-    memcpy(ip, &identity->ip.addr, sizeof(ip)); /* порядок байт сетевой */
+    memcpy(ip, &identity->ip.addr, sizeof(ip));
     mbedtls_x509_san_list san_dns = {
         .node = { .type = MBEDTLS_X509_SAN_DNS_NAME,
                   .san.unstructured_name = { .p = (unsigned char *)dns, .len = strlen(dns) } },
@@ -261,7 +252,6 @@ static void gen_task(void *arg)
     vTaskDelete(NULL);
 }
 
-/* generate() во временной задаче с большим стеком; вызывающая ждёт результата */
 static esp_err_t generate_in_task(const wcs_tls_identity_t *identity)
 {
     gen_job_t job = { .identity = identity, .done = xSemaphoreCreateBinary() };
@@ -274,8 +264,6 @@ static esp_err_t generate_in_task(const wcs_tls_identity_t *identity)
     vSemaphoreDelete(job.done);
     return job.err;
 }
-
-/* ---- публичный API ---- */
 
 esp_err_t wcs_tls_init(const wcs_tls_identity_t *identity)
 {
@@ -294,7 +282,6 @@ esp_err_t wcs_tls_init(const wcs_tls_identity_t *identity)
     ESP_RETURN_ON_ERROR(generate_in_task(identity), TAG, "generation failed");
     esp_err_t err = save(id);
     if (err != ESP_OK) {
-        /* Работать можно и так, но после перезагрузки сертификат будет другим */
         ESP_LOGW(TAG, "certificate save failed: %s", esp_err_to_name(err));
     }
     return ESP_OK;

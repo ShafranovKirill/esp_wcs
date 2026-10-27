@@ -1,11 +1,4 @@
 defmodule Bastion.Release do
-  @moduledoc """
-  Команды для собранного релиза (там нет `mix`):
-
-      bin/bastion eval "Bastion.Release.migrate()"
-      bin/bastion eval "Bastion.Release.admin()"
-      bin/bastion eval "Bastion.Release.admin(reset: true)"
-  """
   use Boundary, top_level?: true, deps: [Bastion.Accounts, Bastion.Repo]
 
   @app :bastion
@@ -20,7 +13,6 @@ defmodule Bastion.Release do
     :ok
   end
 
-  @doc "Администратор из `.env`; `reset: true` — перезаписать пароль и завершить все сессии"
   def admin(opts \\ []) do
     load_app()
     config = Application.get_env(@app, :admin, [])

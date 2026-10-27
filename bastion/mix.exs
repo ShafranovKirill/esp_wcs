@@ -15,9 +15,6 @@ defmodule Bastion.MixProject do
     ]
   end
 
-  # Configuration for the OTP application.
-  #
-  # Type `mix help compile.app` for more information.
   def application do
     [
       mod: {Bastion.Application, []},
@@ -31,13 +28,9 @@ defmodule Bastion.MixProject do
     ]
   end
 
-  # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
-  # Specifies your project dependencies.
-  #
-  # Type `mix help deps` for examples and options.
   defp deps do
     [
       {:phoenix, "~> 1.8.9"},
@@ -70,22 +63,13 @@ defmodule Bastion.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
-      # Границы контекстов DDD проверяются при компиляции
       {:boundary, "~> 0.10", runtime: false},
       {:argon2_elixir, "~> 4.1"},
-      # bastion/.env → переменные окружения
       {:dotenvy, "~> 1.1"},
-      # Центр сертификации: ключи, сертификаты, CSR (обёртка над :public_key)
       {:x509, "~> 0.9.2"}
     ]
   end
 
-  # Aliases are shortcuts or tasks specific to the current project.
-  # For example, to install project dependencies and perform other setup tasks, run:
-  #
-  #     $ mix setup
-  #
-  # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],

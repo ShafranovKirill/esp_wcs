@@ -30,7 +30,6 @@ bool wcs_bastion_parse_addr(const char *addr, wcs_bastion_addr_t *out)
     if (len == 0 || len > WCS_BASTION_ADDR_MAX_LEN) {
         return false;
     }
-    /* Хост или IPv4: буквы, цифры, точка, дефис; одно двоеточие перед портом */
     const char *colon = strchr(addr, ':');
     for (const char *p = addr; *p; p++) {
         if (!(isalnum((unsigned char)*p) || *p == '.' || *p == '-' || p == colon)) {
@@ -78,7 +77,6 @@ static bool resolve(const char *host, esp_ip4_addr_t *ip)
             }
             s_mdns_started = true;
         }
-        /* mDNS спрашивает имя без суффикса .local */
         char name[WCS_BASTION_ADDR_MAX_LEN + 1];
         strlcpy(name, host, sizeof(name));
         name[strlen(name) - 6] = '\0';
@@ -95,7 +93,6 @@ static bool resolve(const char *host, esp_ip4_addr_t *ip)
     return true;
 }
 
-/* TCP-подключение с таймаутом; при успехе сокет остаётся открытым (*fd) */
 static wcs_bastion_probe_result_t tcp_connect(const esp_ip4_addr_t *ip, uint16_t port, uint32_t timeout_ms, int *fd)
 {
     int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -132,7 +129,6 @@ static wcs_bastion_probe_result_t tcp_connect(const esp_ip4_addr_t *ip, uint16_t
 
     switch (err) {
     case 0:
-        /* Дальше TLS в блокирующем режиме с таймаутом на чтение */
         fcntl(s, F_SETFL, fcntl(s, F_GETFL, 0) & ~O_NONBLOCK);
         struct timeval rcv = { .tv_sec = timeout_ms / 1000, .tv_usec = (timeout_ms % 1000) * 1000 };
         setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &rcv, sizeof(rcv));
@@ -140,7 +136,7 @@ static wcs_bastion_probe_result_t tcp_connect(const esp_ip4_addr_t *ip, uint16_t
         *fd = s;
         return WCS_BASTION_PROBE_OK;
     case ECONNREFUSED:
-    case ECONNRESET: /* lwIP сообщает об отказе (RST) так */
+    case ECONNRESET:
         close(s);
         return WCS_BASTION_PROBE_REFUSED;
     case ETIMEDOUT:
@@ -153,7 +149,6 @@ static wcs_bastion_probe_result_t tcp_connect(const esp_ip4_addr_t *ip, uint16_t
     }
 }
 
-/* Сокет блокирующий с таймаутами: любая ошибка — конец рукопожатия */
 static int bio_send(void *ctx, const unsigned char *buf, size_t len)
 {
     int r = send(*(int *)ctx, buf, len, 0);
@@ -169,7 +164,6 @@ static int bio_recv(void *ctx, unsigned char *buf, size_t len)
     return r < 0 ? MBEDTLS_ERR_NET_RECV_FAILED : r;
 }
 
-/* Корневой сертификат: последний в цепочке, CA и самоподписанный */
 static const mbedtls_x509_crt *chain_root(const mbedtls_x509_crt *chain)
 {
     const mbedtls_x509_crt *root = chain;
@@ -183,10 +177,6 @@ static const mbedtls_x509_crt *chain_root(const mbedtls_x509_crt *chain)
     return root;
 }
 
-/*
- * TLS-рукопожатие без проверки сертификата (это первое подключение: доверие —
- * по коду, который сверяет человек), из цепочки — корневой сертификат бастиона.
- */
 static wcs_bastion_probe_result_t tls_inspect(int fd, const char *host, wcs_bastion_probe_t *out)
 {
     mbedtls_ssl_context ssl;
@@ -238,7 +228,6 @@ esp_err_t wcs_bastion_code(const uint8_t *spki_der, size_t len, char out[WCS_BAS
     if (psa_hash_compute(PSA_ALG_SHA_256, spki_der, len, hash, sizeof(hash), &hash_len) != PSA_SUCCESS) {
         return ESP_FAIL;
     }
-    /* 6 байт → 12 hex группами по 4: 7F3A-91C2-B4E0 (docs/protocol.md) */
     snprintf(out, WCS_BASTION_CODE_LEN + 1, "%02X%02X-%02X%02X-%02X%02X", hash[0], hash[1], hash[2], hash[3],
              hash[4], hash[5]);
     return ESP_OK;

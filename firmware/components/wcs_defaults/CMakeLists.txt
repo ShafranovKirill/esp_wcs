@@ -1,4 +1,3 @@
-# Заводские настройки: генерируются из firmware/.env при сборке
 set(gen_src "${CMAKE_CURRENT_BINARY_DIR}/wcs_defaults_gen.c")
 
 idf_component_register(SRCS "${gen_src}"

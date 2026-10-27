@@ -14,13 +14,11 @@ defmodule Bastion.Repo.Migrations.CreateFleet do
     create table(:devices, primary_key: false) do
       add :id, :binary_id, primary_key: true
 
-      # Базовый MAC устройства, 12 hex строчными — неизменный ID из протокола
       add :device_id, :string, size: 12, null: false
       add :name, :string, null: false
       add :status, :string, null: false
       add :folder_id, references(:folders, type: :binary_id, on_delete: :nilify_all)
 
-      # Ключ устройства: код для сверки и запрос на сертификат (пока заявка не одобрена)
       add :device_code, :string, null: false
       add :csr_pem, :text
       add :certificate_pem, :text

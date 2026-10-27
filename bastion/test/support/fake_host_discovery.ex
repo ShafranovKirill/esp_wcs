@@ -1,5 +1,4 @@
 defmodule Bastion.PKI.FakeHostDiscovery do
-  @moduledoc "Имя и адреса машины для тестов центра сертификации"
   use Boundary, top_level?: true, check: [in: false, out: false]
 
   @key {__MODULE__, :hosts}

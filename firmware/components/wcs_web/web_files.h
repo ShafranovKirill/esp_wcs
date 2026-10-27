@@ -1,4 +1,3 @@
-/* Файлы из www/, встроенные в прошивку генератором gen_www.py */
 #pragma once
 
 #include <stdbool.h>
@@ -6,11 +5,11 @@
 #include <stdint.h>
 
 typedef struct {
-    const char *path; /* относительно www/: "pages/login.html", "assets/style.css" */
-    const char *type; /* Content-Type */
+    const char *path;
+    const char *type;
     const uint8_t *data;
     size_t len;
-    bool gzip;        /* data сжаты, отдавать с Content-Encoding: gzip */
+    bool gzip;
 } web_file_t;
 
 extern const web_file_t web_files[];

@@ -1,8 +1,4 @@
 defmodule BastionWeb.ConnectLive do
-  @moduledoc """
-  «Как подключить»: пошаговая инструкция и текущие адреса бастиона для мастера
-  настройки ESP. Адреса берутся из сертификата сервера, то есть всегда актуальны.
-  """
   use BastionWeb, :live_view
 
   @impl true

@@ -1,5 +1,4 @@
 defmodule Bastion.FleetFixtures do
-  @moduledoc "Устройства для тестов: ключ и CSR как у ESP"
   use Boundary, top_level?: true, check: [in: false, out: false]
 
   def device_id, do: :crypto.strong_rand_bytes(6) |> Base.encode16(case: :lower)
@@ -22,7 +21,6 @@ defmodule Bastion.FleetFixtures do
     )
   end
 
-  @doc "Заявка подана; возвращает устройство"
   def pending_device(attrs \\ %{}) do
     attrs = request_attrs(attrs)
     {:ok, :pending} = Bastion.Fleet.submit_request(attrs)

@@ -1,11 +1,4 @@
 defmodule BastionWeb.DeviceLive do
-  @moduledoc """
-  Страница устройства. Вкладки: Консоль, Настройки, Сведения, Журнал.
-  Заявка на одобрение показывается баннером сверху.
-
-  Консоль, параметры порта, Wi-Fi и перезагрузка заработают вместе с WCS Link;
-  пока они нарисованы и недоступны.
-  """
   use BastionWeb, :live_view
 
   alias Bastion.Fleet
@@ -74,8 +67,6 @@ defmodule BastionWeb.DeviceLive do
           else: socket
     end
   end
-
-  # ---- события ----
 
   @impl true
   def handle_info(
@@ -147,8 +138,6 @@ defmodule BastionWeb.DeviceLive do
         {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
     end
   end
-
-  # ---- отображение ----
 
   @impl true
   def render(assigns) do
@@ -252,8 +241,6 @@ defmodule BastionWeb.DeviceLive do
     """
   end
 
-  # ---- вкладка «Консоль» ----
-
   attr :device, :map, required: true
 
   defp console_tab(assigns) do
@@ -297,8 +284,6 @@ defmodule BastionWeb.DeviceLive do
     </section>
     """
   end
-
-  # ---- вкладка «Настройки» ----
 
   attr :device, :map, required: true
   attr :name_form, :map, required: true
@@ -442,8 +427,6 @@ defmodule BastionWeb.DeviceLive do
     """
   end
 
-  # ---- вкладка «Сведения» ----
-
   attr :device, :map, required: true
   attr :online, :map, default: nil
 
@@ -506,8 +489,6 @@ defmodule BastionWeb.DeviceLive do
     """
   end
 
-  # ---- вкладка «Журнал» ----
-
   attr :events, :list, required: true
 
   defp journal_tab(assigns) do
@@ -531,8 +512,6 @@ defmodule BastionWeb.DeviceLive do
     </section>
     """
   end
-
-  # ---- тексты ----
 
   defp format_uptime(seconds) do
     days = div(seconds, 86_400)

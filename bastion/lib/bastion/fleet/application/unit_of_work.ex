@@ -1,9 +1,4 @@
 defmodule Bastion.Fleet.Application.UnitOfWork do
-  @moduledoc """
-  Транзакция команды и события после неё: функция возвращает
-  `{:ok, result, events}` или `{:error, reason}`; события публикуются только
-  после фиксации — подписчики не увидят того, что откатилось.
-  """
   alias Bastion.Repo
 
   @type event :: {Bastion.Events.topic() | [Bastion.Events.topic()], struct()}

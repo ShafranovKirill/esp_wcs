@@ -1,13 +1,4 @@
 defmodule Bastion.Link.Application.Session do
-  @moduledoc """
-  Сеанс WCS Link одного соединения (обработчик WebSock), `docs/protocol.md`.
-
-  - без сертификата клиента — сеанс регистрации: `hello` → `enroll` → ждём решения
-    администратора, при одобрении отдаём сертификат;
-  - с сертификатом (mTLS) — сеанс устройства: сертификат должен принадлежать
-    одобренному устройству и совпадать по серийному номеру с выданным (отзыв и
-    перевыпуск обрезают старые сертификаты); дальше heartbeat и статус онлайн.
-  """
   @behaviour WebSock
   require Logger
 
@@ -20,8 +11,6 @@ defmodule Bastion.Link.Application.Session do
   @hb_timeout :timer.seconds(45)
   @hello_timeout :timer.seconds(10)
   @ping_interval :timer.seconds(30)
-
-  # ---- начало ----
 
   @impl true
   def init(%{ip: ip} = opts) do
@@ -54,8 +43,6 @@ defmodule Bastion.Link.Application.Session do
     end
   end
 
-  # ---- входящие ----
-
   @impl true
   def handle_in({frame, opcode: :text}, state) do
     case Protocol.decode(frame) do
@@ -65,7 +52,6 @@ defmodule Bastion.Link.Application.Session do
     end
   end
 
-  # Данные консоли — на следующем шаге; до сеанса устройства бинарные кадры запрещены
   def handle_in({_data, opcode: :binary}, %{phase: :device} = state), do: {:ok, state}
 
   def handle_in({_data, opcode: :binary}, state),
@@ -152,8 +138,6 @@ defmodule Bastion.Link.Application.Session do
   @impl true
   def handle_control(_frame, state), do: {:ok, state}
 
-  # ---- события и таймеры ----
-
   @impl true
   def handle_info(
         {:event, %DeviceApproved{id: id, certificate_pem: pem}},
@@ -193,8 +177,6 @@ defmodule Bastion.Link.Application.Session do
 
   @impl true
   def terminate(_reason, _state), do: :ok
-
-  # ---- общее ----
 
   defp reset_hb_timer(state) do
     if state.hb_timer, do: Process.cancel_timer(state.hb_timer)

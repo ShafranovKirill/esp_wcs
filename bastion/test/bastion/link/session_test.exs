@@ -1,5 +1,4 @@
 defmodule Bastion.Link.SessionTest do
-  @moduledoc "Сеанс WCS Link: вызовы обработчика WebSock напрямую, как их делает Bandit"
   use Bastion.DataCase, async: false
 
   import Bastion.FleetFixtures

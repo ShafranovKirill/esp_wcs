@@ -1,12 +1,4 @@
 defmodule Bastion.Accounts.Application.Provisioning do
-  @moduledoc """
-  Учётная запись администратора из `.env` (`BASTION_ADMIN_USERNAME`,
-  `BASTION_ADMIN_PASSWORD`). Существующего администратора без `reset: true`
-  не меняет: случайный повторный запуск не сбросит пароль.
-
-  Администратор один: при `reset` прежняя запись заменяется, все сессии
-  завершаются.
-  """
   alias Bastion.Accounts.Domain.{PasswordPolicy, Username}
   alias Bastion.Accounts.Infrastructure.{Admin, AdminSession, Password}
   alias Bastion.Repo

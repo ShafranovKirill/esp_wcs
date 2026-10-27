@@ -1,12 +1,4 @@
 defmodule Bastion.PKI.Infrastructure.HostDiscovery do
-  @moduledoc """
-  Имя машины и её адреса в локальных сетях — для сертификата сервера и страницы
-  «Как подключить».
-
-  Виртуальные интерфейсы (Docker, мосты, VPN, виртуальные машины) пропускаются:
-  устройство в сети Wi-Fi через них бастион всё равно не увидит.
-  """
-
   @virtual_prefixes ~w(lo docker br- veth virbr vmnet vboxnet tun tap wg zt utun awdl llw bridge)
 
   @spec hostname() :: String.t() | nil

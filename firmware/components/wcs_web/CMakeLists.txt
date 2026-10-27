@@ -1,17 +1,9 @@
-# Файлы из www/ встраиваются генератором gen_www.py: таблица файлов, крупные
-# тексты сжимаются gzip. Новый файл в www/ подхватывается без правки этого файла.
-#   www/pages/  — страницы, отдаются только через маршруты (с проверкой входа)
-#   www/assets/ — общие ресурсы, доступны по /assets/<путь> без входа
 set(www_dir "${CMAKE_CURRENT_SOURCE_DIR}/www")
 set(gen_src "${CMAKE_CURRENT_BINARY_DIR}/web_files_gen.c")
-# CONFIGURE_DEPENDS — новые файлы подхватываются без ручного reconfigure;
-# в раннем проходе сборки (script mode) он недопустим
 if(CMAKE_BUILD_EARLY_EXPANSION)
     file(GLOB_RECURSE www_files "${www_dir}/*")
 else()
     file(GLOB_RECURSE www_files CONFIGURE_DEPENDS "${www_dir}/*")
-    # Список файлов перезаписывается только при изменении — так удаление файла
-    # из www/ тоже перезапускает генератор
     set(www_list "${CMAKE_CURRENT_BINARY_DIR}/www_files.txt")
     file(CONFIGURE OUTPUT "${www_list}" CONTENT "${www_files}")
 endif()

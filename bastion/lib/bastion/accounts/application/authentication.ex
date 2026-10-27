@@ -1,11 +1,4 @@
 defmodule Bastion.Accounts.Application.Authentication do
-  @moduledoc """
-  Вход, проверка и завершение сессий администратора.
-
-  Токен сессии — 32 случайных байта; в cookie лежит сам токен, в БД — SHA-256 от
-  него (утечка БД не даёт войти). Сессия истекает после `@idle_timeout_s`
-  бездействия.
-  """
   import Ecto.Query
 
   alias Bastion.Accounts.Domain.Username
@@ -13,7 +6,6 @@ defmodule Bastion.Accounts.Application.Authentication do
   alias Bastion.Repo
 
   @idle_timeout_s 30 * 60
-  # Не писать last_seen_at в БД на каждый запрос
   @touch_every_s 60
 
   @spec idle_timeout_s() :: pos_integer()
@@ -42,11 +34,6 @@ defmodule Bastion.Accounts.Application.Authentication do
     end
   end
 
-  @doc """
-  Администратор по токену. `touch: true` — продлить сессию (действие пользователя);
-  фоновые проверки открытых вкладок вызывают без продления, иначе сессия не истечёт
-  никогда. `nil` — нет сессии или истекла.
-  """
   @spec admin_by_token(binary() | nil, keyword()) :: %{id: String.t(), username: String.t()} | nil
   def admin_by_token(token, opts \\ [])
 
@@ -77,7 +64,6 @@ defmodule Bastion.Accounts.Application.Authentication do
 
   def admin_by_token(_, _), do: nil
 
-  @doc "Идентификатор сессии для отключения её LiveView-вкладок при выходе"
   @spec session_id(binary()) :: String.t()
   def session_id(token), do: Base.url_encode64(hash(token), padding: false)
 

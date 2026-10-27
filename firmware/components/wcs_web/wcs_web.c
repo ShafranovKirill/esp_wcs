@@ -19,14 +19,11 @@
 #define LOGIN_BODY_MAX    512
 #define USERNAME_MAX      64
 #define PASSWORD_MAX      128
-#define SERVER_STACK_SIZE 10240 /* TLS, PBKDF2 и поиск Wi-Fi выполняются в задаче сервера */
+#define SERVER_STACK_SIZE 10240
 #define MAX_URI_HANDLERS  24
-/* Клиент один, но браузер открывает несколько соединений; каждое TLS — ~40 КБ (в PSRAM) */
 #define MAX_OPEN_SOCKETS  5
 #define HOST_MAX          64
 
-/* Сервер перенаправления с HTTP: HTTPS по умолчанию занимает управляющий порт
- * ESP_HTTPD_DEF_CTRL_PORT + 1, этому достаётся обычный */
 #define REDIRECT_CTRL_PORT    ESP_HTTPD_DEF_CTRL_PORT
 #define REDIRECT_MAX_SOCKETS  2
 #define REDIRECT_STACK_SIZE   3072
@@ -38,8 +35,6 @@ wcs_web_config_t web_config;
 static httpd_handle_t s_server;
 static httpd_handle_t s_redirect_server;
 static char s_host[HOST_MAX];
-
-/* ---- общие помощники ---- */
 
 void web_set_security_headers(httpd_req_t *req)
 {
@@ -130,7 +125,6 @@ static int hex_value(char c)
     return c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
 }
 
-/* Декодирует application/x-www-form-urlencoded на месте */
 static void url_decode(char *s)
 {
     char *out = s;
@@ -183,13 +177,10 @@ bool web_json_escape(const char *in, char *out, size_t out_size)
     return true;
 }
 
-/* Главная страница режима после входа */
 static const char *home_path(void)
 {
     return web_config.mode == WCS_WEB_MODE_SETUP ? "/setup" : "/console";
 }
-
-/* ---- общие обработчики ---- */
 
 static esp_err_t root_get(httpd_req_t *req)
 {
@@ -264,11 +255,10 @@ static esp_err_t api_status_get(httpd_req_t *req)
     return web_send_json(req, NULL, json);
 }
 
-/* /assets/<путь> → www/assets/<путь>; страницы из www/pages/ так не достать */
 static esp_err_t asset_get(httpd_req_t *req)
 {
     char path[CONFIG_HTTPD_MAX_URI_LEN + 1];
-    strlcpy(path, req->uri + 1, sizeof(path)); /* без ведущего "/" */
+    strlcpy(path, req->uri + 1, sizeof(path));
     path[strcspn(path, "?#")] = '\0';
     return web_send_file(req, path);
 }
@@ -281,8 +271,6 @@ static const web_route_t s_routes[] = {
     { .uri = "/api/status", .method = HTTP_GET, .handler = api_status_get, .access = WEB_ACCESS_API },
     { .uri = "/assets/*", .method = HTTP_GET, .handler = asset_get, .access = WEB_ACCESS_PUBLIC },
 };
-
-/* ---- маршруты ---- */
 
 static esp_err_t dispatch(httpd_req_t *req)
 {
@@ -311,9 +299,6 @@ esp_err_t web_register_routes(httpd_handle_t server, const web_route_t *routes, 
     return ESP_OK;
 }
 
-/* ---- HTTP → HTTPS ---- */
-
-/* Любой запрос по HTTP — на тот же путь по HTTPS. Тело не читается */
 static esp_err_t redirect_any(httpd_req_t *req)
 {
     char location[sizeof("https://") + HOST_MAX + CONFIG_HTTPD_MAX_URI_LEN];
@@ -345,8 +330,6 @@ static esp_err_t start_redirect_server(void)
     }
     return ESP_OK;
 }
-
-/* ---- запуск ---- */
 
 esp_err_t wcs_web_start(const wcs_web_config_t *config)
 {

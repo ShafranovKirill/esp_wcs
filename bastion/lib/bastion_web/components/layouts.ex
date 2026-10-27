@@ -1,24 +1,8 @@
 defmodule BastionWeb.Layouts do
-  @moduledoc """
-  This module holds layouts and related functionality
-  used by your application.
-  """
   use BastionWeb, :html
 
-  # Embed all files in layouts/* within this module.
-  # The default root.html.heex file contains the HTML
-  # skeleton of your application, namely HTML headers
-  # and other static content.
   embed_templates "layouts/*"
 
-  @doc """
-  Основной макет страниц после входа: шапка с навигацией, языком, темой,
-  логином администратора и выходом.
-
-      <Layouts.app flash={@flash} current_admin={@current_admin} locale={@locale} current_path={@current_path}>
-        ...
-      </Layouts.app>
-  """
   attr :flash, :map, required: true, doc: "the map of flash messages"
   attr :current_admin, :map, default: nil, doc: "вошедший администратор"
   attr :locale, :string, default: "ru"
@@ -87,7 +71,6 @@ defmodule BastionWeb.Layouts do
   attr :label, :string, required: true
   attr :active, :boolean, default: false
 
-  # На узком экране — только иконка, на широком — иконка и подпись
   defp nav_link(assigns) do
     ~H"""
     <.link
@@ -105,7 +88,6 @@ defmodule BastionWeb.Layouts do
     """
   end
 
-  @doc "Переключатель языка: RU / EN, выбор запоминается в сессии"
   attr :locale, :string, required: true
   attr :return_to, :string, default: "/"
 
@@ -136,7 +118,6 @@ defmodule BastionWeb.Layouts do
     """
   end
 
-  @doc "Макет страницы входа: карточка по центру экрана"
   attr :flash, :map, required: true
   attr :locale, :string, default: "ru"
   attr :current_path, :string, default: "/login"
@@ -155,13 +136,6 @@ defmodule BastionWeb.Layouts do
     """
   end
 
-  @doc """
-  Shows the flash group with standard titles and content.
-
-  ## Examples
-
-      <.flash_group flash={@flash} />
-  """
   attr :flash, :map, required: true, doc: "the map of flash messages"
   attr :id, :string, default: "flash-group", doc: "the optional id of flash container"
 
@@ -204,11 +178,6 @@ defmodule BastionWeb.Layouts do
     """
   end
 
-  @doc """
-  Provides dark vs light theme toggle based on themes defined in app.css.
-
-  See <head> in root.html.heex which applies the theme before page load.
-  """
   def theme_toggle(assigns) do
     ~H"""
     <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">

@@ -1,13 +1,4 @@
 defmodule BastionWeb.AdminAuth do
-  @moduledoc """
-  Вход администратора в веб-интерфейсе.
-
-  - plug `:fetch_current_admin` / `:require_admin` — для обычных запросов;
-  - `on_mount :require_admin` — для LiveView: проверка при подключении, затем
-    раз в минуту без продления сессии (истёкшая сессия отключает вкладку);
-    действия пользователя (`handle_event`) сессию продлевают;
-  - при выходе все LiveView-вкладки этой сессии отключаются сразу.
-  """
   use BastionWeb, :verified_routes
 
   import Plug.Conn
@@ -17,8 +8,6 @@ defmodule BastionWeb.AdminAuth do
 
   @token_key "admin_token"
   @check_interval :timer.minutes(1)
-
-  # ---- контроллеры ----
 
   def log_in(conn, token) do
     conn
@@ -66,7 +55,6 @@ defmodule BastionWeb.AdminAuth do
     end
   end
 
-  # Новая сессия при входе и выходе — защита от фиксации сессии
   defp renew_session(conn) do
     delete_csrf_token()
 
@@ -76,8 +64,6 @@ defmodule BastionWeb.AdminAuth do
   end
 
   defp live_socket_id(token), do: "admin_session:" <> Accounts.session_id(token)
-
-  # ---- LiveView ----
 
   def on_mount(:require_admin, _params, session, socket) do
     token = session[@token_key]

@@ -1,5 +1,4 @@
 defmodule Bastion.Fleet.Infrastructure.DeviceRecord do
-  @moduledoc false
   use Ecto.Schema
 
   alias Bastion.Fleet.Device
@@ -32,7 +31,6 @@ defmodule Bastion.Fleet.Infrastructure.DeviceRecord do
 
   def to_domain(%__MODULE__{} = r), do: struct(Device, Map.take(r, [:id | @fields]))
 
-  @doc "Изменения записи по агрегату; уникальность имени — ограничением БД"
   def changeset(%__MODULE__{} = record, %Device{} = device) do
     record
     |> Ecto.Changeset.change(Map.take(device, @fields))

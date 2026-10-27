@@ -1,12 +1,4 @@
 defmodule Bastion.PKI.Infrastructure.FileStore do
-  @moduledoc """
-  Файлы центра сертификации в каталоге данных (`BASTION_DATA_DIR`).
-
-  Каталог создаётся с правами 700, файлы с ключами — 600. Запись атомарная:
-  во временный файл и переименование, чтобы сбой посреди записи не оставил
-  половину ключа.
-  """
-
   @spec read(Path.t(), String.t()) :: {:ok, binary()} | {:error, :enoent} | {:error, File.posix()}
   def read(dir, name), do: File.read(Path.join(dir, name))
 

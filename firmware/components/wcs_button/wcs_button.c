@@ -10,7 +10,7 @@
 #include "freertos/task.h"
 
 #define POLL_PERIOD_MS   10
-#define DEBOUNCE_SAMPLES 3 /* состояние считается устойчивым после 30 мс */
+#define DEBOUNCE_SAMPLES 3
 #define TASK_STACK_SIZE  3072
 #define TASK_PRIORITY    5
 
@@ -20,7 +20,6 @@ static const char *TAG = "wcs_button";
 
 static wcs_button_config_t s_config;
 
-/* Серия коротких нажатий: сколько подряд и когда отпущено последнее */
 static int s_click_count;
 static int64_t s_last_click_us;
 
@@ -75,7 +74,6 @@ static void post_release(int64_t pressed_at_us, uint32_t held_ms)
     }
 }
 
-/* Пороги, достигнутые во время удержания, — каждый публикуется один раз за нажатие */
 static void check_hold(int64_t pressed_at_us, int *thresholds_passed)
 {
     uint32_t held_ms = (uint32_t)((esp_timer_get_time() - pressed_at_us) / 1000);
@@ -91,7 +89,6 @@ static void check_hold(int64_t pressed_at_us, int *thresholds_passed)
 
 static void button_task(void *arg)
 {
-    /* Нажатие, начатое до запуска, отсчитывается от запуска */
     bool stable = false;
     bool last_raw = false;
     int same_count = 0;

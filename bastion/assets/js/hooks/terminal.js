@@ -1,5 +1,3 @@
-// Терминал xterm.js. Пока только отрисовка: данные консоли придут с WCS Link
-// на следующем этапе (docs/protocol.md, «Данные консоли»).
 import {Terminal as XTerm} from "../../vendor/xterm/xterm.mjs"
 import {FitAddon} from "../../vendor/xterm/addon-fit.mjs"
 
@@ -33,7 +31,6 @@ export const Terminal = {
     this.onResize = () => this.fit.fit()
     window.addEventListener("resize", this.onResize)
 
-    // Смена темы — перекрасить терминал
     this.themeObserver = new MutationObserver(() => (this.term.options.theme = currentTheme()))
     this.themeObserver.observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]})
   },

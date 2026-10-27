@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # версия прошивки берётся из git describe
+          fetch-depth: 0
       - name: Build (ESP-IDF v6.1, esp32s3)
         uses: espressif/esp-idf-ci-action@v1
         with:

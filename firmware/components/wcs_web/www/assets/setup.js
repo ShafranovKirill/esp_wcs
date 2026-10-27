@@ -3,11 +3,11 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var info = null;
-  var mode = null;          // выбранный режим: 'direct' | 'bastion'
-  var selected = null;      // выбранная сеть {ssid, secured}
-  var pending = null;       // подключение в процессе {ssid, password}
-  var connected = null;     // сеть, к которой устройство подключилось {ssid, password, ip}
-  var check = null;         // результат проверки бастиона {addr, ok, text}
+  var mode = null;
+  var selected = null;
+  var pending = null;
+  var connected = null;
+  var check = null;
   var applied = false;
   var pollTimer = null;
 
@@ -34,9 +34,6 @@
     el.className = cls || '';
   }
 
-  // ---- шаги мастера ----
-
-  // Шаг, на который ведёт «Назад», и номер шага в своей ветке
   var steps = {
     mode:    { back: null,      n: 1 },
     direct:  { back: 'mode',    n: 2, of: 2 },
@@ -46,7 +43,6 @@
     done:    { back: null }
   };
 
-  // Куда можно попасть сейчас: без выполненных условий — откат на шаг раньше
   function allowed(step) {
     if (applied) return 'done';
     switch (step) {
@@ -91,16 +87,12 @@
     });
   });
 
-  // ---- подсказки «?» ----
-
   document.querySelectorAll('.help').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var hint = $(btn.dataset.help);
       hint.hidden = !hint.hidden;
     });
   });
-
-  // ---- шаг 1: режим ----
 
   document.querySelectorAll('input[name=mode]').forEach(function (radio) {
     radio.addEventListener('change', function () {
@@ -113,16 +105,12 @@
     go(mode === 'direct' ? 'direct' : 'wifi');
   });
 
-  // ---- Direct ----
-
   $('apply-direct').addEventListener('click', function () {
     apply({ mode: 'direct' }, function () {
       return 'Интерфейс настройки закрыт. Подключитесь к Wi-Fi «' + info.direct.ssid +
         '» (пароль ' + info.direct.password + ') и откройте ' + info.direct.url;
     });
   });
-
-  // ---- Bastion, шаг 2: Wi-Fi ----
 
   function signal(rssi) {
     var bars = rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -75 ? 2 : 1;
@@ -206,7 +194,6 @@
       });
   });
 
-  // Пока устройство переключает канал, связь со страницей может прерываться — ошибки сети пропускаем
   function pollStatus(deadline) {
     clearTimeout(pollTimer);
     pollTimer = setTimeout(function () {
@@ -239,8 +226,6 @@
 
   $('wifi-next').addEventListener('click', function () { go('bastion'); });
 
-  // ---- Bastion, шаг 3: адрес и проверка ----
-
   function bastionAddr() {
     return $('bastion').value.trim();
   }
@@ -248,13 +233,11 @@
   function updateBastion() {
     var fresh = check && check.addr === bastionAddr();
     $('bastion-check').disabled = !bastionAddr();
-    // Дальше — только после успешной проверки: устройство запомнит корневой сертификат бастиона
     $('bastion-next').disabled = !(fresh && check.ok);
     $('bastion-code-box').hidden = !(fresh && check.ok);
     if (fresh && check.ok) $('bastion-code').textContent = check.code;
   }
 
-  // Адрес поменялся — прошлая проверка к нему не относится
   $('bastion').addEventListener('input', function () {
     check = null;
     setStatus($('bastion-status'), '');
@@ -289,7 +272,7 @@
     setStatus($('bastion-status'), 'Проверка ' + addr + '…', 'muted');
 
     post('/api/bastion/check', { bastion: addr }).then(function (res) {
-      if (bastionAddr() !== addr) return; // адрес успели поменять
+      if (bastionAddr() !== addr) return;
       if (!res.ok) {
         setStatus($('bastion-status'), checkErrors[res.body.error] || 'Не удалось проверить', 'error');
         return;
@@ -303,8 +286,6 @@
   });
 
   $('bastion-next').addEventListener('click', function () { go('confirm'); });
-
-  // ---- Bastion, шаг 4: подтверждение ----
 
   function fillConfirm() {
     $('confirm-ssid').textContent = connected.ssid;
@@ -322,8 +303,6 @@
         info.device.code + '.';
     });
   });
-
-  // ---- применение ----
 
   var applyErrors = {
     invalid_bastion: 'Проверьте адрес бастиона: IP, домен или имя .local, можно с портом',
@@ -347,8 +326,6 @@
       $('apply-error').hidden = false;
     });
   }
-
-  // ---- начальная загрузка ----
 
   render();
 

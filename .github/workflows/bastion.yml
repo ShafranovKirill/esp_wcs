@@ -16,7 +16,6 @@ jobs:
     env:
       MIX_ENV: test
     services:
-      # Та же БД, что в docker-compose.yml: порт 5434, пользователь bastion
       postgres:
         image: postgres:17-alpine
         env:
@@ -39,7 +38,6 @@ jobs:
             bastion/_build
           key: mix-${{ runner.os }}-${{ hashFiles('bastion/.tool-versions', 'bastion/mix.lock') }}
       - run: mix deps.get
-      # Предупреждения — ошибки: так же ловятся нарушения границ контекстов (boundary)
       - run: mix compile --warnings-as-errors
       - run: mix format --check-formatted
       - run: mix test

@@ -33,7 +33,7 @@ esp_err_t wcs_storage_load(wcs_settings_t *settings)
     nvs_handle_t nvs;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
-        return ESP_OK; /* ничего ещё не сохранялось */
+        return ESP_OK;
     }
     ESP_RETURN_ON_ERROR(err, TAG, "nvs_open failed");
 

@@ -1,5 +1,3 @@
-// <time datetime="ISO" data-format="datetime|relative"> — время в часовом поясе
-// и на языке браузера (сервер не знает часовой пояс пользователя)
 const lang = () => document.documentElement.lang || navigator.language
 
 const UNITS = [

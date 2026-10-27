@@ -1,5 +1,4 @@
 defmodule Bastion.Fleet.Application.DeviceCommands do
-  @moduledoc "Команды над устройствами: заявка, одобрение, отклонение, отзыв, удаление, имя, папка"
   import Ecto.Query
 
   alias Bastion.Fleet.Application.UnitOfWork
@@ -8,8 +7,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
   alias Bastion.Fleet.Events.{DeviceApproved, DeviceChanged, DeviceRequested, DeviceRevoked}
   alias Bastion.Fleet.Infrastructure.{DeviceEventRecord, DeviceRecord, FolderRecord}
   alias Bastion.Repo
-
-  # ---- заявка (от устройства через WCS Link) ----
 
   @type request_attrs :: %{
           required(:device_id) => String.t(),
@@ -62,8 +59,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end
   end
 
-  # Новое устройство с занятым именем получает суффикс из ID. Проверяем заранее:
-  # неудачная вставка прервала бы всю транзакцию PostgreSQL
   defp save_request(nil, device) do
     name =
       if name_taken?(device.name),
@@ -81,8 +76,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
       {:error, _} -> "esp-wcs-" <> String.slice(device_id, -4, 4)
     end
   end
-
-  # ---- решения администратора ----
 
   @spec approve(String.t()) :: {:ok, Device.t()} | {:error, atom()}
   def approve(id) do
@@ -164,8 +157,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  # ---- имя и папка ----
-
   @spec rename(String.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
   def rename(id, name) do
     UnitOfWork.run(fn ->
@@ -183,7 +174,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  @doc "Перенести в папку; `nil` — «Без папки»"
   @spec move(String.t(), String.t() | nil) :: {:ok, Device.t()} | {:error, atom()}
   def move(id, folder_id) do
     UnitOfWork.run(fn ->
@@ -217,8 +207,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end
   end
 
-  # ---- от других контекстов: журнал и «был на связи» ----
-
   @spec record_event(String.t(), Bastion.Fleet.DeviceEvent.type(), map()) :: :ok
   def record_event(id, type, data) do
     journal(id, type, data)
@@ -237,8 +225,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     Repo.update_all(from(d in DeviceRecord, where: d.id == ^id), set: changes)
     :ok
   end
-
-  # ---- общее ----
 
   defp lock(id) do
     with {:ok, uuid} <- cast_id(id),

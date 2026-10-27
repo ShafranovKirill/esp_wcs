@@ -1,8 +1,4 @@
 defmodule BastionWeb.DashboardLive do
-  @moduledoc """
-  Главная: код бастиона, заявки на одобрение, устройства по папкам, поиск.
-  Обновляется сама по событиям контекста Fleet.
-  """
   use BastionWeb, :live_view
 
   alias Bastion.Fleet
@@ -38,21 +34,15 @@ defmodule BastionWeb.DashboardLive do
   defp count(%{folders: folders, unfiled: unfiled}),
     do: Enum.reduce(folders, length(unfiled), fn {_, devices}, acc -> acc + length(devices) end)
 
-  # ---- события Fleet ----
-
   @impl true
   def handle_info({:event, %Bastion.Link.Events.PresenceChanged{}}, socket),
     do: {:noreply, assign(socket, online: Bastion.Link.online())}
 
   def handle_info({:event, _event}, socket), do: {:noreply, load(socket)}
 
-  # ---- поиск ----
-
   @impl true
   def handle_event("search", %{"q" => query}, socket),
     do: {:noreply, assign(socket, query: String.trim(query))}
-
-  # ---- заявки ----
 
   def handle_event("confirm-approve", %{"id" => id}, socket) do
     device = Enum.find(socket.assigns.overview.requests, &(&1.id == id))
@@ -80,8 +70,6 @@ defmodule BastionWeb.DashboardLive do
       {:error, reason} -> {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
     end
   end
-
-  # ---- папки ----
 
   def handle_event("toggle-folder", %{"id" => id}, socket) do
     collapsed = socket.assigns.collapsed
@@ -137,8 +125,6 @@ defmodule BastionWeb.DashboardLive do
     {:noreply,
      put_flash(socket, :info, gettext("Folder deleted, its devices moved to “No folder”"))}
   end
-
-  # ---- отображение ----
 
   @impl true
   def render(assigns) do

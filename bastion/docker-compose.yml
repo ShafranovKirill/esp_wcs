@@ -1,13 +1,3 @@
-# Разработка — только PostgreSQL (порт 5434 на localhost, чтобы не мешать другим):
-#   docker compose up -d db
-#
-# Сервер на Linux — бастион тоже в контейнере (профиль server):
-#   docker compose --profile server up -d --build
-#   docker compose --profile server run --rm bastion /app/bin/bastion eval "Bastion.Release.admin()"
-#
-# Бастиону нужна сеть машины (network_mode: host): её настоящие IP попадают в
-# сертификат сервера, а устройства подключаются к ним напрямую. На macOS/Windows
-# host-сеть Docker работает ограниченно — там бастион запускают без Docker.
 services:
   db:
     image: postgres:17-alpine
@@ -43,5 +33,4 @@ services:
 
 volumes:
   db_data:
-  # Ключ корневого сертификата (зашифрован) и сертификаты. Потеря = регистрировать устройства заново
   bastion_data:

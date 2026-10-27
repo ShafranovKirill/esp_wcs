@@ -1,5 +1,4 @@
 defmodule BastionWeb.Errors do
-  @moduledoc "Понятные сообщения для ошибок контекстов"
   use Gettext, backend: BastionWeb.Gettext
 
   @spec message(atom()) :: String.t()
