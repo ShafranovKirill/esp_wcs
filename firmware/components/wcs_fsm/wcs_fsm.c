@@ -87,6 +87,8 @@ static int s_ap_clients;
 static bool s_error;
 static char s_setup_ssid[33];
 static char s_direct_ssid[33];
+static char s_direct_ap_ssid[WCS_SSID_MAX_LEN + 1];
+static char s_direct_ap_password[WCS_WIFI_PASSWORD_MAX_LEN + 1];
 static char s_device_name[33];
 
 static void update_led(void)
@@ -235,6 +237,20 @@ static bool start_access_point(const char *ssid, const char *password, const wcs
     return true;
 }
 
+static void load_direct_credentials(void)
+{
+    wcs_settings_t settings;
+    if (wcs_storage_load(&settings) != ESP_OK) {
+        memset(&settings, 0, sizeof(settings));
+    }
+    strlcpy(s_direct_ap_ssid, settings.direct_ssid[0] ? settings.direct_ssid : s_direct_ssid,
+            sizeof(s_direct_ap_ssid));
+    strlcpy(s_direct_ap_password,
+            settings.direct_password[0] ? settings.direct_password : wcs_defaults.direct_ap_password,
+            sizeof(s_direct_ap_password));
+    memset(&settings, 0, sizeof(settings));
+}
+
 static void enter_setup(void)
 {
     ESP_LOGI(TAG, "-> setup");
@@ -244,10 +260,11 @@ static void enter_setup(void)
     s_error = false;
     s_state = WCS_FSM_STATE_SETUP;
 
+    load_direct_credentials();
     const wcs_web_config_t web = {
         .mode = WCS_WEB_MODE_SETUP,
         .host = WEB_HOST,
-        .direct = { .ssid = s_direct_ssid, .password = wcs_defaults.direct_ap_password, .url = WEB_URL },
+        .direct = { .ssid = s_direct_ap_ssid, .password = s_direct_ap_password, .url = WEB_URL },
         .apply = on_web_apply,
     };
     start_access_point(s_setup_ssid, wcs_defaults.setup_ap_password, &web);
@@ -255,8 +272,9 @@ static void enter_setup(void)
 
 static void start_direct_access_point(void)
 {
+    load_direct_credentials();
     const wcs_web_config_t web = { .mode = WCS_WEB_MODE_DIRECT, .host = WEB_HOST };
-    start_access_point(s_direct_ssid, wcs_defaults.direct_ap_password, &web);
+    start_access_point(s_direct_ap_ssid, s_direct_ap_password, &web);
 }
 
 static void enter_direct(bool raise_ap)

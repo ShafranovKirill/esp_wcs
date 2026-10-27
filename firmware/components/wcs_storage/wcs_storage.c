@@ -11,6 +11,9 @@
 #define KEY_STA_PASSWORD "sta_pass"
 #define KEY_BASTION      "bastion"
 #define KEY_BASTION_CA   "bastion_ca"
+#define KEY_DIRECT_SSID  "direct_ssid"
+#define KEY_DIRECT_PASS  "direct_pass"
+#define KEY_CONSOLE      "console"
 
 static const char *TAG = "wcs_storage";
 
@@ -51,6 +54,12 @@ esp_err_t wcs_storage_load(wcs_settings_t *settings)
     if (err == ESP_OK) {
         err = read_str(nvs, KEY_BASTION, settings->bastion_addr, sizeof(settings->bastion_addr));
     }
+    if (err == ESP_OK) {
+        err = read_str(nvs, KEY_DIRECT_SSID, settings->direct_ssid, sizeof(settings->direct_ssid));
+    }
+    if (err == ESP_OK) {
+        err = read_str(nvs, KEY_DIRECT_PASS, settings->direct_password, sizeof(settings->direct_password));
+    }
     nvs_close(nvs);
     ESP_RETURN_ON_ERROR(err, TAG, "read failed");
 
@@ -74,6 +83,12 @@ esp_err_t wcs_storage_save(const wcs_settings_t *settings)
     }
     if (err == ESP_OK) {
         err = nvs_set_str(nvs, KEY_BASTION, settings->bastion_addr);
+    }
+    if (err == ESP_OK) {
+        err = nvs_set_str(nvs, KEY_DIRECT_SSID, settings->direct_ssid);
+    }
+    if (err == ESP_OK) {
+        err = nvs_set_str(nvs, KEY_DIRECT_PASS, settings->direct_password);
     }
     if (err == ESP_OK) {
         err = nvs_commit(nvs);
@@ -122,4 +137,36 @@ esp_err_t wcs_storage_load_bastion_ca(char *pem, size_t size)
     err = nvs_get_str(nvs, KEY_BASTION_CA, pem, &len);
     nvs_close(nvs);
     return err == ESP_ERR_NVS_NOT_FOUND ? ESP_ERR_NOT_FOUND : err;
+}
+
+esp_err_t wcs_storage_save_console(const wcs_console_settings_t *console)
+{
+    ESP_RETURN_ON_FALSE(console, ESP_ERR_INVALID_ARG, TAG, "console is NULL");
+
+    nvs_handle_t nvs;
+    ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs), TAG, "nvs_open failed");
+    esp_err_t err = nvs_set_blob(nvs, KEY_CONSOLE, console, sizeof(*console));
+    if (err == ESP_OK) {
+        err = nvs_commit(nvs);
+    }
+    nvs_close(nvs);
+    return err;
+}
+
+esp_err_t wcs_storage_load_console(wcs_console_settings_t *console)
+{
+    ESP_RETURN_ON_FALSE(console, ESP_ERR_INVALID_ARG, TAG, "console is NULL");
+
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs);
+    if (err != ESP_OK) {
+        return err == ESP_ERR_NVS_NOT_FOUND ? ESP_ERR_NOT_FOUND : err;
+    }
+    size_t len = sizeof(*console);
+    err = nvs_get_blob(nvs, KEY_CONSOLE, console, &len);
+    nvs_close(nvs);
+    if (err == ESP_ERR_NVS_NOT_FOUND || (err == ESP_OK && len != sizeof(*console))) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    return err;
 }

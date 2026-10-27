@@ -7,6 +7,7 @@
 #include "esp_psram.h"
 #include "nvs_flash.h"
 #include "wcs_auth.h"
+#include "wcs_console.h"
 #include "wcs_fsm.h"
 #include "wcs_led.h"
 
@@ -43,6 +44,15 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(wcs_auth_init());
+
+    const wcs_console_config_t console = {
+        .uart_num = BOARD_CONSOLE_UART_NUM,
+        .tx_gpio = BOARD_CONSOLE_TX_GPIO,
+        .rx_gpio = BOARD_CONSOLE_RX_GPIO,
+        .default_baud = BOARD_CONSOLE_DEFAULT_BAUD,
+        .break_ms = BOARD_CONSOLE_BREAK_MS,
+    };
+    ESP_ERROR_CHECK(wcs_console_init(&console));
 
     const wcs_fsm_config_t fsm = {
         .button_gpio = BOARD_BUTTON_GPIO,

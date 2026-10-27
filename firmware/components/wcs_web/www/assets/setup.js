@@ -105,10 +105,28 @@
     go(mode === 'direct' ? 'direct' : 'wifi');
   });
 
+  $('direct-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    $('apply-direct').click();
+  });
+
   $('apply-direct').addEventListener('click', function () {
-    apply({ mode: 'direct' }, function () {
-      return 'Интерфейс настройки закрыт. Подключитесь к Wi-Fi «' + info.direct.ssid +
-        '» (пароль ' + info.direct.password + ') и откройте ' + info.direct.url;
+    var ssid = $('direct-ssid').value;
+    var password = $('direct-password').value;
+    var bytes = function (s) { return new TextEncoder().encode(s).length; };
+    if (!ssid || bytes(ssid) > 32) {
+      $('apply-error').textContent = 'Имя сети — от 1 до 32 байт';
+      $('apply-error').hidden = false;
+      return;
+    }
+    if (bytes(password) < 8 || bytes(password) > 63) {
+      $('apply-error').textContent = 'Пароль — от 8 до 63 символов';
+      $('apply-error').hidden = false;
+      return;
+    }
+    apply({ mode: 'direct', direct_ssid: ssid, direct_password: password }, function () {
+      return 'Интерфейс настройки закрыт. Подключитесь к Wi-Fi «' + ssid +
+        '» (пароль ' + password + ') и откройте ' + info.direct.url;
     });
   });
 
@@ -305,6 +323,8 @@
   });
 
   var applyErrors = {
+    invalid_ssid: 'Имя сети — от 1 до 32 байт',
+    invalid_ap_password: 'Пароль — от 8 до 63 символов',
     invalid_bastion: 'Проверьте адрес бастиона: IP, домен или имя .local, можно с портом',
     wifi_not_connected: 'Устройство не подключено к выбранной сети, подключитесь заново',
     bastion_not_checked: 'Проверьте бастион ещё раз: адрес изменился после проверки'
@@ -331,9 +351,9 @@
 
   api('/api/setup/info').then(function (res) {
     info = res.body;
-    ['ssid', 'password', 'url'].forEach(function (k) {
-      document.querySelector('[data-direct="' + k + '"]').textContent = info.direct[k];
-    });
+    document.querySelector('[data-direct="url"]').textContent = info.direct.url;
+    $('direct-ssid').value = info.direct.ssid;
+    $('direct-password').value = info.direct.password;
     var port = info.bastion_default_port;
     $('bastion-hint').textContent = 'Порт по умолчанию — ' + port + '. Другой укажите через двоеточие: bastion.local:8443';
     $('bastion').value = info.saved.bastion || '';

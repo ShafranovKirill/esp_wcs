@@ -9,6 +9,7 @@ GZIP_MIN_GAIN = 0.9
 TYPES = {
     '.html': ('text/html; charset=utf-8', True),
     '.js': ('text/javascript; charset=utf-8', True),
+    '.mjs': ('text/javascript; charset=utf-8', True),
     '.css': ('text/css; charset=utf-8', True),
     '.json': ('application/json', True),
     '.svg': ('image/svg+xml', True),
