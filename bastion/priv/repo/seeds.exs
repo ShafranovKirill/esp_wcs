@@ -1,11 +1,3 @@
-# Демо-данные для разработки: папки и устройства во всех состояниях.
-#
-#     mix run priv/repo/seeds.exs
-#
-# Устройства проходят настоящий путь: ключ P-256 и CSR как у ESP, заявка,
-# одобрение через центр сертификации. Повторный запуск ничего не дублирует.
-# Администратор создаётся отдельно: mix bastion.admin
-
 alias Bastion.Fleet
 
 if Mix.env() != :dev do
@@ -46,7 +38,9 @@ device = fn device_id, name ->
   end
 end
 
-approve = fn d -> if d.status == :pending, do: elem(Fleet.approve(d.id), 1), else: d end
+approve = fn d ->
+  if d.status == :pending, do: elem(Fleet.approve(d.id, d.device_code), 1), else: d
+end
 
 server_room = folder.("Серверная 1")
 warehouse = folder.("Склад")

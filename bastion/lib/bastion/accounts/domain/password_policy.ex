@@ -1,11 +1,4 @@
 defmodule Bastion.Accounts.Domain.PasswordPolicy do
-  @moduledoc """
-  Требования к паролю администратора из `.env`.
-
-  Бастион доступен из сети, поэтому пароль из шаблона и короткие пароли не
-  принимаются: задача `bastion.admin` откажется их записывать.
-  """
-
   @min_length 12
   @placeholders ~w(change-me admin password changeme)
 

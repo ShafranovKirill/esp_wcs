@@ -1,5 +1,4 @@
 defmodule BastionWeb.Errors do
-  @moduledoc "Понятные сообщения для ошибок контекстов"
   use Gettext, backend: BastionWeb.Gettext
 
   @spec message(atom()) :: String.t()
@@ -17,6 +16,13 @@ defmodule BastionWeb.Errors do
       )
 
   def message(:invalid), do: gettext("The name contains invalid characters")
+
+  def message(:code_changed),
+    do: gettext("The device sent a new request with a different code — compare the code again")
+
+  def message(:fleet_full),
+    do: gettext("Device limit reached (%{max})", max: Bastion.Fleet.max_devices())
+
   def message(:folder_not_found), do: gettext("Folder not found")
   def message(:invalid_csr), do: gettext("The device sent an invalid certificate request")
 

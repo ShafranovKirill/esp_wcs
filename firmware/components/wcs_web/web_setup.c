@@ -1,11 +1,3 @@
-/*
- * Режим «Настройка»: мастер выбора режима работы.
- *
- * Direct — показать, куда подключаться дальше, и применить.
- * Bastion — найти Wi-Fi, проверить подключение (параллельно с точкой настройки),
- * задать адрес бастиона, проверить его доступность и применить.
- * Шаги мастера переключаются в браузере, сервер только отвечает на запросы API.
- */
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,18 +12,13 @@
 
 #define BODY_MAX         640
 #define SCAN_MAX         24
-#define SCAN_ITEM_JSON   (WCS_SSID_MAX_LEN * 6 + 64) /* худший случай экранирования */
-/* В форме значения приходят в %XX-кодировке — до трёх символов на байт */
+#define SCAN_ITEM_JSON   (WCS_SSID_MAX_LEN * 6 + 64)
 #define FORM_SSID_MAX    (WCS_SSID_MAX_LEN * 3 + 1)
 #define FORM_PASS_MAX    (WCS_WIFI_PASSWORD_MAX_LEN * 3 + 1)
 #define FORM_ADDR_MAX    (WCS_BASTION_ADDR_MAX_LEN * 3 + 1)
 
 static const char *TAG = "wcs_web_setup";
 
-/*
- * Последний успешно проверенный бастион: его корневой сертификат закрепляется
- * при «Применить» — только если пользователь видел именно этот код (тот же адрес)
- */
 static struct {
     char addr[WCS_BASTION_ADDR_MAX_LEN + 1];
     char code[WCS_BASTION_CODE_LEN + 1];
@@ -78,9 +65,8 @@ static esp_err_t info_get(httpd_req_t *req)
     web_json_escape(web_config.direct.url, url, sizeof(url));
     web_json_escape(saved.sta_ssid, sta_ssid, sizeof(sta_ssid));
     web_json_escape(saved.bastion_addr, bastion, sizeof(bastion));
-    memset(&saved.sta_password, 0, sizeof(saved.sta_password)); /* пароль в браузер не отдаём */
+    memset(&saved.sta_password, 0, sizeof(saved.sta_password));
 
-    /* Код устройства — для сверки с заявкой на бастионе (шаг «Итог») */
     char device_code[WCS_LINK_CODE_LEN + 1] = "";
     char device_id[WCS_LINK_DEVICE_ID_LEN + 1] = "";
     wcs_link_device_code(device_code);
@@ -179,7 +165,6 @@ static esp_err_t status_get(httpd_req_t *req)
     return web_send_json(req, NULL, json);
 }
 
-/* Доступен ли бастион из сети, к которой устройство подключилось */
 static esp_err_t bastion_check_post(httpd_req_t *req)
 {
     char body[BODY_MAX];
@@ -194,7 +179,6 @@ static esp_err_t bastion_check_post(httpd_req_t *req)
         return web_send_json(req, "409 Conflict", "{\"error\":\"wifi_not_connected\"}");
     }
 
-    /* ~1,7 КБ — не на стек задачи сервера */
     wcs_bastion_probe_t *probe = malloc(sizeof(*probe));
     if (!probe) {
         return web_send_json(req, "500 Internal Server Error", "{\"error\":\"no_memory\"}");
@@ -255,7 +239,6 @@ static esp_err_t apply_post(httpd_req_t *req)
             memset(password, 0, sizeof(password));
             return web_send_json(req, "400 Bad Request", "{\"error\":\"invalid_bastion\"}");
         }
-        /* Применяем только проверенную сеть: устройство сейчас к ней подключено */
         wcs_wifi_sta_status_t st;
         wcs_wifi_sta_get_status(&st);
         if (st.state != WCS_WIFI_STA_CONNECTED || strcmp(st.ssid, ssid) != 0 ||
@@ -264,7 +247,6 @@ static esp_err_t apply_post(httpd_req_t *req)
             return web_send_json(req, "409 Conflict", "{\"error\":\"wifi_not_connected\"}");
         }
 
-        /* Бастион должен быть проверен по этому же адресу: пользователь сверил его код */
         if (strcmp(s_checked.addr, addr) != 0 || s_checked.code[0] == '\0') {
             memset(password, 0, sizeof(password));
             return web_send_json(req, "409 Conflict", "{\"error\":\"bastion_not_checked\"}");

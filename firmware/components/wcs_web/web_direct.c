@@ -1,4 +1,3 @@
-/* Режим Direct connection: после входа — консоль */
 #include "web_priv.h"
 
 static esp_err_t console_get(httpd_req_t *req)

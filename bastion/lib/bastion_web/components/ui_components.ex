@@ -1,5 +1,4 @@
 defmodule BastionWeb.UIComponents do
-  @moduledoc "Общие элементы интерфейса бастиона: статусы, коды, время, копирование, диалоги"
   use Phoenix.Component
   use Gettext, backend: BastionWeb.Gettext
 
@@ -7,7 +6,6 @@ defmodule BastionWeb.UIComponents do
 
   import BastionWeb.CoreComponents, only: [icon: 1]
 
-  @doc "Статус устройства: заявка, одобрено, отозвано"
   attr :status, :atom, required: true
   attr :class, :any, default: nil
 
@@ -24,15 +22,10 @@ defmodule BastionWeb.UIComponents do
   defp status_class(:approved), do: "badge-success badge-soft"
   defp status_class(:revoked), do: "badge-error badge-soft"
 
-  @doc false
   def status_text(:pending), do: gettext("Awaiting approval")
   def status_text(:approved), do: gettext("Approved")
   def status_text(:revoked), do: gettext("Revoked")
 
-  @doc """
-  Связь с устройством: онлайн (отклик, сигнал) или когда было на связи.
-  `online` — показатели из `Bastion.Link.presence/1` или `nil`.
-  """
   attr :device, :map, required: true
   attr :online, :map, default: nil
 
@@ -59,7 +52,6 @@ defmodule BastionWeb.UIComponents do
     """
   end
 
-  @doc "Уровень сигнала Wi-Fi: 1–4 полоски по RSSI"
   attr :rssi, :integer, required: true
 
   def signal(assigns) do
@@ -80,13 +72,11 @@ defmodule BastionWeb.UIComponents do
     """
   end
 
-  @doc false
   def signal_bars(rssi) when rssi >= -55, do: 4
   def signal_bars(rssi) when rssi >= -67, do: 3
   def signal_bars(rssi) when rssi >= -75, do: 2
   def signal_bars(_rssi), do: 1
 
-  @doc "Код для сверки: моноширинный, крупный, группами"
   attr :code, :string, required: true
   attr :size, :string, default: "md", values: ~w(sm md lg)
   attr :rest, :global
@@ -107,7 +97,6 @@ defmodule BastionWeb.UIComponents do
     """
   end
 
-  @doc "Время в часовом поясе браузера (`LocalTime`)"
   attr :at, DateTime, required: true
   attr :id, :string, required: true
   attr :format, :string, default: "datetime", values: ~w(datetime relative)
@@ -120,7 +109,6 @@ defmodule BastionWeb.UIComponents do
     """
   end
 
-  @doc "Кнопка «Копировать»"
   attr :id, :string, required: true
   attr :text, :string, required: true
   attr :class, :any, default: "btn btn-ghost btn-xs"
@@ -142,10 +130,6 @@ defmodule BastionWeb.UIComponents do
     """
   end
 
-  @doc """
-  Модальное окно на `<dialog>`. Открыть: `phx-click={open_dialog("id")}`;
-  закрыть с сервера: `push_event(socket, "close-dialog", %{id: "id"})`.
-  """
   attr :id, :string, required: true
   attr :title, :string, required: true
   slot :inner_block, required: true
@@ -153,7 +137,6 @@ defmodule BastionWeb.UIComponents do
 
   def dialog(assigns) do
     ~H"""
-    <%!-- open ставит браузер (showModal) — LiveView не должен снимать его при перерисовке --%>
     <dialog id={@id} class="modal" phx-mounted={JS.ignore_attributes(["open"])}>
       <div class="modal-box">
         <h3 class="text-lg font-semibold">{@title}</h3>

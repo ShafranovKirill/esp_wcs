@@ -1,12 +1,4 @@
 defmodule Bastion.Link.Application.Presence do
-  @moduledoc """
-  Какие устройства сейчас на связи и их свежие показатели (отклик, сигнал,
-  время работы). Хранится в ETS: читается из любого процесса без очереди.
-
-  Сеанс регистрируется здесь; процесс следит за ним (`monitor`), поэтому даже
-  при падении сеанса устройство становится офлайн и это пишется в журнал.
-  Новое подключение того же устройства вытесняет старое.
-  """
   use GenServer
   require Logger
 
@@ -27,11 +19,9 @@ defmodule Bastion.Link.Application.Presence do
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
-  @doc "Сеанс устройства начался; прежний сеанс того же устройства закрывается"
   @spec register(String.t(), info()) :: :ok
   def register(id, info), do: GenServer.call(__MODULE__, {:register, id, self(), info})
 
-  @doc "Обновить показатели (из процесса сеанса)"
   @spec update(String.t(), info()) :: :ok
   def update(id, info) do
     case :ets.lookup(@table, id) do
@@ -58,8 +48,6 @@ defmodule Bastion.Link.Application.Presence do
   @spec all() :: %{String.t() => info()}
   def all, do: :ets.foldl(fn {id, _pid, info}, acc -> Map.put(acc, id, info) end, %{}, @table)
 
-  # ---- GenServer ----
-
   @impl true
   def init(nil) do
     :ets.new(@table, [:named_table, :public, read_concurrency: true])
@@ -83,7 +71,6 @@ defmodule Bastion.Link.Application.Presence do
   def handle_info({:DOWN, ref, :process, pid, _reason}, state) do
     {{id, ^pid}, monitors} = Map.pop(state.monitors, ref)
 
-    # Запись удаляем, только если это всё ещё тот же сеанс (а не новый, вытеснивший его)
     case :ets.lookup(@table, id) do
       [{^id, ^pid, _}] ->
         :ets.delete(@table, id)
@@ -97,8 +84,6 @@ defmodule Bastion.Link.Application.Presence do
     {:noreply, %{state | monitors: monitors}}
   end
 
-  # Запись в журнал — отдельной задачей: сбой БД не должен ронять этот процесс,
-  # иначе пропадёт таблица онлайн-статусов всех устройств
   defp record_disconnect(id) do
     Task.start(fn ->
       try do

@@ -1,5 +1,4 @@
 defmodule Bastion.Link.SessionTest do
-  @moduledoc "Сеанс WCS Link: вызовы обработчика WebSock напрямую, как их делает Bandit"
   use Bastion.DataCase, async: false
 
   import Bastion.FleetFixtures
@@ -36,7 +35,7 @@ defmodule Bastion.Link.SessionTest do
       assert device.status == :pending
       assert device.last_ip == @ip
 
-      {:ok, approved} = Fleet.approve(device.id)
+      {:ok, approved} = Fleet.approve(device.id, device.device_code)
       assert_receive {:event, %Fleet.Events.DeviceApproved{} = event}
 
       {%{"status" => "approved", "cert" => cert}, _} =
@@ -64,12 +63,23 @@ defmodule Bastion.Link.SessionTest do
                Session.handle_in(text(%{t: "enroll", name: "x", csr: csr(device_id())}), state)
 
       id = device_id()
-      pending_device(%{device_id: id})
+      key = X509.PrivateKey.new_ec(:secp256r1)
+      pending_device(%{device_id: id, csr_pem: csr(id, key)})
       {:ok, state} = Session.init(%{ip: @ip})
       {_, state} = push!(Session.handle_in(hello(id), state))
 
       assert {:stop, :normal, {4008, _}, _} =
-               Session.handle_in(text(%{t: "enroll", name: "x", csr: csr(id)}), state)
+               Session.handle_in(text(%{t: "enroll", name: "x", csr: csr(id, key)}), state)
+    end
+
+    test "заявка с другим ключом при заявке на рассмотрении — rejected" do
+      id = device_id()
+      pending_device(%{device_id: id})
+      {:ok, state} = Session.init(%{ip: @ip})
+      {_, state} = push!(Session.handle_in(hello(id), state))
+
+      assert {%{"status" => "rejected"}, _} =
+               push!(Session.handle_in(text(%{t: "enroll", name: "x", csr: csr(id)}), state))
     end
 
     test "heartbeat до сеанса устройства и бинарные кадры при регистрации запрещены" do

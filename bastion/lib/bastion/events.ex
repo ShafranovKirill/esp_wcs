@@ -1,12 +1,4 @@
 defmodule Bastion.Events do
-  @moduledoc """
-  Шина доменных событий между контекстами (поверх `Phoenix.PubSub`).
-
-  Событие — структура из модуля `Events` контекста-источника, например
-  `Bastion.Fleet.Events.DeviceApproved`. Подписчик получает `{:event, event}`.
-  Темы — атомы контекстов (`:fleet`, `:link`…) или `{:device, id}` для событий
-  одного устройства.
-  """
   use Boundary, top_level?: true, deps: []
 
   @pubsub Bastion.PubSub

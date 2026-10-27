@@ -1,11 +1,4 @@
 defmodule BastionWeb.TLS do
-  @moduledoc """
-  HTTPS веб-интерфейса с сертификатом от центра сертификации бастиона.
-
-  Сертификат и ключ берутся из памяти контекста PKI при запуске `Endpoint` —
-  открытым текстом на диске их нет. Когда PKI перевыпускает сертификат
-  (`ServerCertificateRenewed`), `Endpoint` перезапускается с новым.
-  """
   use GenServer
   require Logger
 
@@ -14,12 +7,10 @@ defmodule BastionWeb.TLS do
   @endpoint BastionWeb.Endpoint
   @supervisor Bastion.Supervisor
 
-  @doc "Описание дочернего процесса `Endpoint` с сертификатом из PKI"
   def endpoint_child_spec do
     %{id: @endpoint, start: {__MODULE__, :start_endpoint, []}, type: :supervisor}
   end
 
-  @doc false
   def start_endpoint do
     config = Application.get_env(:bastion, @endpoint, [])
 
@@ -29,8 +20,6 @@ defmodule BastionWeb.TLS do
     end
   end
 
-  # Bandit принимает опции :ssl только внутри thousand_island_options.transport_options;
-  # версии TLS (1.2 и 1.3) и шифры задаёт cipher_suite: :strong
   defp put_ssl_options(https) do
     island = Keyword.get(https, :thousand_island_options, [])
     transport = Keyword.get(island, :transport_options, []) ++ Bastion.PKI.server_ssl_options()
@@ -41,8 +30,6 @@ defmodule BastionWeb.TLS do
       Keyword.put(island, :transport_options, transport)
     )
   end
-
-  # ---- перезапуск при перевыпуске сертификата ----
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 

@@ -1,5 +1,4 @@
 defmodule BastionWeb.CAController do
-  @moduledoc "Корневой сертификат бастиона — для установки в браузер или систему"
   use BastionWeb, :controller
 
   def show(conn, _params) do

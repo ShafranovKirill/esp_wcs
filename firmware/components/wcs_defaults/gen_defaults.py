@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Генерирует C-файл с заводскими настройками из .env.
-
-Пароль администратора превращается в PBKDF2-HMAC-SHA256 со случайной солью,
-в прошивку попадают только соль и хэш.
-"""
 import hashlib
 import os
 import sys
@@ -20,10 +15,8 @@ REQUIRED = (
     'WCS_PBKDF2_ITERATIONS',
 )
 
-
 def fail(msg):
     sys.exit(f'gen_defaults: {msg}')
-
 
 def parse_env(path):
     values = {}
@@ -41,13 +34,11 @@ def parse_env(path):
             values[key.strip()] = value
     return values
 
-
 def check_ssid_prefix(env, name):
     prefix = env[name]
     if not 1 <= len(prefix) <= 28:
         fail(f'{name}: от 1 до 28 символов (SSID до 32, плюс 4 цифры MAC)')
     return prefix
-
 
 def check_ap_password(env, name):
     password = env[name]
@@ -55,21 +46,17 @@ def check_ap_password(env, name):
         fail(f'{name}: от 8 до 63 символов (требование WPA2)')
     return password
 
-
 def c_string(value, name):
     if not all(0x20 <= ord(ch) < 0x7f for ch in value):
         fail(f'{name}: допустимы только печатные ASCII-символы')
     return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
 
-
 def c_bytes(data):
     return '{' + ', '.join(f'0x{b:02x}' for b in data) + '}'
-
 
 def main():
     if len(sys.argv) != 4:
         fail('использование: gen_defaults.py <.env> <.env.example> <выходной .c>')
-    # Новые переменные, которых ещё нет в .env пользователя, берутся из шаблона
     env = parse_env(sys.argv[2])
     env.update(parse_env(sys.argv[1]))
     missing = [k for k in REQUIRED if k not in env]
@@ -114,7 +101,6 @@ const wcs_defaults_t wcs_defaults = {{
 '''
     with open(sys.argv[3], 'w', encoding='utf-8') as f:
         f.write(source)
-
 
 if __name__ == '__main__':
     main()

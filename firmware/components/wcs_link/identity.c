@@ -1,10 +1,3 @@
-/*
- * Идентичность устройства для WCS Link: ключ P-256, CSR, сертификат от бастиона.
- *
- * NVS "wcs_link": key — закрытый ключ (PEM), cert — сертификат устройства (PEM),
- * cert_ca — код CA бастиона, который его выдал. Сертификат используется, только
- * если код совпадает с закреплённым сейчас бастионом.
- */
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,15 +22,12 @@
 #define KEY_CERT_CA    "cert_ca"
 
 #define KEY_PEM_MAX    512
-/* Подпись ECDSA требует больше стека, чем у вызывающей задачи */
 #define GEN_TASK_STACK 12288
 
 static const char *TAG = "wcs_link_id";
 
 static char *s_key_pem;
 static char s_device_code[WCS_LINK_CODE_LEN + 1];
-
-/* ---- хранение ---- */
 
 static esp_err_t nvs_read_str(const char *key, char **out)
 {
@@ -78,8 +68,6 @@ static esp_err_t nvs_write(const char *const keys[], const char *const values[],
     return err;
 }
 
-/* ---- ключ ---- */
-
 static esp_err_t parse_key(mbedtls_pk_context *pk)
 {
     mbedtls_pk_init(pk);
@@ -93,7 +81,6 @@ static esp_err_t compute_code(void)
     ESP_RETURN_ON_ERROR(parse_key(&pk), TAG, "key parse failed");
 
     unsigned char der[160];
-    /* mbedtls пишет DER в конец буфера */
     int len = mbedtls_pk_write_pubkey_der(&pk, der, sizeof(der));
     mbedtls_pk_free(&pk);
     ESP_RETURN_ON_FALSE(len > 0, ESP_FAIL, TAG, "public key write failed");
@@ -140,8 +127,6 @@ static esp_err_t generate_key(void)
     return ESP_OK;
 }
 
-/* ---- запуск работы в задаче с большим стеком ---- */
-
 typedef struct {
     esp_err_t (*fn)(void *arg);
     void *arg;
@@ -180,8 +165,6 @@ static esp_err_t init_job(void *arg)
     return compute_code();
 }
 
-/* ---- публичный API ---- */
-
 esp_err_t wcs_link_identity_init(void)
 {
     ESP_RETURN_ON_FALSE(!s_key_pem, ESP_ERR_INVALID_STATE, TAG, "already initialized");
@@ -215,8 +198,6 @@ esp_err_t wcs_link_forget_certificate(void)
     const char *values[] = { NULL, NULL };
     return nvs_write(keys, values, 2);
 }
-
-/* ---- для сеанса ---- */
 
 const char *link_key_pem(void)
 {
@@ -268,7 +249,6 @@ esp_err_t link_load_certificate(const char *ca_code, char **cert_pem)
     bool same_ca = strcmp(issuer, ca_code) == 0;
     free(issuer);
     if (!same_ca) {
-        /* Сертификат от другого бастиона — для нынешнего он бесполезен */
         ESP_LOGW(TAG, "certificate was issued by another bastion, forgetting it");
         wcs_link_forget_certificate();
         return ESP_ERR_NOT_FOUND;

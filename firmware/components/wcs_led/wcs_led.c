@@ -12,8 +12,8 @@
 
 #define FRAME_PERIOD_MS      20
 #define BREATHE_PERIOD_MS    2000
-#define BREATHE_MIN_LEVEL    0.06f /* не гаснуть полностью, чтобы было видно, что устройство живо */
-#define BLINK_PERIOD_MS      200   /* 5 Гц */
+#define BREATHE_MIN_LEVEL    0.06f
+#define BLINK_PERIOD_MS      200
 #define DIM_LEVEL            0.33f
 #define ACTIVITY_OFF_MS      30
 #define ACTIVITY_MIN_GAP_MS  100
@@ -25,7 +25,7 @@ typedef struct {
     wcs_led_indication_t base;
     wcs_led_indication_t overlay;
     bool overlay_active;
-    int64_t overlay_until_us; /* 0 — бессрочно */
+    int64_t overlay_until_us;
     bool activity_pending;
 } led_state_t;
 
@@ -36,7 +36,6 @@ static uint8_t s_brightness;
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static led_state_t s_state;
 
-/* Уровень свечения 0..1 для характера свечения в момент now_ms */
 static float pattern_level(wcs_led_pattern_t pattern, int64_t now_ms)
 {
     switch (pattern) {
@@ -47,7 +46,7 @@ static float pattern_level(wcs_led_pattern_t pattern, int64_t now_ms)
     case WCS_LED_BREATHE: {
         float phase = (float)(now_ms % BREATHE_PERIOD_MS) / BREATHE_PERIOD_MS;
         float wave = (1.0f - cosf(2.0f * (float)M_PI * phase)) / 2.0f;
-        return BREATHE_MIN_LEVEL + (1.0f - BREATHE_MIN_LEVEL) * wave * wave; /* квадрат — мягче для глаза */
+        return BREATHE_MIN_LEVEL + (1.0f - BREATHE_MIN_LEVEL) * wave * wave;
     }
     case WCS_LED_BLINK_FAST:
         return (now_ms % BLINK_PERIOD_MS) < BLINK_PERIOD_MS / 2 ? 1.0f : 0.0f;
@@ -64,7 +63,7 @@ static uint8_t scale(uint8_t component, float level)
 
 static void led_task(void *arg)
 {
-    uint8_t last[3] = { 1, 1, 1 }; /* заведомо не совпадает с первым кадром */
+    uint8_t last[3] = { 1, 1, 1 };
     int64_t activity_off_until_ms = 0;
     int64_t activity_next_allowed_ms = 0;
 

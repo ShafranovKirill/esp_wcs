@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
-"""Встраивает файлы из www/ в прошивку: C-массивы и таблица web_files[].
-
-Путь в таблице — относительно www/, например "assets/style.css".
-Текстовые файлы больше GZIP_MIN_SIZE сжимаются gzip, если это заметно уменьшает
-размер: отдаются с Content-Encoding: gzip, браузер распаковывает сам.
-
-Использование: gen_www.py <папка www> <выходной .c>
-"""
 import gzip
 import os
 import sys
 
 GZIP_MIN_SIZE = 1024
-GZIP_MIN_GAIN = 0.9  # сжатый должен быть меньше 90% исходного
+GZIP_MIN_GAIN = 0.9
 
 TYPES = {
     '.html': ('text/html; charset=utf-8', True),
@@ -26,10 +18,8 @@ TYPES = {
     '.woff2': ('font/woff2', False),
 }
 
-
 def fail(msg):
     sys.exit(f'gen_www: {msg}')
-
 
 def collect(root):
     files = []
@@ -46,10 +36,8 @@ def collect(root):
             files.append((rel, full, ext))
     return files
 
-
 def c_string(s):
     return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
-
 
 def main():
     if len(sys.argv) != 3:
@@ -93,7 +81,6 @@ def main():
     with open(out_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(out))
     print(f'gen_www: {len(entries)} files, {total_src} -> {total_out} bytes')
-
 
 if __name__ == '__main__':
     main()

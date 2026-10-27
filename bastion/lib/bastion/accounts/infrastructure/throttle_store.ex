@@ -1,14 +1,9 @@
 defmodule Bastion.Accounts.Infrastructure.ThrottleStore do
-  @moduledoc """
-  Счётчики неверных попыток входа по IP (в памяти). После перезапуска бастиона
-  счётчики обнуляются — это допустимо: перебор всё равно упирается в паузы.
-  """
   use GenServer
 
   alias Bastion.Accounts.Domain.Throttle
 
   @table __MODULE__
-  # Записи без ошибок дольше суток удаляются, чтобы таблица не росла
   @cleanup_interval :timer.hours(1)
   @forget_after_s 24 * 3600
 

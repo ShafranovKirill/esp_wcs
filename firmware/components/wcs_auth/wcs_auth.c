@@ -33,7 +33,6 @@ static session_t s_sessions[CONFIG_WCS_AUTH_MAX_SESSIONS];
 static uint32_t s_failures;
 static int64_t s_locked_until_us;
 
-/* Сравнение без раннего выхода, чтобы время ответа не выдавало совпавший префикс */
 static bool ct_equal(const void *a, const void *b, size_t len)
 {
     const uint8_t *x = a;
@@ -49,7 +48,6 @@ static bool ct_streq(const char *a, const char *b)
 {
     size_t len_a = strlen(a);
     size_t len_b = strlen(b);
-    /* Сравниваем всегда len_b байт, чтобы время не зависело от введённой строки */
     return ct_equal(len_a == len_b ? a : b, b, len_b) && len_a == len_b;
 }
 
@@ -88,7 +86,6 @@ static uint32_t seconds_until(int64_t deadline_us, int64_t now_us)
     return deadline_us > now_us ? (uint32_t)((deadline_us - now_us + US_PER_S - 1) / US_PER_S) : 0;
 }
 
-/* Вызывать под s_lock */
 static session_t *find_session(const char *token, int64_t now_us)
 {
     if (!token || strlen(token) != WCS_AUTH_TOKEN_LEN) {
@@ -100,7 +97,7 @@ static session_t *find_session(const char *token, int64_t now_us)
             continue;
         }
         if (now_us - s->last_seen_us > SESSION_IDLE_TIMEOUT) {
-            s->used = false; /* истекла */
+            s->used = false;
             continue;
         }
         if (ct_equal(s->token, token, WCS_AUTH_TOKEN_LEN)) {
@@ -110,7 +107,6 @@ static session_t *find_session(const char *token, int64_t now_us)
     return NULL;
 }
 
-/* Вызывать под s_lock. Занимает свободный слот или вытесняет самую давнюю сессию. */
 static void create_session(char token[WCS_AUTH_TOKEN_LEN + 1], int64_t now_us)
 {
     session_t *slot = &s_sessions[0];
@@ -141,7 +137,6 @@ esp_err_t wcs_auth_init(void)
         s_lock = xSemaphoreCreateMutex();
         ESP_RETURN_ON_FALSE(s_lock, ESP_ERR_NO_MEM, TAG, "mutex create failed");
     }
-    /* Пока пароль только заводской; хранение своего в NVS — вместе с настройками */
     ESP_LOGI(TAG, "admin user \"%s\", PBKDF2 %" PRIu32 " iterations",
              wcs_defaults.admin_username, wcs_defaults.admin_password.iterations);
     return ESP_OK;
@@ -162,7 +157,6 @@ wcs_auth_result_t wcs_auth_login(const char *username, const char *password,
     }
     xSemaphoreGive(s_lock);
 
-    /* PBKDF2 считаем всегда, даже при неверном логине — время ответа одинаковое */
     int64_t started_us = esp_timer_get_time();
     bool user_ok = ct_streq(username, wcs_defaults.admin_username);
     bool pass_ok = password_matches(password, &wcs_defaults.admin_password);

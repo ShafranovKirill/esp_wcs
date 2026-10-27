@@ -12,7 +12,6 @@ defmodule Bastion.Repo.Migrations.CreateAdmins do
 
     create unique_index(:admins, ["lower(username)"], name: :admins_username_index)
 
-    # Сессии входа: в БД только SHA-256 токена, сам токен — в зашифрованной cookie
     create table(:admin_sessions, primary_key: false) do
       add :id, :binary_id, primary_key: true
       add :admin_id, references(:admins, type: :binary_id, on_delete: :delete_all), null: false

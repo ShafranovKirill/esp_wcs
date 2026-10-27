@@ -1,4 +1,3 @@
-// Копирование текста из data-copy по клику; на время показывает «Скопировано»
 export const Clipboard = {
   mounted() {
     this.el.addEventListener("click", async () => {
@@ -6,7 +5,6 @@ export const Clipboard = {
       try {
         await navigator.clipboard.writeText(text)
       } catch (_e) {
-        // HTTP без доверенного сертификата: clipboard API недоступен — запасной путь
         const area = document.createElement("textarea")
         area.value = text
         document.body.appendChild(area)

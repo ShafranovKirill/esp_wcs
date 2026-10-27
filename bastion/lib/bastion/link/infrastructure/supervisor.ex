@@ -1,8 +1,4 @@
 defmodule Bastion.Link.Infrastructure.Supervisor do
-  @moduledoc """
-  Процессы контекста Link: учёт онлайн-устройств и TLS-слушатель. Слушатель
-  перезапускается с новым сертификатом, когда PKI его перевыпускает.
-  """
   use Supervisor
   require Logger
 

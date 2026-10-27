@@ -1,5 +1,4 @@
 defmodule Bastion.Fleet.Application.Queries do
-  @moduledoc "Чтение: главная страница, устройство, журнал"
   import Ecto.Query
 
   alias Bastion.Fleet.{Device, DeviceEvent, Folder}
@@ -12,7 +11,6 @@ defmodule Bastion.Fleet.Application.Queries do
           unfiled: [Device.t()]
         }
 
-  @doc "Главная: заявки отдельно, остальные устройства по папкам, всё по имени"
   @spec overview() :: overview()
   def overview do
     devices =

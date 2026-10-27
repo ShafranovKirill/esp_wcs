@@ -1,6 +1,4 @@
 defmodule Bastion.Fleet.Application.FolderCommands do
-  @moduledoc "Папки: создать, переименовать, удалить (устройства уходят в «Без папки»)"
-
   alias Bastion.Fleet.Application.UnitOfWork
   alias Bastion.Fleet.Domain.Name
   alias Bastion.Fleet.Events.FoldersChanged

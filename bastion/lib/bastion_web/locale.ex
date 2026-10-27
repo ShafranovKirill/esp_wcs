@@ -1,11 +1,4 @@
 defmodule BastionWeb.Locale do
-  @moduledoc """
-  Язык интерфейса: русский (по умолчанию) или английский.
-
-  Выбор пользователя хранится в сессии; если выбора нет — по заголовку
-  `Accept-Language` браузера. Работает и для обычных запросов (plug), и для
-  LiveView (`on_mount`).
-  """
   use BastionWeb, :verified_routes
 
   import Plug.Conn
@@ -17,8 +10,6 @@ defmodule BastionWeb.Locale do
   @spec locales() :: [String.t()]
   def locales, do: @locales
 
-  # ---- plug ----
-
   def init(opts), do: opts
 
   def call(conn, _opts) do
@@ -29,8 +20,6 @@ defmodule BastionWeb.Locale do
     |> put_session(@session_key, locale)
     |> assign(:locale, locale)
   end
-
-  # ---- LiveView ----
 
   def on_mount(:default, _params, session, socket) do
     locale = if session[@session_key] in @locales, do: session[@session_key], else: @default
@@ -46,9 +35,6 @@ defmodule BastionWeb.Locale do
     {:cont, socket}
   end
 
-  # ---- переключение ----
-
-  @doc "Сменить язык и вернуться на ту же страницу (только свои пути — не открытый редирект)"
   def switch(conn, %{"locale" => locale} = params) when locale in @locales do
     conn
     |> put_session(@session_key, locale)

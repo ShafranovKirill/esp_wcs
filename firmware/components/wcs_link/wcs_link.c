@@ -1,12 +1,3 @@
-/*
- * Сеанс WCS Link (docs/protocol.md): своя задача ведёт подключение к бастиону,
- * события клиента WebSocket приходят ей через очередь.
- *
- *   подключение ──▶ hello ──▶ welcome enroll ──▶ enroll ──▶ pending … approved ──▶ сохранить
- *        │                                                                          сертификат,
- *        │                                                                          переподключиться
- *        └── с сертификатом (mTLS) ──▶ hello ──▶ welcome device ──▶ hb / hb_ack …
- */
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,16 +26,13 @@
 #define QUEUE_LEN           8
 #define WS_BUFFER_SIZE      4096
 #define NETWORK_TIMEOUT_MS  10000
-/* Не пришёл welcome — соединение бесполезно */
 #define WELCOME_TIMEOUT_MS  20000
 #define CSR_PEM_MAX         1024
 
 #define BACKOFF_MIN_MS      1000
 #define BACKOFF_MAX_MS      60000
-/* После отказа в заявке, частых заявок или отзыва — не раньше, чем через минуту */
 #define RETRY_LATER_MS      60000
 
-/* Коды закрытия (docs/protocol.md) */
 #define CLOSE_FORBIDDEN     4003
 #define CLOSE_RATE_LIMITED  4008
 
@@ -61,14 +49,13 @@ typedef enum {
 typedef struct {
     msg_type_t type;
     int close_code;
-    char *text; /* MSG_TEXT, освобождает получатель */
+    char *text;
 } link_msg_t;
 
-/* Чем закончился сеанс */
 typedef enum {
-    OUTCOME_RETRY,      /* обычная пауза с удвоением */
-    OUTCOME_NOW,        /* сразу снова (получен сертификат) */
-    OUTCOME_LATER,      /* через минуту */
+    OUTCOME_RETRY,
+    OUTCOME_NOW,
+    OUTCOME_LATER,
 } outcome_t;
 
 typedef struct {
@@ -80,12 +67,10 @@ typedef struct {
 static config_t s_config;
 static TaskHandle_t s_task;
 static QueueHandle_t s_queue;
-static SemaphoreHandle_t s_wake; /* прервать паузу при остановке */
+static SemaphoreHandle_t s_wake;
 static SemaphoreHandle_t s_done;
 static volatile bool s_stop;
 static volatile wcs_link_state_t s_state = WCS_LINK_STATE_STOPPED;
-
-/* ---- состояние ---- */
 
 static void set_state(wcs_link_state_t state)
 {
@@ -95,8 +80,6 @@ static void set_state(wcs_link_state_t state)
     s_state = state;
     esp_event_post(WCS_LINK_EVENT, WCS_LINK_EVENT_STATE, &state, sizeof(state), 0);
 }
-
-/* ---- события клиента WebSocket (его задача) → очередь ---- */
 
 static void post(msg_type_t type, int close_code, char *text)
 {
@@ -116,7 +99,6 @@ static void on_ws_event(void *arg, esp_event_base_t base, int32_t id, void *data
         break;
     case WEBSOCKET_EVENT_DATA:
         if (ev->op_code == 0x1) {
-            /* Сообщения протокола помещаются в один кадр и в буфер (≤ 4 КиБ) */
             if (ev->payload_offset == 0 && ev->data_len == ev->payload_len && ev->data_len > 0) {
                 char *text = malloc(ev->data_len + 1);
                 if (text) {
@@ -142,8 +124,6 @@ static void on_ws_event(void *arg, esp_event_base_t base, int32_t id, void *data
         break;
     }
 }
-
-/* ---- сообщения протокола ---- */
 
 static int64_t now_ms(void)
 {
@@ -208,7 +188,6 @@ static void send_heartbeat(esp_websocket_client_handle_t client, uint32_t seq, i
     send_json(client, json);
 }
 
-/* Время бастиона с поправкой на половину отклика — у ESP своих часов нет */
 static void set_time(double bastion_ms, int rtt)
 {
     int64_t ms = (int64_t)bastion_ms + (rtt > 0 ? rtt / 2 : 0);
@@ -216,13 +195,11 @@ static void set_time(double bastion_ms, int rtt)
     settimeofday(&tv, NULL);
 }
 
-/* ---- сеанс ---- */
-
 typedef struct {
     esp_websocket_client_handle_t client;
     const char *device_id;
     const char *ca_code;
-    bool device_session;  /* с сертификатом (mTLS) */
+    bool device_session;
     bool welcomed;
     int hb_interval_ms;
     int64_t next_hb;
@@ -291,7 +268,6 @@ static void handle_close(session_t *s, int code)
 {
     s->done = true;
     if (code == CLOSE_FORBIDDEN && s->device_session) {
-        /* Сертификат больше не принимается (отзыв) — заново через заявку */
         ESP_LOGW(TAG, "certificate refused by the bastion, will send a new request");
         wcs_link_forget_certificate();
         s->outcome = OUTCOME_LATER;
@@ -314,8 +290,6 @@ static esp_err_t ca_code_of(const char *ca_pem, char code[WCS_BASTION_CODE_LEN +
     return err;
 }
 
-/* Один сеанс: подключение, обмен, закрытие. Возвращает, когда пробовать снова */
-/* *was_online — сеанс устройства дошёл до welcome (связь была) */
 static outcome_t run_session(const char *ca_pem, const char *ca_code, const char *device_id, bool *was_online)
 {
     wcs_bastion_addr_t addr;
@@ -333,8 +307,6 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
 
     esp_websocket_client_config_t cfg = {
         .uri = uri,
-        /* Доверяем только закреплённому корневому сертификату бастиона; имя в
-         * сертификате не сверяем — подключаемся по IP, а CA у бастиона свой */
         .cert_pem = ca_pem,
         .skip_cert_common_name_check = true,
         .client_cert = device_session ? cert_pem : NULL,
@@ -400,7 +372,6 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
     }
     esp_websocket_client_destroy(client);
 
-    /* Освободить тексты, оставшиеся в очереди */
     link_msg_t msg;
     while (xQueueReceive(s_queue, &msg, 0) == pdTRUE) {
         free(msg.text);
@@ -412,7 +383,6 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
 
 static uint32_t jitter(uint32_t ms)
 {
-    /* ±20 %, чтобы много устройств не переподключались одновременно */
     return ms * 8 / 10 + esp_random() % (ms * 4 / 10 + 1);
 }
 
@@ -456,7 +426,6 @@ static void link_task(void *arg)
             backoff = backoff * 2 > BACKOFF_MAX_MS ? BACKOFF_MAX_MS : backoff * 2;
             break;
         }
-        /* Связь уже была — значит потеряна (красный); не было — ещё подключаемся */
         set_state(ever_online ? WCS_LINK_STATE_OFFLINE : WCS_LINK_STATE_CONNECTING);
         if (delay) {
             ESP_LOGI(TAG, "reconnect in %" PRIu32 " ms", delay);
@@ -469,8 +438,6 @@ static void link_task(void *arg)
     xSemaphoreGive(s_done);
     vTaskDelete(NULL);
 }
-
-/* ---- публичный API ---- */
 
 esp_err_t wcs_link_start(const wcs_link_config_t *config)
 {

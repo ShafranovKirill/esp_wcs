@@ -1,13 +1,4 @@
 defmodule Bastion.Link.Infrastructure.Listener do
-  @moduledoc """
-  TLS-слушатель WCS Link для устройств (по умолчанию 7443).
-
-  Только TLS 1.3. Сертификат клиента запрашивается, но не обязателен: без него
-  возможна только регистрация. Сертификат, подписанный не нашим CA, обрывает
-  рукопожатие. Сертификат сервера — тот же, что у веб-интерфейса (из PKI).
-  """
-
-  @doc "Описание дочернего процесса Bandit"
   def child_spec(opts) do
     port = Keyword.fetch!(opts, :port)
 
@@ -27,10 +18,16 @@ defmodule Bastion.Link.Infrastructure.Listener do
     Bastion.PKI.server_ssl_options() ++
       [
         versions: [:"tlsv1.3"],
+        ciphers: ciphers(),
         verify: :verify_peer,
         fail_if_no_peer_cert: false,
-        # Быстрое переподключение устройств после обрыва Wi-Fi
         session_tickets: :stateless
       ]
+  end
+
+  defp ciphers do
+    :ssl.filter_cipher_suites(:ssl.cipher_suites(:all, :"tlsv1.3"),
+      cipher: &(&1 in [:aes_128_gcm, :chacha20_poly1305])
+    )
   end
 end

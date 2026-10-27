@@ -1,16 +1,4 @@
 defmodule Bastion.PKI.Application.Authority do
-  @moduledoc """
-  Центр сертификации бастиона: процесс, который держит в памяти ключ корневого
-  сертификата и выпускает сертификаты.
-
-  При запуске (синхронно, до веб-сервера):
-  - корневой сертификат загружается или, если его нет совсем, создаётся;
-  - сертификат сервера перевыпускается, если его нет, он подписан другим CA,
-    истекает в ближайшие 30 дней или изменились адреса машины.
-
-  Раз в сутки проверка сертификата сервера повторяется; о перевыпуске
-  сообщает событие `Bastion.PKI.Events.ServerCertificateRenewed`.
-  """
   use GenServer
   require Logger
 
@@ -28,8 +16,6 @@ defmodule Bastion.PKI.Application.Authority do
 
   defstruct [:config, :ca_cert, :ca_key, :ca_code, :server_cert, :server_key, :hosts]
 
-  # ---- API ----
-
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, __MODULE__))
   end
@@ -41,8 +27,6 @@ defmodule Bastion.PKI.Application.Authority do
 
   def check_server_certificate(server \\ __MODULE__),
     do: GenServer.call(server, :check_server_certificate)
-
-  # ---- GenServer ----
 
   @impl true
   def init(opts) do
@@ -97,8 +81,6 @@ defmodule Bastion.PKI.Application.Authority do
     end
   end
 
-  # ---- корневой сертификат ----
-
   defp load_or_create_ca(%{config: config} = state) do
     dir = config.data_dir
 
@@ -115,7 +97,6 @@ defmodule Bastion.PKI.Application.Authority do
         create_ca(state)
 
       _ ->
-        # Есть только ключ или только сертификат — не перезаписываем: это потеря CA
         {:error, {:ca_incomplete, dir}}
     end
   end
@@ -137,8 +118,6 @@ defmodule Bastion.PKI.Application.Authority do
 
   defp ca_code(cert),
     do: cert |> Certificates.public_key() |> Certificates.spki_der() |> Code.from_spki_der()
-
-  # ---- сертификат сервера ----
 
   defp ensure_server_certificate(%{config: config} = state) do
     hosts = current_hosts(config)
@@ -213,8 +192,6 @@ defmodule Bastion.PKI.Application.Authority do
     Hosts.build(config.discovery.hostname(), config.discovery.addresses(), config.extra_hosts)
   end
 
-  # ---- сертификаты устройств ----
-
   defp sign(csr_pem, device_id, state) do
     with {:ok, %{public_key: public_key, common_name: cn}} <- Certificates.parse_csr(csr_pem),
          true <- cn == device_id || {:error, :subject_mismatch} do
@@ -229,8 +206,6 @@ defmodule Bastion.PKI.Application.Authority do
        }}
     end
   end
-
-  # ---- общее ----
 
   defp unseal(sealed, passphrase) do
     case KeyVault.decrypt(sealed, passphrase) do

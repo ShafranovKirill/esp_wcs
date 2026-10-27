@@ -1,17 +1,7 @@
 defmodule Bastion.Fleet.Device do
-  @moduledoc """
-  Агрегат «устройство» и правила его жизненного цикла (`docs/protocol.md`,
-  «Состояния устройства на бастионе»). Чистые функции, без БД.
-
-      (нет) ──заявка──▶ pending ──одобрить──▶ approved ──отозвать──▶ revoked ──удалить──▶ (нет)
-                           │                                            │
-                           └── отклонить ──▶ (нет) или revoked          └── новая заявка ──▶ pending
-
-  Отклонение заявки удаляет устройство, если оно ни разу не было одобрено, —
-  иначе (повторная заявка отозванного) возвращает его в `revoked` с журналом.
-  """
-
   @request_interval_s 60
+  @max_devices 100
+  @max_pending 10
 
   @type status :: :pending | :approved | :revoked
 
@@ -64,18 +54,15 @@ defmodule Bastion.Fleet.Device do
 
   @type certificate :: %{certificate_pem: String.t(), serial: String.t(), not_after: DateTime.t()}
 
-  @doc "Повторная заявка — не чаще, секунд"
   @spec request_interval_s() :: pos_integer()
   def request_interval_s, do: @request_interval_s
 
-  @doc """
-  Заявка устройства. `nil` — устройство новое.
+  @spec max_devices() :: pos_integer()
+  def max_devices, do: @max_devices
 
-  - уже одобрено тем же ключом → `{:already_approved, device}` (ESP была офлайн
-    в момент одобрения и спрашивает снова — отдаём сертификат);
-  - одобрено, но ключ другой → `{:error, :key_mismatch}` (сначала отозвать);
-  - заявка или отзыв были меньше минуты назад → `{:error, :rate_limited}`.
-  """
+  @spec max_pending() :: pos_integer()
+  def max_pending, do: @max_pending
+
   @spec request(t() | nil, request(), DateTime.t()) ::
           {:ok, t()} | {:already_approved, t()} | {:error, :rate_limited | :key_mismatch}
   def request(nil, req, now) do
@@ -97,6 +84,10 @@ defmodule Bastion.Fleet.Device do
       do: {:already_approved, device},
       else: {:error, :key_mismatch}
   end
+
+  def request(%__MODULE__{status: :pending, device_code: code}, %{device_code: other}, _now)
+      when code != other,
+      do: {:error, :key_mismatch}
 
   def request(%__MODULE__{status: status} = device, req, now)
       when status in [:pending, :revoked] do
@@ -138,7 +129,6 @@ defmodule Bastion.Fleet.Device do
 
   def approve(_device, _cert, _now), do: {:error, :not_pending}
 
-  @doc "Отклонить заявку: `:delete` — устройство новое; иначе вернуть в `revoked`"
   @spec reject(t(), DateTime.t()) :: :delete | {:ok, t()} | {:error, :not_pending}
   def reject(%__MODULE__{status: :pending, approved_at: nil}, _now), do: :delete
 
@@ -153,7 +143,6 @@ defmodule Bastion.Fleet.Device do
 
   def revoke(_device, _now), do: {:error, :not_approved}
 
-  @doc "Удалить можно только отозванное — чтобы не стереть рабочее устройство по ошибке"
   @spec delete(t()) :: :delete | {:error, :not_revoked}
   def delete(%__MODULE__{status: :revoked}), do: :delete
   def delete(_device), do: {:error, :not_revoked}

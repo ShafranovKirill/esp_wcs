@@ -1,8 +1,4 @@
 defmodule Bastion.Link.Infrastructure.Plug do
-  @moduledoc """
-  HTTP-часть WCS Link: только `GET /link` с переходом на WebSocket. Сертификат
-  клиента (если был в TLS) и адрес передаются сеансу.
-  """
   @behaviour Plug
 
   import Plug.Conn
@@ -28,7 +24,6 @@ defmodule Bastion.Link.Infrastructure.Plug do
 
   def call(conn, _opts), do: conn |> send_resp(404, "") |> halt()
 
-  # Слушатель двойного стека отдаёт IPv4 как ::ffff:a.b.c.d — показываем обычный IPv4
   defp format_ip({0, 0, 0, 0, 0, 0xFFFF, ab, cd}),
     do: format_ip({div(ab, 256), rem(ab, 256), div(cd, 256), rem(cd, 256)})
 

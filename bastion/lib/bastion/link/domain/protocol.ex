@@ -1,11 +1,4 @@
 defmodule Bastion.Link.Domain.Protocol do
-  @moduledoc """
-  Разбор и сборка сообщений WCS Link v1 (`docs/protocol.md`). Чистые функции.
-
-  Входящие текстовые кадры проверяются строго: неизвестный тип, неверные поля
-  или слишком длинные значения — `{:error, :protocol}` (закрытие 4000).
-  """
-
   @version 1
   @max_frame 4096
 
@@ -41,8 +34,6 @@ defmodule Bastion.Link.Domain.Protocol do
 
   @spec close_code(atom()) :: pos_integer()
   def close_code(reason), do: Map.fetch!(@close_codes, reason)
-
-  # ---- входящие ----
 
   @spec decode(binary()) :: {:ok, message()} | {:error, :protocol | :too_big}
   def decode(frame) when byte_size(frame) > @max_frame, do: {:error, :too_big}
@@ -105,8 +96,6 @@ defmodule Bastion.Link.Domain.Protocol do
         {:error, :protocol}
     end
   end
-
-  # ---- исходящие ----
 
   @spec welcome(:enroll | :device, pos_integer(), integer()) :: binary()
   def welcome(session, hb_s, now_ms),

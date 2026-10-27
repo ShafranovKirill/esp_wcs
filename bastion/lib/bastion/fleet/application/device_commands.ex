@@ -1,5 +1,4 @@
 defmodule Bastion.Fleet.Application.DeviceCommands do
-  @moduledoc "Команды над устройствами: заявка, одобрение, отклонение, отзыв, удаление, имя, папка"
   import Ecto.Query
 
   alias Bastion.Fleet.Application.UnitOfWork
@@ -8,8 +7,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
   alias Bastion.Fleet.Events.{DeviceApproved, DeviceChanged, DeviceRequested, DeviceRevoked}
   alias Bastion.Fleet.Infrastructure.{DeviceEventRecord, DeviceRecord, FolderRecord}
   alias Bastion.Repo
-
-  # ---- заявка (от устройства через WCS Link) ----
 
   @type request_attrs :: %{
           required(:device_id) => String.t(),
@@ -39,8 +36,32 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
 
   defp do_submit(req) do
     record = lock_by_device_id(req.device_id)
-    now = now()
 
+    with :ok <- check_capacity(record) do
+      request(record, req, now())
+    end
+  end
+
+  defp check_capacity(nil) do
+    cond do
+      Repo.aggregate(DeviceRecord, :count) >= Device.max_devices() -> {:error, :fleet_full}
+      pending_count() >= Device.max_pending() -> {:error, :too_many_requests}
+      true -> :ok
+    end
+  end
+
+  defp check_capacity(%DeviceRecord{status: :pending}), do: :ok
+
+  defp check_capacity(_record) do
+    if pending_count() >= Device.max_pending(), do: {:error, :too_many_requests}, else: :ok
+  end
+
+  defp pending_count do
+    status = :pending
+    Repo.aggregate(from(d in DeviceRecord, where: d.status == ^status), :count)
+  end
+
+  defp request(record, req, now) do
     case Device.request(record && DeviceRecord.to_domain(record), req, now) do
       {:ok, device} ->
         with {:ok, saved} <- save_request(record, device) do
@@ -62,8 +83,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end
   end
 
-  # Новое устройство с занятым именем получает суффикс из ID. Проверяем заранее:
-  # неудачная вставка прервала бы всю транзакцию PostgreSQL
   defp save_request(nil, device) do
     name =
       if name_taken?(device.name),
@@ -82,13 +101,12 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end
   end
 
-  # ---- решения администратора ----
-
-  @spec approve(String.t()) :: {:ok, Device.t()} | {:error, atom()}
-  def approve(id) do
+  @spec approve(String.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
+  def approve(id, device_code) do
     UnitOfWork.run(fn ->
       with {:ok, record} <- lock(id),
            device = DeviceRecord.to_domain(record),
+           true <- device.device_code == device_code || {:error, :code_changed},
            {:ok, cert} <- sign(device),
            {:ok, device} <- Device.approve(device, cert, now()),
            {:ok, saved} <- persist(record, device) do
@@ -164,8 +182,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  # ---- имя и папка ----
-
   @spec rename(String.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
   def rename(id, name) do
     UnitOfWork.run(fn ->
@@ -183,7 +199,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  @doc "Перенести в папку; `nil` — «Без папки»"
   @spec move(String.t(), String.t() | nil) :: {:ok, Device.t()} | {:error, atom()}
   def move(id, folder_id) do
     UnitOfWork.run(fn ->
@@ -217,8 +232,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end
   end
 
-  # ---- от других контекстов: журнал и «был на связи» ----
-
   @spec record_event(String.t(), Bastion.Fleet.DeviceEvent.type(), map()) :: :ok
   def record_event(id, type, data) do
     journal(id, type, data)
@@ -237,8 +250,6 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     Repo.update_all(from(d in DeviceRecord, where: d.id == ^id), set: changes)
     :ok
   end
-
-  # ---- общее ----
 
   defp lock(id) do
     with {:ok, uuid} <- cast_id(id),

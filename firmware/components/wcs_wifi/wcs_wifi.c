@@ -14,7 +14,7 @@
 #include "freertos/event_groups.h"
 
 #define SCAN_MAX_RECORDS       32
-#define STA_CHECK_ATTEMPTS     3     /* попыток при проверке сети без auto_reconnect */
+#define STA_CHECK_ATTEMPTS     3
 #define STA_RETRY_MIN_MS       1000
 #define STA_RETRY_MAX_MS       30000
 #define STA_START_TIMEOUT_MS   2000
@@ -33,7 +33,6 @@ static bool s_started;
 static bool s_ap_running;
 static bool s_sta_enabled;
 
-/* Состояние клиента меняется в задаче событий, читается из любой */
 static portMUX_TYPE s_sta_lock = portMUX_INITIALIZER_UNLOCKED;
 static wcs_wifi_sta_status_t s_sta;
 static bool s_sta_auto_reconnect;
@@ -78,7 +77,7 @@ static void sta_try_connect(void)
     if (esp_wifi_connect() == ESP_OK) {
         s_sta_connect_pending = false;
     } else {
-        s_sta_connect_pending = true; /* подключимся по WIFI_EVENT_STA_START */
+        s_sta_connect_pending = true;
     }
 }
 
@@ -91,7 +90,6 @@ static void on_retry_timer(void *arg)
 
 static void on_sta_disconnected(const wifi_event_sta_disconnected_t *e)
 {
-    /* Отключение по нашей команде (новое подключение или остановка) — не ошибка */
     if (e->reason == WIFI_REASON_ASSOC_LEAVE || !s_sta_enabled) {
         return;
     }
@@ -154,7 +152,6 @@ static void on_ip_event(void *arg, esp_event_base_t base, int32_t id, void *data
     ESP_LOGI(TAG, "STA connected, ip " IPSTR, IP2STR(&e->ip_info.ip));
 }
 
-/* Драйвер Wi-Fi поднимается один раз, при первом использовании */
 static esp_err_t wifi_init_once(void)
 {
     if (s_ap_netif) {
@@ -170,7 +167,6 @@ static esp_err_t wifi_init_once(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_RETURN_ON_ERROR(esp_wifi_init(&cfg), TAG, "esp_wifi_init failed");
-    /* Настройки Wi-Fi хранит наше приложение, драйверу писать в NVS незачем */
     ESP_RETURN_ON_ERROR(esp_wifi_set_storage(WIFI_STORAGE_RAM), TAG, "set storage failed");
     ESP_RETURN_ON_ERROR(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi_event, NULL),
                         TAG, "event register failed");
@@ -182,7 +178,6 @@ static esp_err_t wifi_init_once(void)
     return ESP_OK;
 }
 
-/* Режим драйвера по тому, что сейчас нужно: точка доступа и/или клиент */
 static esp_err_t apply_mode(void)
 {
     wifi_mode_t mode = WIFI_MODE_NULL;
@@ -288,13 +283,11 @@ esp_err_t wcs_wifi_scan(wcs_wifi_network_t *networks, size_t max, size_t *count)
     ESP_RETURN_ON_FALSE(s_started, ESP_ERR_INVALID_STATE, TAG, "wifi not started");
     *count = 0;
 
-    /* Поиск идёт через интерфейс клиента */
     if (!s_sta_enabled) {
         s_sta_enabled = true;
         set_sta_state(WCS_WIFI_STA_IDLE, WCS_WIFI_FAIL_NONE, 0);
         ESP_RETURN_ON_ERROR(apply_mode(), TAG, "enable STA failed");
     }
-    /* Сразу после включения интерфейс клиента ещё не готов, и поиск ничего не находит */
     EventBits_t bits = xEventGroupWaitBits(s_events, STA_STARTED_BIT, pdFALSE, pdTRUE,
                                            pdMS_TO_TICKS(STA_START_TIMEOUT_MS));
     ESP_RETURN_ON_FALSE(bits & STA_STARTED_BIT, ESP_ERR_TIMEOUT, TAG, "STA did not start");
@@ -319,7 +312,7 @@ esp_err_t wcs_wifi_scan(wcs_wifi_network_t *networks, size_t max, size_t *count)
     for (uint16_t i = 0; i < found; i++) {
         const char *ssid = (const char *)records[i].ssid;
         if (ssid[0] == '\0') {
-            continue; /* скрытая сеть */
+            continue;
         }
         size_t j = 0;
         while (j < *count && strcmp(networks[j].ssid, ssid) != 0) {

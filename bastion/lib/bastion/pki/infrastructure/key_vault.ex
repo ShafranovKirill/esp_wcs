@@ -1,18 +1,4 @@
 defmodule Bastion.PKI.Infrastructure.KeyVault do
-  @moduledoc """
-  Шифрование закрытых ключей паролем для хранения на диске.
-
-  Ключ шифрования — PBKDF2-HMAC-SHA256 из пароля (600 000 итераций, соль 16 байт),
-  шифр — AES-256-GCM. Заголовок защищён как дополнительные данные GCM: подмена
-  числа итераций или соли обнаруживается.
-
-  Формат: `"WCSK"` | версия (1 байт) | итерации (4 байта) | соль (16) | IV (12) |
-  тег (16) | шифротекст.
-
-  Встроенное в PEM шифрование (`X509.PrivateKey.to_pem(password: …)`) не годится:
-  это 3DES с выводом ключа через одну итерацию MD5 — пароль подбирается быстро.
-  """
-
   @magic "WCSK"
   @version 1
   @iterations 600_000
@@ -21,7 +7,6 @@ defmodule Bastion.PKI.Infrastructure.KeyVault do
   @tag_len 16
   @key_len 32
 
-  @doc "Итераций PBKDF2 по умолчанию (в тестах берут меньше — для скорости)"
   @spec default_iterations() :: pos_integer()
   def default_iterations, do: @iterations
 

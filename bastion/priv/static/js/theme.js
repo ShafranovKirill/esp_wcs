@@ -1,5 +1,3 @@
-// Тема (светлая / тёмная / как в системе) до отрисовки страницы — без мигания.
-// Отдельный файл, а не inline-скрипт: CSP бастиона inline-скрипты запрещает.
 (() => {
   const systemTheme = () => matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 

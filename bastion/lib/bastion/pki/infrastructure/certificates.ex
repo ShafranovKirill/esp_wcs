@@ -1,10 +1,4 @@
 defmodule Bastion.PKI.Infrastructure.Certificates do
-  @moduledoc """
-  Выпуск и разбор сертификатов (обёртка над `x509` / `:public_key`).
-
-  Все ключи — ECDSA P-256, подпись — SHA-256: быстро на ESP32 и в TLS 1.3.
-  """
-
   alias Bastion.PKI.Domain.Hosts
   alias X509.Certificate.{Extension, Template}
 
@@ -12,7 +6,6 @@ defmodule Bastion.PKI.Infrastructure.Certificates do
 
   @ca_subject "/O=ESP WCS/CN=ESP WCS Bastion Root CA"
   @ca_days 365 * 20
-  # Apple не принимает серверные сертификаты дольше 825 дней; 397 — как у публичных CA
   @server_days 397
   @device_days 365 * 10
 
@@ -63,7 +56,6 @@ defmodule Bastion.PKI.Infrastructure.Certificates do
     )
   end
 
-  @doc "CSR из PEM: подпись верна, ключ P-256; возвращает открытый ключ и CN"
   @spec parse_csr(String.t()) ::
           {:ok, %{public_key: X509.PublicKey.t(), common_name: String.t() | nil}}
           | {:error, :invalid_csr | :bad_signature | :unsupported_key}
@@ -85,7 +77,6 @@ defmodule Bastion.PKI.Infrastructure.Certificates do
   @spec public_key(cert()) :: X509.PublicKey.t()
   def public_key(cert), do: X509.Certificate.public_key(cert)
 
-  @doc "Адреса из SAN сертификата сервера"
   @spec hosts(cert()) :: Hosts.t()
   def hosts(cert) do
     case X509.Certificate.extension(cert, :subject_alt_name) do
@@ -109,7 +100,6 @@ defmodule Bastion.PKI.Infrastructure.Certificates do
     to |> :pubkey_cert.time_str_2_gregorian_sec() |> gregorian_to_datetime()
   end
 
-  @doc "Подписан ли сертификат этим CA"
   @spec issued_by?(cert(), cert()) :: boolean()
   def issued_by?(cert, ca_cert) do
     :public_key.pkix_is_issuer(X509.Certificate.to_der(cert), X509.Certificate.to_der(ca_cert)) and
@@ -137,7 +127,6 @@ defmodule Bastion.PKI.Infrastructure.Certificates do
   @spec key_from_der(binary()) :: {:ok, key()} | {:error, term()}
   def key_from_der(der), do: X509.PrivateKey.from_der(der)
 
-  @doc "Ключ для опций `:ssl` (`key: {:ECPrivateKey, der}`)"
   @spec ssl_key(key()) :: {:ECPrivateKey, binary()}
   def ssl_key(key), do: {:ECPrivateKey, X509.PrivateKey.to_der(key, wrap: false)}
 
