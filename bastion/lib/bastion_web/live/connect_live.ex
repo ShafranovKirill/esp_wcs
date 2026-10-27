@@ -14,7 +14,8 @@ defmodule BastionWeb.ConnectLive do
      assign(socket,
        page_title: gettext("How to connect"),
        addresses: addresses,
-       bastion_code: Bastion.PKI.bastion_code()
+       bastion_code: Bastion.PKI.bastion_code(),
+       mdns: Bastion.Discovery.method()
      )}
   end
 
@@ -57,6 +58,9 @@ defmodule BastionWeb.ConnectLive do
             {gettext(
               "Copy one of the addresses on the right. bastion.local works if mDNS is available in the network, otherwise use the IP address."
             )}
+            <span :if={@mdns == :off} class="text-warning" id="mdns-off">
+              {gettext("mDNS is turned off on this bastion (BASTION_MDNS=off).")}
+            </span>
           </.step>
           <.step n={5} title={gettext("Compare the bastion code")}>
             {gettext(
@@ -123,6 +127,9 @@ defmodule BastionWeb.ConnectLive do
               >
                 <.icon name="hero-arrow-down-tray" class="size-4" /> {gettext("Download")}
               </a>
+              <.link href={~p"/ca"} class="link text-sm" id="ca-instructions">
+                {gettext("How to install it")}
+              </.link>
             </div>
           </div>
         </aside>
