@@ -199,37 +199,49 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  @spec move(String.t(), String.t() | nil) :: {:ok, Device.t()} | {:error, atom()}
-  def move(id, folder_id) do
+  @spec set_folders(String.t(), [String.t()]) :: {:ok, Device.t()} | {:error, atom()}
+  def set_folders(id, folder_ids) do
     UnitOfWork.run(fn ->
       with {:ok, record} <- lock(id),
-           {:ok, folder_name} <- folder_name(folder_id) do
-        if record.folder_id == folder_id do
+           {:ok, folders} <- folders(folder_ids) do
+        record = Repo.preload(record, :folders)
+        before = record.folders |> Enum.map(& &1.id) |> Enum.sort()
+
+        if before == Enum.map(folders, & &1.id) do
           {:ok, DeviceRecord.to_domain(record), []}
         else
-          with {:ok, saved} <-
-                 persist(record, %{DeviceRecord.to_domain(record) | folder_id: folder_id}) do
-            journal(saved.id, :moved, %{folder: folder_name})
-            {:ok, saved, [changed(saved.id, :moved)]}
-          end
+          saved =
+            record
+            |> Ecto.Changeset.change()
+            |> Ecto.Changeset.put_assoc(:folders, folders)
+            |> Repo.update!()
+
+          journal(saved.id, :moved, %{folders: Enum.map(folders, & &1.name)})
+          {:ok, DeviceRecord.to_domain(saved), [changed(saved.id, :moved)]}
         end
       end
     end)
   end
 
-  defp folder_name(nil), do: {:ok, nil}
+  defp folders(ids) do
+    ids = ids |> Enum.reject(&(&1 in [nil, ""])) |> Enum.uniq()
 
-  defp folder_name(folder_id) do
-    case Ecto.UUID.cast(folder_id) do
-      {:ok, uuid} ->
-        case Repo.get(FolderRecord, uuid) do
-          nil -> {:error, :folder_not_found}
-          folder -> {:ok, folder.name}
-        end
+    with {:ok, uuids} <- cast_folder_ids(ids) do
+      found = Repo.all(from f in FolderRecord, where: f.id in ^uuids, order_by: f.id)
 
-      :error ->
-        {:error, :folder_not_found}
+      if length(found) == length(uuids),
+        do: {:ok, Enum.sort_by(found, & &1.id)},
+        else: {:error, :folder_not_found}
     end
+  end
+
+  defp cast_folder_ids(ids) do
+    Enum.reduce_while(ids, {:ok, []}, fn id, {:ok, acc} ->
+      case Ecto.UUID.cast(id) do
+        {:ok, uuid} -> {:cont, {:ok, [uuid | acc]}}
+        :error -> {:halt, {:error, :folder_not_found}}
+      end
+    end)
   end
 
   @spec record_event(String.t(), Bastion.Fleet.DeviceEvent.type(), map()) :: :ok
@@ -255,7 +267,7 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     with {:ok, uuid} <- cast_id(id),
          %DeviceRecord{} = record <-
            Repo.one(from d in DeviceRecord, where: d.id == ^uuid, lock: "FOR UPDATE") do
-      {:ok, record}
+      {:ok, Repo.preload(record, :folders)}
     else
       _ -> {:error, :not_found}
     end
@@ -266,8 +278,10 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     Repo.exists?(from d in DeviceRecord, where: fragment("lower(?)", d.name) == ^lowered)
   end
 
-  defp lock_by_device_id(device_id),
-    do: Repo.one(from d in DeviceRecord, where: d.device_id == ^device_id, lock: "FOR UPDATE")
+  defp lock_by_device_id(device_id) do
+    Repo.one(from d in DeviceRecord, where: d.device_id == ^device_id, lock: "FOR UPDATE")
+    |> Repo.preload(:folders)
+  end
 
   defp cast_id(id) do
     case Ecto.UUID.cast(id) do
@@ -282,7 +296,8 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
   defp persist(record, device),
     do: record |> DeviceRecord.changeset(device) |> Repo.update() |> result()
 
-  defp result({:ok, record}), do: {:ok, DeviceRecord.to_domain(record)}
+  defp result({:ok, record}),
+    do: {:ok, record |> Repo.preload(:folders) |> DeviceRecord.to_domain()}
 
   defp result({:error, changeset}) do
     if Keyword.has_key?(changeset.errors, :name),

@@ -2,6 +2,7 @@ defmodule BastionWeb.DashboardLive do
   use BastionWeb, :live_view
 
   alias Bastion.Fleet
+  alias Bastion.Fleet.Folder
 
   @impl true
   def mount(_params, _session, socket) do
@@ -18,7 +19,9 @@ defmodule BastionWeb.DashboardLive do
         query: "",
         approving: nil,
         folder_form: to_form(%{"name" => ""}, as: :folder),
-        editing_folder: nil,
+        folder_mode: {:new, nil},
+        move_form: to_form(%{"parent_id" => ""}, as: :move),
+        moving_folder: nil,
         collapsed: MapSet.new()
       )
       |> load()
@@ -28,11 +31,15 @@ defmodule BastionWeb.DashboardLive do
 
   defp load(socket) do
     overview = Fleet.overview()
-    assign(socket, overview: overview, total: count(overview), online: Bastion.Link.online())
-  end
 
-  defp count(%{folders: folders, unfiled: unfiled}),
-    do: Enum.reduce(folders, length(unfiled), fn {_, devices}, acc -> acc + length(devices) end)
+    assign(socket,
+      overview: overview,
+      tree: Folder.tree(overview.folders),
+      folders_by_id: Map.new(overview.folders, &{&1.id, &1}),
+      total: overview.total,
+      online: Bastion.Link.online()
+    )
+  end
 
   @impl true
   def handle_info({:event, %Bastion.Link.Events.PresenceChanged{}}, socket),
@@ -82,26 +89,31 @@ defmodule BastionWeb.DashboardLive do
     {:noreply, assign(socket, collapsed: collapsed)}
   end
 
-  def handle_event("new-folder", _params, socket) do
-    {:noreply,
-     assign(socket, editing_folder: nil, folder_form: to_form(%{"name" => ""}, as: :folder))}
-  end
-
-  def handle_event("edit-folder", %{"id" => id}, socket) do
-    folder = Enum.find_value(socket.assigns.overview.folders, fn {f, _} -> f.id == id && f end)
+  def handle_event("new-folder", params, socket) do
+    parent = params["parent"] && socket.assigns.folders_by_id[params["parent"]]
 
     {:noreply,
      assign(socket,
-       editing_folder: folder,
+       folder_mode: {:new, parent},
+       folder_form: to_form(%{"name" => ""}, as: :folder)
+     )}
+  end
+
+  def handle_event("edit-folder", %{"id" => id}, socket) do
+    folder = socket.assigns.folders_by_id[id]
+
+    {:noreply,
+     assign(socket,
+       folder_mode: {:rename, folder},
        folder_form: to_form(%{"name" => folder.name}, as: :folder)
      )}
   end
 
   def handle_event("save-folder", %{"folder" => %{"name" => name}}, socket) do
     result =
-      case socket.assigns.editing_folder do
-        nil -> Fleet.create_folder(name)
-        folder -> Fleet.rename_folder(folder.id, name)
+      case socket.assigns.folder_mode do
+        {:new, parent} -> Fleet.create_folder(name, parent && parent.id)
+        {:rename, folder} -> Fleet.rename_folder(folder.id, name)
       end
 
     case result do
@@ -119,11 +131,42 @@ defmodule BastionWeb.DashboardLive do
     end
   end
 
-  def handle_event("delete-folder", %{"id" => id}, socket) do
-    :ok = Fleet.delete_folder(id)
+  def handle_event("pick-move", %{"id" => id}, socket) do
+    folder = socket.assigns.folders_by_id[id]
 
     {:noreply,
-     put_flash(socket, :info, gettext("Folder deleted, its devices moved to “No folder”"))}
+     assign(socket,
+       moving_folder: folder,
+       move_form: to_form(%{"parent_id" => folder.parent_id || ""}, as: :move)
+     )}
+  end
+
+  def handle_event("move-folder", %{"move" => %{"parent_id" => parent_id}}, socket) do
+    folder = socket.assigns.moving_folder
+
+    case Fleet.move_folder(folder.id, if(parent_id == "", do: nil, else: parent_id)) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(moving_folder: nil)
+         |> push_event("close-dialog", %{id: "move-dialog"})}
+
+      {:error, reason} ->
+        form =
+          to_form(%{"parent_id" => parent_id},
+            as: :move,
+            errors: [parent_id: {BastionWeb.Errors.message(reason), []}]
+          )
+
+        {:noreply, assign(socket, move_form: form)}
+    end
+  end
+
+  def handle_event("delete-folder", %{"id" => id}, socket) do
+    case Fleet.delete_folder(id) do
+      :ok -> {:noreply, put_flash(socket, :info, gettext("Folder deleted"))}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
+    end
   end
 
   @impl true
@@ -247,20 +290,18 @@ defmodule BastionWeb.DashboardLive do
         <.link navigate={~p"/connect"} class="btn btn-primary btn-sm mt-4">{gettext("How to connect")}</.link>
       </div>
 
-      <section :if={@total > 0} id="devices" class="space-y-3">
-        <.folder
-          :for={{folder, devices} <- @overview.folders}
-          id={"folder-#{folder.id}"}
-          folder={folder}
-          devices={filter(devices, @query)}
-          all_count={length(devices)}
-          collapsed={MapSet.member?(@collapsed, folder.id)}
+      <section :if={@total > 0 or @tree != []} id="devices" class="space-y-3">
+        <.folder_node
+          :for={node <- @tree}
+          node={node}
+          devices={@overview.devices}
+          query={@query}
+          collapsed={@collapsed}
           online={@online}
         />
-        <.folder
+        <.device_group
           :if={@overview.unfiled != []}
           id="folder-none"
-          folder={nil}
           devices={filter(@overview.unfiled, @query)}
           all_count={length(@overview.unfiled)}
           collapsed={MapSet.member?(@collapsed, "none")}
@@ -305,8 +346,13 @@ defmodule BastionWeb.DashboardLive do
 
       <.dialog
         id="folder-dialog"
-        title={if(@editing_folder, do: gettext("Rename folder"), else: gettext("New folder"))}
+        title={folder_dialog_title(@folder_mode)}
       >
+        <p :if={match?({:new, %Folder{}}, @folder_mode)} class="text-sm text-base-content/60">
+          {gettext("Inside “%{folder}”",
+            folder: Folder.full_name(elem(@folder_mode, 1), @folders_by_id)
+          )}
+        </p>
         <.form for={@folder_form} id="folder-form" phx-submit="save-folder">
           <.input
             field={@folder_form[:name]}
@@ -323,54 +369,117 @@ defmodule BastionWeb.DashboardLive do
           </div>
         </.form>
       </.dialog>
+
+      <.dialog id="move-dialog" title={gettext("Move folder")}>
+        <.form :if={@moving_folder} for={@move_form} id="move-form" phx-submit="move-folder">
+          <p class="text-sm">
+            {gettext("Move “%{folder}” with everything inside into:",
+              folder: Folder.full_name(@moving_folder, @folders_by_id)
+            )}
+          </p>
+          <.input
+            field={@move_form[:parent_id]}
+            type="select"
+            options={move_targets(@overview.folders, @moving_folder, @folders_by_id)}
+          />
+          <div class="modal-action">
+            <button type="button" class="btn btn-ghost" phx-click={close_dialog("move-dialog")}>{gettext(
+              "Cancel"
+            )}</button>
+            <button type="submit" class="btn btn-primary">{gettext("Move")}</button>
+          </div>
+        </.form>
+      </.dialog>
     </Layouts.app>
     """
   end
 
-  attr :id, :string, required: true
-  attr :folder, :any, required: true, doc: "папка или nil — «Без папки»"
-  attr :devices, :list, required: true
-  attr :all_count, :integer, required: true
-  attr :collapsed, :boolean, default: false
+  defp folder_dialog_title({:rename, _}), do: gettext("Rename folder")
+  defp folder_dialog_title({:new, nil}), do: gettext("New folder")
+  defp folder_dialog_title({:new, _}), do: gettext("New subfolder")
+
+  defp move_targets(folders, moving, by_id) do
+    targets =
+      folders
+      |> Enum.reject(&(&1.id == moving.id or Folder.inside?(&1, moving)))
+      |> Enum.map(&{Folder.full_name(&1, by_id), &1.id})
+
+    [{gettext("Top level"), ""} | targets]
+  end
+
+  attr :node, :any, required: true
+  attr :devices, :map, required: true
+  attr :query, :string, required: true
+  attr :collapsed, :any, required: true
   attr :online, :map, default: %{}
 
-  defp folder(assigns) do
-    assigns = assign(assigns, :key, if(assigns.folder, do: assigns.folder.id, else: "none"))
+  defp folder_node(assigns) do
+    {folder, children} = assigns.node
+    own = Map.get(assigns.devices, folder.id, [])
+    subtree = subtree_devices(assigns.node, assigns.devices)
+
+    assigns =
+      assign(assigns,
+        folder: folder,
+        children: children,
+        own: filter(own, assigns.query),
+        own_count: length(own),
+        subtree_count: length(subtree),
+        visible: assigns.query == "" or filter(subtree, assigns.query) != [],
+        collapsed?: assigns.query == "" and MapSet.member?(assigns.collapsed, folder.id),
+        deletable: own == [] and children == []
+      )
 
     ~H"""
-    <div id={@id} class="rounded-box border border-base-300 bg-base-100">
+    <div
+      :if={@visible}
+      id={"folder-#{@folder.id}"}
+      class="rounded-box border border-base-300 bg-base-100"
+    >
       <div class="flex items-center gap-2 px-4 py-3">
         <button
           type="button"
           class="flex flex-1 items-center gap-2 text-left"
           phx-click="toggle-folder"
-          phx-value-id={@key}
-          aria-expanded={to_string(!@collapsed)}
+          phx-value-id={@folder.id}
+          aria-expanded={to_string(!@collapsed?)}
         >
           <.icon
             name="hero-chevron-right"
-            class={["size-4 transition-transform", !@collapsed && "rotate-90"]}
+            class={["size-4 transition-transform", !@collapsed? && "rotate-90"]}
           />
-          <.icon
-            name={if(@folder, do: "hero-folder", else: "hero-inbox")}
-            class="size-5 text-base-content/60"
-          />
-          <span class="font-medium">{if(@folder, do: @folder.name, else: gettext("No folder"))}</span>
-          <span class="badge badge-ghost badge-sm">{@all_count}</span>
+          <.icon name="hero-folder" class="size-5 text-base-content/60" />
+          <span class="font-medium">{@folder.name}</span>
+          <span class="badge badge-ghost badge-sm" title={gettext("Devices inside, with subfolders")}>
+            {@subtree_count}
+          </span>
         </button>
-        <div :if={@folder} class="dropdown dropdown-end">
+        <div class="dropdown dropdown-end">
           <div
             tabindex="0"
             role="button"
             class="btn btn-ghost btn-xs"
             aria-label={gettext("Folder actions")}
+            id={"folder-menu-#{@folder.id}"}
           >
             <.icon name="hero-ellipsis-horizontal" class="size-4" />
           </div>
-          <ul tabindex="0" class="menu dropdown-content z-10 w-44 rounded-box bg-base-100 p-1 shadow">
+          <ul tabindex="0" class="menu dropdown-content z-10 w-52 rounded-box bg-base-100 p-1 shadow">
+            <li :if={Folder.depth(@folder) < Folder.max_depth()}>
+              <button
+                type="button"
+                id={"new-subfolder-#{@folder.id}"}
+                phx-click={
+                  JS.push("new-folder", value: %{parent: @folder.id}) |> open_dialog("folder-dialog")
+                }
+              >
+                <.icon name="hero-folder-plus" class="size-4" /> {gettext("New subfolder")}
+              </button>
+            </li>
             <li>
               <button
                 type="button"
+                id={"rename-folder-#{@folder.id}"}
                 phx-click={
                   JS.push("edit-folder", value: %{id: @folder.id}) |> open_dialog("folder-dialog")
                 }
@@ -381,50 +490,126 @@ defmodule BastionWeb.DashboardLive do
             <li>
               <button
                 type="button"
+                id={"move-folder-#{@folder.id}"}
+                phx-click={
+                  JS.push("pick-move", value: %{id: @folder.id}) |> open_dialog("move-dialog")
+                }
+              >
+                <.icon name="hero-arrows-right-left" class="size-4" /> {gettext("Move")}
+              </button>
+            </li>
+            <li :if={@deletable}>
+              <button
+                type="button"
                 class="text-error"
+                id={"delete-folder-#{@folder.id}"}
                 phx-click="delete-folder"
                 phx-value-id={@folder.id}
-                data-confirm={
-                  gettext("Delete folder “%{name}”? Devices will move to “No folder”.",
-                    name: @folder.name
-                  )
-                }
+                data-confirm={gettext("Delete folder “%{name}”?", name: @folder.name)}
               >
                 <.icon name="hero-trash" class="size-4" /> {gettext("Delete")}
               </button>
+            </li>
+            <li :if={!@deletable} class="menu-disabled">
+              <span class="text-xs">{gettext("Only an empty folder can be deleted")}</span>
             </li>
           </ul>
         </div>
       </div>
 
-      <div :if={!@collapsed}>
+      <div :if={!@collapsed?} class="border-t border-base-300">
+        <div :if={@children != []} class="space-y-2 p-2 pl-6">
+          <.folder_node
+            :for={child <- @children}
+            node={child}
+            devices={@devices}
+            query={@query}
+            collapsed={@collapsed}
+            online={@online}
+          />
+        </div>
         <p
-          :if={@devices == []}
-          class="border-t border-base-300 px-4 py-4 text-sm text-base-content/50"
+          :if={@own == [] and @children == []}
+          class="px-4 py-4 text-sm text-base-content/50"
         >
-          {if(@all_count == 0,
-            do: gettext("The folder is empty — move devices here from their settings"),
+          {if(@own_count == 0,
+            do: gettext("The folder is empty — add devices here from their settings"),
             else: gettext("Nothing found")
           )}
         </p>
-
-        <ul :if={@devices != []} class="divide-y divide-base-300 border-t border-base-300">
-          <li :for={device <- @devices} id={"device-#{device.id}"}>
-            <.link
-              navigate={~p"/devices/#{device.id}"}
-              class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-base-200/60"
-            >
-              <span class="min-w-40 font-medium">{device.name}</span>
-              <span class="font-mono text-xs text-base-content/50">{Fleet.format_mac(device.device_id)}</span>
-              <span class="flex-1"></span>
-              <.presence :if={device.status == :approved} device={device} online={@online[device.id]} />
-              <.status_badge :if={device.status != :approved} status={device.status} />
-              <.icon name="hero-chevron-right" class="size-4 text-base-content/30" />
-            </.link>
-          </li>
-        </ul>
+        <.device_list :if={@own != []} devices={@own} online={@online} scope={@folder.id} />
       </div>
     </div>
+    """
+  end
+
+  defp subtree_devices({folder, children}, devices) do
+    (Map.get(devices, folder.id, []) ++ Enum.flat_map(children, &subtree_devices(&1, devices)))
+    |> Enum.uniq_by(& &1.id)
+  end
+
+  attr :id, :string, required: true
+  attr :devices, :list, required: true
+  attr :all_count, :integer, required: true
+  attr :collapsed, :boolean, default: false
+  attr :online, :map, default: %{}
+
+  defp device_group(assigns) do
+    ~H"""
+    <div id={@id} class="rounded-box border border-base-300 bg-base-100">
+      <div class="flex items-center gap-2 px-4 py-3">
+        <button
+          type="button"
+          class="flex flex-1 items-center gap-2 text-left"
+          phx-click="toggle-folder"
+          phx-value-id="none"
+          aria-expanded={to_string(!@collapsed)}
+        >
+          <.icon
+            name="hero-chevron-right"
+            class={["size-4 transition-transform", !@collapsed && "rotate-90"]}
+          />
+          <.icon name="hero-inbox" class="size-5 text-base-content/60" />
+          <span class="font-medium">{gettext("No folder")}</span>
+          <span class="badge badge-ghost badge-sm">{@all_count}</span>
+        </button>
+      </div>
+      <div :if={!@collapsed} class="border-t border-base-300">
+        <p :if={@devices == []} class="px-4 py-4 text-sm text-base-content/50">
+          {gettext("Nothing found")}
+        </p>
+        <.device_list :if={@devices != []} devices={@devices} online={@online} scope="none" />
+      </div>
+    </div>
+    """
+  end
+
+  attr :devices, :list, required: true
+  attr :online, :map, default: %{}
+  attr :scope, :string, required: true
+
+  defp device_list(assigns) do
+    ~H"""
+    <ul class="divide-y divide-base-300">
+      <li :for={device <- @devices} id={"device-#{@scope}-#{device.id}"}>
+        <.link
+          navigate={~p"/devices/#{device.id}"}
+          class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-base-200/60"
+        >
+          <span class="min-w-40 font-medium">{device.name}</span>
+          <span class="font-mono text-xs text-base-content/50">{Fleet.format_mac(device.device_id)}</span>
+          <span class="flex-1"></span>
+          <.presence
+            :if={device.status == :approved}
+            device={device}
+            online={@online[device.id]}
+            scope={@scope}
+          />
+          <.status_badge :if={device.status != :approved} status={device.status} />
+          <.icon name="hero-chevron-right" class="size-4 text-base-content/30" />
+        </.link>
+      </li>
+    </ul>
     """
   end
 

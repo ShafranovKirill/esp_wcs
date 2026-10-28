@@ -33,9 +33,10 @@ defmodule Bastion.Fleet do
   defdelegate delete(id), to: DeviceCommands
 
   defdelegate rename(id, name), to: DeviceCommands
-  defdelegate move(id, folder_id), to: DeviceCommands
-  defdelegate create_folder(name), to: FolderCommands, as: :create
+  defdelegate set_folders(id, folder_ids), to: DeviceCommands
+  defdelegate create_folder(name, parent_id \\ nil), to: FolderCommands, as: :create
   defdelegate rename_folder(id, name), to: FolderCommands, as: :rename
+  defdelegate move_folder(id, parent_id), to: FolderCommands, as: :move
   defdelegate delete_folder(id), to: FolderCommands, as: :delete
 
   defdelegate record_event(id, type, data \\ %{}), to: DeviceCommands

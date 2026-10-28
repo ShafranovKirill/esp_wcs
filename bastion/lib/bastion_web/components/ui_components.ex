@@ -28,6 +28,7 @@ defmodule BastionWeb.UIComponents do
 
   attr :device, :map, required: true
   attr :online, :map, default: nil
+  attr :scope, :string, default: nil
 
   def presence(assigns) do
     ~H"""
@@ -44,7 +45,11 @@ defmodule BastionWeb.UIComponents do
       <span class="size-2 rounded-full bg-base-content/25"></span>
       <%= if @device.last_seen_at do %>
         {gettext("offline")} ·
-        <.time at={@device.last_seen_at} format="relative" id={"seen-#{@device.id}"} />
+        <.time
+          at={@device.last_seen_at}
+          format="relative"
+          id={Enum.join(Enum.reject(["seen", @scope, @device.id], &is_nil/1), "-")}
+        />
       <% else %>
         {gettext("never connected")}
       <% end %>

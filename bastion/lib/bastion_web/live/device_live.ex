@@ -94,7 +94,6 @@ defmodule BastionWeb.DeviceLive do
 
     assign(socket,
       name_form: to_form(%{"name" => device.name}, as: :device),
-      folder_form: to_form(%{"folder_id" => device.folder_id || ""}, as: :device),
       wifi_form: to_form(%{"ssid" => "", "password" => ""}, as: :wifi)
     )
   end
@@ -198,9 +197,11 @@ defmodule BastionWeb.DeviceLive do
     end
   end
 
-  def handle_event("move", %{"device" => %{"folder_id" => folder_id}}, socket) do
-    case Fleet.move(socket.assigns.device.id, if(folder_id == "", do: nil, else: folder_id)) do
-      {:ok, _} -> {:noreply, socket |> reload() |> put_flash(:info, gettext("Folder changed"))}
+  def handle_event("set-folders", params, socket) do
+    ids = get_in(params, ["device", "folder_ids"]) || []
+
+    case Fleet.set_folders(socket.assigns.device.id, ids) do
+      {:ok, _} -> {:noreply, socket |> reload() |> put_flash(:info, gettext("Folders changed"))}
       {:error, reason} -> {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
     end
   end
@@ -354,7 +355,6 @@ defmodule BastionWeb.DeviceLive do
         online={@online}
         wifi_form={@wifi_form}
         name_form={@name_form}
-        folder_form={@folder_form}
         folders={@folders}
       />
       <.info_tab :if={@tab == :info} device={@device} online={@online} />
@@ -557,7 +557,6 @@ defmodule BastionWeb.DeviceLive do
   attr :device, :map, required: true
   attr :online, :map, default: nil
   attr :name_form, :map, required: true
-  attr :folder_form, :map, required: true
   attr :wifi_form, :map, required: true
   attr :folders, :list, required: true
 
@@ -581,14 +580,32 @@ defmodule BastionWeb.DeviceLive do
         </.form>
       </.card>
 
-      <.card title={gettext("Folder")}>
-        <.form for={@folder_form} id="folder-form" phx-change="move">
-          <.input
-            field={@folder_form[:folder_id]}
-            type="select"
-            options={[{gettext("No folder"), ""} | Enum.map(@folders, &{&1.name, &1.id})]}
-          />
-        </.form>
+      <.card title={gettext("Folders")}>
+        <p :if={@folders == []} class="text-sm text-base-content/60">
+          {gettext("No folders yet — create them on the devices page")}
+        </p>
+        <form :if={@folders != []} id="folder-form" phx-change="set-folders" class="space-y-1">
+          <input type="hidden" name="device[folder_ids][]" value="" />
+          <label
+            :for={folder <- @folders}
+            class="flex cursor-pointer items-center gap-2 text-sm"
+            style={"padding-left: #{(Fleet.Folder.depth(folder) - 1) * 1.25}rem"}
+          >
+            <input
+              type="checkbox"
+              class="checkbox checkbox-sm"
+              name="device[folder_ids][]"
+              value={folder.id}
+              id={"folder-check-#{folder.id}"}
+              checked={folder.id in @device.folder_ids}
+            />
+            <.icon name="hero-folder" class="size-4 text-base-content/50" />
+            {folder.name}
+          </label>
+          <p class="pt-2 text-xs text-base-content/50">
+            {gettext("A device can be in several folders; access is granted through any of them.")}
+          </p>
+        </form>
       </.card>
 
       <.card
@@ -883,6 +900,12 @@ defmodule BastionWeb.DeviceLive do
 
   defp event_text(%{type: :renamed, data: d}),
     do: gettext("Renamed from “%{from}” to “%{to}”", from: d["from"], to: d["to"])
+
+  defp event_text(%{type: :moved, data: %{"folders" => []}}),
+    do: gettext("Removed from all folders")
+
+  defp event_text(%{type: :moved, data: %{"folders" => names}}),
+    do: gettext("Folders: %{folders}", folders: Enum.join(names, ", "))
 
   defp event_text(%{type: :moved, data: %{"folder" => nil}}), do: gettext("Moved out of folders")
 

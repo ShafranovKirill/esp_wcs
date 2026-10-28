@@ -6,7 +6,7 @@ defmodule Bastion.Fleet.Infrastructure.DeviceRecord do
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
-  @fields ~w(device_id name status folder_id device_code csr_pem certificate_pem certificate_serial
+  @fields ~w(device_id name status device_code csr_pem certificate_pem certificate_serial
              certificate_not_after firmware_version last_ip last_seen_at requested_at approved_at revoked_at)a
 
   schema "devices" do
@@ -24,18 +24,29 @@ defmodule Bastion.Fleet.Infrastructure.DeviceRecord do
     field :requested_at, :utc_datetime
     field :approved_at, :utc_datetime
     field :revoked_at, :utc_datetime
-    belongs_to :folder, Bastion.Fleet.Infrastructure.FolderRecord
+
+    many_to_many :folders, Bastion.Fleet.Infrastructure.FolderRecord,
+      join_through: "device_folders",
+      join_keys: [device_id: :id, folder_id: :id],
+      on_replace: :delete
 
     timestamps(type: :utc_datetime)
   end
 
-  def to_domain(%__MODULE__{} = r), do: struct(Device, Map.take(r, [:id | @fields]))
+  def to_domain(%__MODULE__{} = r) do
+    folder_ids =
+      case r.folders do
+        %Ecto.Association.NotLoaded{} -> []
+        folders -> folders |> Enum.map(& &1.id) |> Enum.sort()
+      end
+
+    struct(Device, r |> Map.take([:id | @fields]) |> Map.put(:folder_ids, folder_ids))
+  end
 
   def changeset(%__MODULE__{} = record, %Device{} = device) do
     record
     |> Ecto.Changeset.change(Map.take(device, @fields))
     |> Ecto.Changeset.unique_constraint(:name, name: :devices_name_index)
     |> Ecto.Changeset.unique_constraint(:device_id)
-    |> Ecto.Changeset.foreign_key_constraint(:folder_id)
   end
 end

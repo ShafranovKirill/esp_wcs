@@ -53,7 +53,7 @@ for {id, name, room} <- [
       {"aabbcc0000c0", "lab-esp", nil}
     ] do
   d = id |> device.(name) |> approve.()
-  if room && d.folder_id != room.id, do: Fleet.move(d.id, room.id)
+  if room && room.id not in d.folder_ids, do: Fleet.set_folders(d.id, [room.id])
 end
 
 old = "aabbcc0000d0" |> device.("decommissioned-sw") |> approve.()

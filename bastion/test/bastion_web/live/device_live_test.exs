@@ -84,8 +84,15 @@ defmodule BastionWeb.DeviceLiveTest do
     view |> element("#rename-form") |> render_submit(%{device: %{name: "core-sw-01"}})
     assert has_element?(view, "#device-name", "core-sw-01")
 
-    view |> element("#folder-form") |> render_change(%{device: %{folder_id: folder.id}})
-    assert Fleet.get_device(device.id).folder_id == folder.id
+    view
+    |> element("#folder-form")
+    |> render_change(%{device: %{folder_ids: ["", folder.id]}})
+
+    assert Fleet.get_device(device.id).folder_ids == [folder.id]
+    assert has_element?(view, "#folder-check-#{folder.id}[checked]")
+
+    view |> element("#folder-form") |> render_change(%{device: %{folder_ids: [""]}})
+    assert Fleet.get_device(device.id).folder_ids == []
   end
 
   test "настройки онлайн-устройства: порт, Wi-Fi, перезагрузка", %{conn: conn} do

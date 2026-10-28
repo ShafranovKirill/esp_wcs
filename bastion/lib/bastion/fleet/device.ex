@@ -10,7 +10,7 @@ defmodule Bastion.Fleet.Device do
           device_id: String.t(),
           name: String.t(),
           status: status(),
-          folder_id: String.t() | nil,
+          folder_ids: [String.t()],
           device_code: String.t(),
           csr_pem: String.t() | nil,
           certificate_pem: String.t() | nil,
@@ -29,7 +29,6 @@ defmodule Bastion.Fleet.Device do
     :device_id,
     :name,
     :status,
-    :folder_id,
     :device_code,
     :csr_pem,
     :certificate_pem,
@@ -40,7 +39,8 @@ defmodule Bastion.Fleet.Device do
     :last_seen_at,
     :requested_at,
     :approved_at,
-    :revoked_at
+    :revoked_at,
+    folder_ids: []
   ]
 
   @type request :: %{

@@ -24,6 +24,15 @@ defmodule BastionWeb.Errors do
     do: gettext("Device limit reached (%{max})", max: Bastion.Fleet.max_devices())
 
   def message(:folder_not_found), do: gettext("Folder not found")
+  def message(:folder_not_empty), do: gettext("Only an empty folder can be deleted")
+
+  def message(:folder_too_deep),
+    do:
+      gettext("Folders can be nested at most %{max} levels",
+        max: Bastion.Fleet.Folder.max_depth()
+      )
+
+  def message(:folder_into_itself), do: gettext("A folder cannot be moved into itself")
   def message(:invalid_csr), do: gettext("The device sent an invalid certificate request")
 
   def message(:subject_mismatch),

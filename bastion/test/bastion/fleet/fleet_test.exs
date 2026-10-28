@@ -25,7 +25,7 @@ defmodule Bastion.FleetTest do
       assert_receive {:event, %DeviceRequested{device_id: id}}
       assert id == attrs.device_id
 
-      assert %{requests: [device], folders: [], unfiled: []} = Fleet.overview()
+      assert %{requests: [device], folders: [], unfiled: [], total: 0} = Fleet.overview()
       assert device.status == :pending
       assert device.device_code =~ ~r/\A[0-9A-F]{4}(-[0-9A-F]{4}){4}\z/
       assert [%{type: :requested}] = Fleet.list_events(device.id)
@@ -150,20 +150,24 @@ defmodule Bastion.FleetTest do
                hd(Fleet.list_events(a.id))
     end
 
-    test "папки: устройства группируются, удаление папки возвращает их в «Без папки»" do
+    test "папки: устройства группируются, непустую папку удалить нельзя" do
       device = approved_device()
       assert {:ok, folder} = Fleet.create_folder("Серверная 1")
       assert_receive {:event, %FoldersChanged{}}
       assert {:error, :name_taken} = Fleet.create_folder("серверная 1")
 
-      assert {:ok, _} = Fleet.move(device.id, folder.id)
-      assert %{folders: [{^folder, [%{id: id}]}], unfiled: []} = Fleet.overview()
+      assert {:ok, %{folder_ids: [fid]}} = Fleet.set_folders(device.id, [folder.id])
+      assert fid == folder.id
+      assert %{devices: %{^fid => [%{id: id}]}, unfiled: [], total: 1} = Fleet.overview()
       assert id == device.id
+      assert %{type: :moved, data: %{"folders" => ["Серверная 1"]}} = hd(Fleet.list_events(id))
 
-      assert {:error, :folder_not_found} = Fleet.move(device.id, Ecto.UUID.generate())
+      assert {:error, :folder_not_found} = Fleet.set_folders(device.id, [Ecto.UUID.generate()])
+      assert {:error, :folder_not_empty} = Fleet.delete_folder(folder.id)
 
+      assert {:ok, %{folder_ids: []}} = Fleet.set_folders(device.id, [])
       assert :ok = Fleet.delete_folder(folder.id)
-      assert %{folders: [], unfiled: [%{id: ^id, folder_id: nil}]} = Fleet.overview()
+      assert %{folders: [], unfiled: [%{id: ^id, folder_ids: []}]} = Fleet.overview()
     end
 
     test "переименование папки" do
