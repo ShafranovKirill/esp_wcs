@@ -470,14 +470,16 @@ defmodule BastionWeb.DeviceLive do
         <span>{gettext("The console is available for approved devices only.")}</span>
       </div>
 
-      <div
-        id={"terminal-#{@device.id}"}
-        phx-hook="Terminal"
-        phx-update="ignore"
-        data-readonly="true"
-        data-banner={@banner}
-        class="h-[28rem] overflow-hidden rounded-box border border-base-300 bg-base-200 p-2"
-      >
+      <div class="h-[28rem] overflow-hidden rounded-box border border-base-300 bg-base-200 p-2">
+        <div
+          id={"terminal-#{@device.id}"}
+          phx-hook="Terminal"
+          phx-update="ignore"
+          data-readonly="true"
+          data-banner={@banner}
+          class="size-full overflow-hidden"
+        >
+        </div>
       </div>
     </section>
     """
