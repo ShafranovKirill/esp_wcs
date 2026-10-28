@@ -28,7 +28,7 @@ const fit = new FitAddon();
 term.loadAddon(fit);
 term.open($('terminal'));
 fit.fit();
-window.addEventListener('resize', () => fit.fit());
+new ResizeObserver(() => fit.fit()).observe($('terminal'));
 dark.addEventListener('change', () => { term.options.theme = dark.matches ? themes.dark : themes.light; });
 
 const encoder = new TextEncoder();

@@ -53,8 +53,8 @@ export const Terminal = {
       if (this.owner) this.pushEvent("console-ping", {})
     }, PING_MS)
 
-    this.onResize = () => this.fit.fit()
-    window.addEventListener("resize", this.onResize)
+    this.resizeObserver = new ResizeObserver(() => this.fit.fit())
+    this.resizeObserver.observe(this.el)
 
     this.themeObserver = new MutationObserver(() => (this.term.options.theme = currentTheme()))
     this.themeObserver.observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]})
@@ -64,7 +64,7 @@ export const Terminal = {
   },
   destroyed() {
     clearInterval(this.ping)
-    window.removeEventListener("resize", this.onResize)
+    this.resizeObserver.disconnect()
     this.themeObserver.disconnect()
     this.term.dispose()
   },
