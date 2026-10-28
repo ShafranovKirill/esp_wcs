@@ -42,8 +42,12 @@ defmodule Bastion.Accounts.Application.Provisioning do
     case %UserRecord{}
          |> UserRecord.changeset(username, Password.hash(password))
          |> Repo.insert() do
-      {:ok, _} -> {:ok, :created}
-      {:error, _} -> {:error, :insert_failed}
+      {:ok, record} ->
+        Bastion.Access.grant_superadmin(record.id)
+        {:ok, :created}
+
+      {:error, _} ->
+        {:error, :insert_failed}
     end
   end
 
@@ -60,6 +64,7 @@ defmodule Bastion.Accounts.Application.Provisioning do
         |> Repo.update!()
 
         Authentication.close_sessions(record.id)
+        Bastion.Access.grant_superadmin(record.id)
         {:ok, :reset}
     end
   end

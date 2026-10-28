@@ -6,9 +6,10 @@ defmodule Bastion.Accounts.Application.Staff do
   alias Bastion.Accounts.Events.UsersChanged
   alias Bastion.Accounts.Infrastructure.{Password, UserRecord}
   alias Bastion.Accounts.User
+  alias Bastion.Access.Actor
   alias Bastion.Repo
 
-  @type actor :: %{id: String.t(), username: String.t()}
+  @type actor :: Actor.t()
 
   @spec list() :: [User.t()]
   def list do
@@ -30,7 +31,8 @@ defmodule Bastion.Accounts.Application.Staff do
     username = String.trim(username || "")
     password = Password.generate()
 
-    with true <- Username.valid?(username) || {:error, :invalid_username},
+    with :ok <- allow(actor),
+         true <- Username.valid?(username) || {:error, :invalid_username},
          {:ok, record} <-
            %UserRecord{}
            |> UserRecord.changeset(username, Password.hash(password))
@@ -38,7 +40,7 @@ defmodule Bastion.Accounts.Application.Staff do
       Journal.record(:user_created,
         user_id: record.id,
         username: record.username,
-        actor_id: actor.id
+        actor_id: actor.user_id
       )
 
       changed()
@@ -52,7 +54,9 @@ defmodule Bastion.Accounts.Application.Staff do
   @spec reset_password(actor(), String.t()) ::
           {:ok, User.t(), String.t()} | {:error, :user_not_found}
   def reset_password(actor, id) do
-    with {:ok, record} <- fetch(id) do
+    with :ok <- allow(actor),
+         {:ok, record} <- fetch(id),
+         :ok <- not_superadmin_target(actor, record) do
       password = Password.generate()
 
       record =
@@ -65,7 +69,7 @@ defmodule Bastion.Accounts.Application.Staff do
       Journal.record(:password_reset,
         user_id: record.id,
         username: record.username,
-        actor_id: actor.id
+        actor_id: actor.user_id
       )
 
       changed()
@@ -76,8 +80,10 @@ defmodule Bastion.Accounts.Application.Staff do
   @spec block(actor(), String.t()) ::
           {:ok, User.t()} | {:error, :user_not_found | :self | :last_user}
   def block(actor, id) do
-    with {:ok, record} <- fetch(id),
+    with :ok <- allow(actor),
+         {:ok, record} <- fetch(id),
          :ok <- not_self(actor, record),
+         :ok <- not_superadmin_target(actor, record),
          :ok <- not_last(record) do
       record =
         record
@@ -85,7 +91,13 @@ defmodule Bastion.Accounts.Application.Staff do
         |> Repo.update!()
 
       Authentication.close_sessions(record.id)
-      Journal.record(:blocked, user_id: record.id, username: record.username, actor_id: actor.id)
+
+      Journal.record(:blocked,
+        user_id: record.id,
+        username: record.username,
+        actor_id: actor.user_id
+      )
+
       changed()
       {:ok, UserRecord.to_domain(record)}
     end
@@ -93,13 +105,14 @@ defmodule Bastion.Accounts.Application.Staff do
 
   @spec unblock(actor(), String.t()) :: {:ok, User.t()} | {:error, :user_not_found}
   def unblock(actor, id) do
-    with {:ok, record} <- fetch(id) do
+    with :ok <- allow(actor),
+         {:ok, record} <- fetch(id) do
       record = record |> Ecto.Changeset.change(blocked_at: nil) |> Repo.update!()
 
       Journal.record(:unblocked,
         user_id: record.id,
         username: record.username,
-        actor_id: actor.id
+        actor_id: actor.user_id
       )
 
       changed()
@@ -110,7 +123,7 @@ defmodule Bastion.Accounts.Application.Staff do
   @spec change_password(actor(), String.t(), String.t()) ::
           :ok | {:error, :invalid_current | :missing | :too_short | :placeholder | :same}
   def change_password(actor, current, new) do
-    with {:ok, record} <- fetch(actor.id),
+    with {:ok, record} <- fetch(actor.user_id),
          true <-
            Password.verify(current || "", record.password_hash) || {:error, :invalid_current},
          :ok <- PasswordPolicy.check(new),
@@ -125,7 +138,7 @@ defmodule Bastion.Accounts.Application.Staff do
       Journal.record(:password_changed,
         user_id: record.id,
         username: record.username,
-        actor_id: actor.id
+        actor_id: actor.user_id
       )
 
       changed()
@@ -136,17 +149,30 @@ defmodule Bastion.Accounts.Application.Staff do
     end
   end
 
-  defp not_self(%{id: id}, %UserRecord{id: id}), do: {:error, :self}
+  defp allow(actor),
+    do: if(Actor.can?(actor, "users.manage"), do: :ok, else: {:error, :forbidden})
+
+  defp not_self(%Actor{user_id: id}, %UserRecord{id: id}), do: {:error, :self}
   defp not_self(_, _), do: :ok
 
+  defp not_superadmin_target(actor, record) do
+    if record.id in Bastion.Access.superadmin_user_ids() and not Actor.superadmin?(actor),
+      do: {:error, :forbidden},
+      else: :ok
+  end
+
   defp not_last(record) do
+    superadmins = Bastion.Access.superadmin_user_ids() -- [record.id]
+
     others =
       Repo.aggregate(
-        from(u in UserRecord, where: u.id != ^record.id and is_nil(u.blocked_at)),
+        from(u in UserRecord, where: u.id in ^superadmins and is_nil(u.blocked_at)),
         :count
       )
 
-    if others > 0, do: :ok, else: {:error, :last_user}
+    if record.id in Bastion.Access.superadmin_user_ids() and others == 0,
+      do: {:error, :last_user},
+      else: :ok
   end
 
   defp fetch(id) do

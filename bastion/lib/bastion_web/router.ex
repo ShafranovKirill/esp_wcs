@@ -57,6 +57,9 @@ defmodule BastionWeb.Router do
       live "/users", UsersLive, :staff
       live "/users/journal", UsersLive, :journal
       live "/account", AccountLive, :index
+      live "/access", AccessLive, :grants
+      live "/access/roles", AccessLive, :roles
+      live "/access/groups", AccessLive, :groups
     end
   end
 

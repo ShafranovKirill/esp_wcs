@@ -8,6 +8,12 @@ defmodule BastionWeb.UsersLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    if Bastion.Access.can?(socket.assigns.current_actor, "users.manage"),
+      do: mount_staff(socket),
+      else: {:ok, forbidden(socket)}
+  end
+
+  defp mount_staff(socket) do
     if connected?(socket), do: Accounts.subscribe()
 
     {:ok,
@@ -30,14 +36,32 @@ defmodule BastionWeb.UsersLive do
     socket
     |> assign(users: Accounts.list_users())
     |> then(fn s ->
-      if s.assigns[:tab] == :journal,
-        do: assign(s, events: Accounts.list_access_events()),
-        else: assign(s, events: [])
+      if s.assigns[:tab] == :journal do
+        folders = Bastion.Fleet.list_folders()
+        by_id = Map.new(folders, &{&1.id, &1})
+
+        assign(s,
+          events: Accounts.list_access_events(),
+          folder_names: Map.new(folders, &{&1.id, Bastion.Fleet.Folder.full_name(&1, by_id)})
+        )
+      else
+        assign(s, events: [], folder_names: %{})
+      end
     end)
   end
 
   @impl true
-  def handle_info({:event, _event}, socket), do: {:noreply, load(socket)}
+  def handle_info({:event, _event}, socket) do
+    if Bastion.Access.can?(socket.assigns.current_actor, "users.manage"),
+      do: {:noreply, load(socket)},
+      else: {:noreply, forbidden(socket)}
+  end
+
+  defp forbidden(socket),
+    do:
+      socket
+      |> put_flash(:error, BastionWeb.Errors.message(:forbidden))
+      |> push_navigate(to: ~p"/")
 
   @impl true
   def handle_event("new-user", _params, socket) do
@@ -45,7 +69,7 @@ defmodule BastionWeb.UsersLive do
   end
 
   def handle_event("create-user", %{"user" => %{"username" => username}}, socket) do
-    case Accounts.create_user(socket.assigns.current_user, username) do
+    case Accounts.create_user(socket.assigns.current_actor, username) do
       {:ok, user, password} ->
         {:noreply,
          socket
@@ -64,14 +88,14 @@ defmodule BastionWeb.UsersLive do
   end
 
   def handle_event("reset-password", %{"id" => id}, socket) do
-    case Accounts.reset_password(socket.assigns.current_user, id) do
+    case Accounts.reset_password(socket.assigns.current_actor, id) do
       {:ok, user, password} -> {:noreply, show_password(socket, user, password, :reset)}
       {:error, reason} -> {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
     end
   end
 
   def handle_event("block", %{"id" => id}, socket) do
-    case Accounts.block(socket.assigns.current_user, id) do
+    case Accounts.block(socket.assigns.current_actor, id) do
       {:ok, user} ->
         {:noreply, put_flash(socket, :info, gettext("%{name} blocked", name: user.username))}
 
@@ -81,7 +105,7 @@ defmodule BastionWeb.UsersLive do
   end
 
   def handle_event("unblock", %{"id" => id}, socket) do
-    case Accounts.unblock(socket.assigns.current_user, id) do
+    case Accounts.unblock(socket.assigns.current_actor, id) do
       {:ok, user} ->
         {:noreply, put_flash(socket, :info, gettext("%{name} unblocked", name: user.username))}
 
@@ -109,6 +133,7 @@ defmodule BastionWeb.UsersLive do
     <Layouts.app
       flash={@flash}
       current_user={@current_user}
+      current_actor={@current_actor}
       locale={@locale}
       current_path={@current_path}
     >
@@ -240,7 +265,7 @@ defmodule BastionWeb.UsersLive do
               <.icon name={event_icon(event.type)} class="size-4" />
             </span>
             <p class="flex-1 text-sm">
-              {event_text(event)}
+              {event_text(event, @folder_names)}
               <span :if={event.remote_ip} class="text-base-content/50">· {event.remote_ip}</span>
             </p>
             <span class="shrink-0 text-xs text-base-content/50"><.time
@@ -319,6 +344,73 @@ defmodule BastionWeb.UsersLive do
   defp event_icon(:password_reset), do: "hero-key"
   defp event_icon(:blocked), do: "hero-no-symbol"
   defp event_icon(:unblocked), do: "hero-check-circle"
+  defp event_icon(type) when type in [:role_created, :role_updated], do: "hero-identification"
+  defp event_icon(:role_deleted), do: "hero-identification"
+  defp event_icon(type) when type in [:group_created, :group_renamed], do: "hero-user-group"
+  defp event_icon(:group_deleted), do: "hero-user-group"
+  defp event_icon(:member_added), do: "hero-user-plus"
+  defp event_icon(:member_removed), do: "hero-user-minus"
+  defp event_icon(:access_granted), do: "hero-shield-check"
+  defp event_icon(:access_revoked), do: "hero-shield-exclamation"
+
+  defp event_text(%{type: :role_created} = e, _folders),
+    do: gettext("%{actor} created role %{role}", actor: actor(e), role: e.data["role"])
+
+  defp event_text(%{type: :role_updated} = e, _folders),
+    do: gettext("%{actor} changed role %{role}", actor: actor(e), role: e.data["role"])
+
+  defp event_text(%{type: :role_deleted} = e, _folders),
+    do: gettext("%{actor} deleted role %{role}", actor: actor(e), role: e.data["role"])
+
+  defp event_text(%{type: :group_created} = e, _folders),
+    do: gettext("%{actor} created group %{group}", actor: actor(e), group: e.data["group"])
+
+  defp event_text(%{type: :group_renamed} = e, _folders),
+    do:
+      gettext("%{actor} renamed group %{from} to %{group}",
+        actor: actor(e),
+        from: e.data["from"],
+        group: e.data["group"]
+      )
+
+  defp event_text(%{type: :group_deleted} = e, _folders),
+    do: gettext("%{actor} deleted group %{group}", actor: actor(e), group: e.data["group"])
+
+  defp event_text(%{type: :member_added} = e, _folders),
+    do:
+      gettext("%{actor} added %{name} to group %{group}",
+        actor: actor(e),
+        name: subject(e),
+        group: e.data["group"]
+      )
+
+  defp event_text(%{type: :member_removed} = e, _folders),
+    do:
+      gettext("%{actor} removed %{name} from group %{group}",
+        actor: actor(e),
+        name: subject(e),
+        group: e.data["group"]
+      )
+
+  defp event_text(%{type: :access_granted} = e, folders),
+    do:
+      gettext("%{actor} granted %{role} to %{name} in %{folder}",
+        actor: actor(e),
+        role: e.data["role"],
+        name: grantee(e),
+        folder: folder(e, folders)
+      )
+
+  defp event_text(%{type: :access_revoked} = e, folders),
+    do:
+      gettext("%{actor} revoked %{role} from %{name} in %{folder}",
+        actor: actor(e),
+        role: e.data["role"],
+        name: grantee(e),
+        folder: folder(e, folders)
+      )
+
+  defp event_text(event, _folders), do: event_text(event)
 
   defp event_text(%{type: :login, username: name}), do: gettext("%{name} signed in", name: name)
 
@@ -345,6 +437,17 @@ defmodule BastionWeb.UsersLive do
 
   defp event_text(%{type: :unblocked} = e),
     do: gettext("%{actor} unblocked %{name}", actor: actor(e), name: e.username)
+
+  defp subject(%{username: nil}), do: gettext("deleted account")
+  defp subject(%{username: name}), do: name
+
+  defp grantee(%{data: %{"group" => group}}), do: gettext("group %{group}", group: group)
+  defp grantee(event), do: subject(event)
+
+  defp folder(%{data: %{"folder_id" => id}}, folders),
+    do: Map.get(folders, id, gettext("a deleted folder"))
+
+  defp folder(_event, _folders), do: gettext("all folders")
 
   defp actor(%{actor: nil}), do: gettext("deleted account")
   defp actor(%{actor: name}), do: name

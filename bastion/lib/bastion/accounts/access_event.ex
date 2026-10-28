@@ -1,5 +1,7 @@
 defmodule Bastion.Accounts.AccessEvent do
-  @types ~w(login login_failed logout user_created password_changed password_reset blocked unblocked)a
+  @types ~w(login login_failed logout user_created password_changed password_reset blocked unblocked
+            role_created role_updated role_deleted group_created group_renamed group_deleted
+            member_added member_removed access_granted access_revoked)a
 
   @type type ::
           :login
@@ -10,6 +12,7 @@ defmodule Bastion.Accounts.AccessEvent do
           | :password_reset
           | :blocked
           | :unblocked
+          | Bastion.Access.Events.GrantsChanged.change()
 
   @type t :: %__MODULE__{
           id: String.t(),

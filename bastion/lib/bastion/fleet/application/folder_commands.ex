@@ -1,18 +1,20 @@
 defmodule Bastion.Fleet.Application.FolderCommands do
   import Ecto.Query
 
-  alias Bastion.Fleet.Application.UnitOfWork
+  alias Bastion.Access.Actor
+  alias Bastion.Fleet.Application.{Policy, UnitOfWork}
   alias Bastion.Fleet.Domain.Name
   alias Bastion.Fleet.Events.FoldersChanged
   alias Bastion.Fleet.Folder
   alias Bastion.Fleet.Infrastructure.FolderRecord
   alias Bastion.Repo
 
-  @spec create(String.t(), String.t() | nil) :: {:ok, Folder.t()} | {:error, atom()}
-  def create(name, parent_id \\ nil) do
+  @spec create(Actor.t(), String.t(), String.t() | nil) :: {:ok, Folder.t()} | {:error, atom()}
+  def create(actor, name, parent_id \\ nil) do
     with {:ok, name} <- Name.normalize(name) do
       UnitOfWork.run(fn ->
         with {:ok, parent} <- parent(parent_id),
+             :ok <- Policy.authorize_folder(actor, "folder.manage", parent && parent.path),
              :ok <- check_depth(parent, 1) do
           id = Ecto.UUID.generate()
           path = if parent, do: parent.path <> "/" <> id, else: id
@@ -26,21 +28,24 @@ defmodule Bastion.Fleet.Application.FolderCommands do
     end
   end
 
-  @spec rename(String.t(), String.t()) :: {:ok, Folder.t()} | {:error, atom()}
-  def rename(id, name) do
+  @spec rename(Actor.t(), String.t(), String.t()) :: {:ok, Folder.t()} | {:error, atom()}
+  def rename(actor, id, name) do
     with {:ok, name} <- Name.normalize(name),
-         {:ok, record} <- get(id) do
+         {:ok, record} <- get(id),
+         :ok <- Policy.authorize_folder(actor, "folder.manage", record.path) do
       UnitOfWork.run(fn ->
         record |> FolderRecord.changeset(%{name: name}) |> Repo.update() |> result()
       end)
     end
   end
 
-  @spec move(String.t(), String.t() | nil) :: {:ok, Folder.t()} | {:error, atom()}
-  def move(id, parent_id) do
+  @spec move(Actor.t(), String.t(), String.t() | nil) :: {:ok, Folder.t()} | {:error, atom()}
+  def move(actor, id, parent_id) do
     UnitOfWork.run(fn ->
       with {:ok, record} <- lock(id),
+           :ok <- Policy.authorize_folder(actor, "folder.manage", record.path),
            {:ok, parent} <- parent(parent_id),
+           :ok <- Policy.authorize_folder(actor, "folder.manage", parent && parent.path),
            :ok <- check_not_inside(record, parent),
            :ok <- check_depth(parent, subtree_height(record)) do
         if record.parent_id == (parent && parent.id) do
@@ -70,10 +75,12 @@ defmodule Bastion.Fleet.Application.FolderCommands do
     end)
   end
 
-  @spec delete(String.t()) :: :ok | {:error, :folder_not_found | :folder_not_empty}
-  def delete(id) do
+  @spec delete(Actor.t(), String.t()) ::
+          :ok | {:error, :folder_not_found | :folder_not_empty | :forbidden}
+  def delete(actor, id) do
     UnitOfWork.run(fn ->
-      with {:ok, record} <- lock(id) do
+      with {:ok, record} <- lock(id),
+           :ok <- Policy.authorize_folder(actor, "folder.manage", record.path) do
         cond do
           Repo.exists?(from f in FolderRecord, where: f.parent_id == ^record.id) ->
             {:error, :folder_not_empty}

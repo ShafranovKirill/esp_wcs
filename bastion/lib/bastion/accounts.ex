@@ -1,17 +1,23 @@
 defmodule Bastion.Accounts do
   use Boundary,
     top_level?: true,
-    deps: [Bastion.Repo, Bastion.Events],
+    deps: [Bastion.Repo, Bastion.Events, Bastion.Access],
     exports: [User, AccessEvent, Events.SessionsClosed, Events.UsersChanged]
 
-  alias Bastion.Accounts.Application.{Authentication, Journal, Provisioning, Staff}
+  alias Bastion.Accounts.Application.{AccessJournal, Authentication, Journal, Provisioning, Staff}
   alias Bastion.Accounts.Domain.PasswordPolicy
   alias Bastion.Accounts.Infrastructure.ThrottleStore
 
   @type current :: Authentication.current()
 
   def child_spec(_opts) do
-    %{id: __MODULE__, start: {ThrottleStore, :start_link, [[]]}}
+    %{
+      id: __MODULE__,
+      type: :supervisor,
+      start:
+        {Supervisor, :start_link,
+         [[ThrottleStore, AccessJournal], [strategy: :one_for_one, name: __MODULE__.Supervisor]]}
+    }
   end
 
   def subscribe, do: Bastion.Events.subscribe(:accounts)
@@ -55,4 +61,7 @@ defmodule Bastion.Accounts do
 
   @spec list_access_events(pos_integer()) :: [Bastion.Accounts.AccessEvent.t()]
   defdelegate list_access_events(limit \\ 200), to: Journal, as: :list
+
+  @spec sync_journal() :: :ok
+  defdelegate sync_journal(), to: AccessJournal, as: :sync
 end

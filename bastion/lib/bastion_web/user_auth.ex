@@ -4,7 +4,8 @@ defmodule BastionWeb.UserAuth do
   import Plug.Conn
   import Phoenix.Controller
 
-  alias Bastion.Accounts
+  alias Bastion.{Access, Accounts}
+  alias Bastion.Access.Events.GrantsChanged
   alias Bastion.Accounts.Events.SessionsClosed
 
   @token_key "user_token"
@@ -76,12 +77,13 @@ defmodule BastionWeb.UserAuth do
       user ->
         if Phoenix.LiveView.connected?(socket) do
           Accounts.subscribe(user.id)
+          Access.subscribe()
           schedule_check()
         end
 
         socket =
           socket
-          |> Phoenix.Component.assign(:current_user, user)
+          |> Phoenix.Component.assign(current_user: user, current_actor: Access.actor(user))
           |> Phoenix.LiveView.attach_hook(
             :user_session_check,
             :handle_info,
@@ -108,6 +110,11 @@ defmodule BastionWeb.UserAuth do
 
   defp check_session({:event, %SessionsClosed{}}, socket, _token),
     do: {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/login")}
+
+  defp check_session({:event, %GrantsChanged{}}, socket, _token) do
+    actor = Access.actor(socket.assigns.current_user)
+    {:cont, Phoenix.Component.assign(socket, :current_actor, actor)}
+  end
 
   defp check_session(_message, socket, _token), do: {:cont, socket}
 

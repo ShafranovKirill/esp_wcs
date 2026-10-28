@@ -25,6 +25,7 @@ defmodule BastionWeb.ConnectLive do
     <Layouts.app
       flash={@flash}
       current_user={@current_user}
+      current_actor={@current_actor}
       locale={@locale}
       current_path={@current_path}
     >

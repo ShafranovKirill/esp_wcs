@@ -30,12 +30,15 @@ defmodule BastionWeb.DashboardLive do
   end
 
   defp load(socket) do
-    overview = Fleet.overview()
+    actor = socket.assigns.current_actor
+    overview = Fleet.overview(actor)
 
     assign(socket,
       overview: overview,
       tree: Folder.tree(overview.folders),
       folders_by_id: Map.new(overview.folders, &{&1.id, &1}),
+      can_approve: Bastion.Access.can?(actor, "enrollment.approve"),
+      can_root: Fleet.can_folder?(actor, "folder.manage", nil),
       total: overview.total,
       online: Bastion.Link.online()
     )
@@ -59,7 +62,7 @@ defmodule BastionWeb.DashboardLive do
   def handle_event("approve", %{"id" => id, "code" => code}, socket) do
     socket = push_event(socket, "close-dialog", %{id: "approve-dialog"})
 
-    case Fleet.approve(id, code) do
+    case Fleet.approve(socket.assigns.current_actor, id, code) do
       {:ok, device} ->
         {:noreply,
          socket
@@ -72,7 +75,7 @@ defmodule BastionWeb.DashboardLive do
   end
 
   def handle_event("reject", %{"id" => id}, socket) do
-    case Fleet.reject(id) do
+    case Fleet.reject(socket.assigns.current_actor, id) do
       {:ok, _} -> {:noreply, put_flash(socket, :info, gettext("Request rejected"))}
       {:error, reason} -> {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
     end
@@ -112,8 +115,11 @@ defmodule BastionWeb.DashboardLive do
   def handle_event("save-folder", %{"folder" => %{"name" => name}}, socket) do
     result =
       case socket.assigns.folder_mode do
-        {:new, parent} -> Fleet.create_folder(name, parent && parent.id)
-        {:rename, folder} -> Fleet.rename_folder(folder.id, name)
+        {:new, parent} ->
+          Fleet.create_folder(socket.assigns.current_actor, name, parent && parent.id)
+
+        {:rename, folder} ->
+          Fleet.rename_folder(socket.assigns.current_actor, folder.id, name)
       end
 
     case result do
@@ -144,7 +150,9 @@ defmodule BastionWeb.DashboardLive do
   def handle_event("move-folder", %{"move" => %{"parent_id" => parent_id}}, socket) do
     folder = socket.assigns.moving_folder
 
-    case Fleet.move_folder(folder.id, if(parent_id == "", do: nil, else: parent_id)) do
+    parent_id = if(parent_id == "", do: nil, else: parent_id)
+
+    case Fleet.move_folder(socket.assigns.current_actor, folder.id, parent_id) do
       {:ok, _} ->
         {:noreply,
          socket
@@ -163,7 +171,7 @@ defmodule BastionWeb.DashboardLive do
   end
 
   def handle_event("delete-folder", %{"id" => id}, socket) do
-    case Fleet.delete_folder(id) do
+    case Fleet.delete_folder(socket.assigns.current_actor, id) do
       :ok -> {:noreply, put_flash(socket, :info, gettext("Folder deleted"))}
       {:error, reason} -> {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
     end
@@ -175,6 +183,7 @@ defmodule BastionWeb.DashboardLive do
     <Layouts.app
       flash={@flash}
       current_user={@current_user}
+      current_actor={@current_actor}
       locale={@locale}
       current_path={@current_path}
     >
@@ -199,6 +208,7 @@ defmodule BastionWeb.DashboardLive do
             </label>
           </form>
           <button
+            :if={@can_root}
             type="button"
             class="btn btn-sm"
             phx-click={JS.push("new-folder") |> open_dialog("folder-dialog")}
@@ -206,7 +216,12 @@ defmodule BastionWeb.DashboardLive do
           >
             <.icon name="hero-folder-plus" class="size-4" /> {gettext("New folder")}
           </button>
-          <.link navigate={~p"/connect"} class="btn btn-sm btn-primary" id="how-to-connect">
+          <.link
+            :if={@can_approve}
+            navigate={~p"/connect"}
+            class="btn btn-sm btn-primary"
+            id="how-to-connect"
+          >
             <.icon name="hero-plus" class="size-4" /> {gettext("Connect a device")}
           </.link>
         </div>
@@ -298,6 +313,8 @@ defmodule BastionWeb.DashboardLive do
           query={@query}
           collapsed={@collapsed}
           online={@online}
+          dim={@overview.dim}
+          actor={@current_actor}
         />
         <.device_group
           :if={@overview.unfiled != []}
@@ -412,6 +429,8 @@ defmodule BastionWeb.DashboardLive do
   attr :query, :string, required: true
   attr :collapsed, :any, required: true
   attr :online, :map, default: %{}
+  attr :dim, :any, required: true
+  attr :actor, :any, required: true
 
   defp folder_node(assigns) do
     {folder, children} = assigns.node
@@ -427,7 +446,9 @@ defmodule BastionWeb.DashboardLive do
         subtree_count: length(subtree),
         visible: assigns.query == "" or filter(subtree, assigns.query) != [],
         collapsed?: assigns.query == "" and MapSet.member?(assigns.collapsed, folder.id),
-        deletable: own == [] and children == []
+        deletable: own == [] and children == [],
+        dim?: MapSet.member?(assigns.dim, folder.id),
+        manage?: Fleet.can_folder?(assigns.actor, "folder.manage", folder)
       )
 
     ~H"""
@@ -449,12 +470,12 @@ defmodule BastionWeb.DashboardLive do
             class={["size-4 transition-transform", !@collapsed? && "rotate-90"]}
           />
           <.icon name="hero-folder" class="size-5 text-base-content/60" />
-          <span class="font-medium">{@folder.name}</span>
+          <span class={["font-medium", @dim? && "text-base-content/50"]}>{@folder.name}</span>
           <span class="badge badge-ghost badge-sm" title={gettext("Devices inside, with subfolders")}>
             {@subtree_count}
           </span>
         </button>
-        <div class="dropdown dropdown-end">
+        <div :if={@manage?} class="dropdown dropdown-end">
           <div
             tabindex="0"
             role="button"
@@ -526,6 +547,8 @@ defmodule BastionWeb.DashboardLive do
             query={@query}
             collapsed={@collapsed}
             online={@online}
+            dim={@dim}
+            actor={@actor}
           />
         </div>
         <p

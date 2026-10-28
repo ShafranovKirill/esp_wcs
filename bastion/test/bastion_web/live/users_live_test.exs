@@ -5,6 +5,8 @@ defmodule BastionWeb.UsersLiveTest do
 
   alias Bastion.Accounts
 
+  defp actor(user), do: Bastion.Access.actor(user)
+
   setup :log_in_user
 
   defp admin, do: Enum.find(Accounts.list_users(), &(&1.username == "admin"))
@@ -29,7 +31,7 @@ defmodule BastionWeb.UsersLiveTest do
   end
 
   test "блокировка выкидывает открытую страницу сотрудника", %{conn: conn} do
-    {:ok, user, password} = Accounts.create_user(admin(), "petrov")
+    {:ok, user, password} = Accounts.create_user(actor(admin()), "petrov")
     {:ok, token} = Accounts.login("petrov", password, "127.0.0.2")
 
     other =
@@ -46,7 +48,7 @@ defmodule BastionWeb.UsersLiveTest do
   end
 
   test "сброс пароля показывает новый пароль", %{conn: conn} do
-    {:ok, user, _} = Accounts.create_user(admin(), "sidorov")
+    {:ok, user, _} = Accounts.create_user(actor(admin()), "sidorov")
     {:ok, view, _html} = live(conn, ~p"/users")
 
     view |> element("#reset-#{user.id}") |> render_click()

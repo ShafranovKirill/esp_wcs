@@ -74,7 +74,7 @@ defmodule BastionWeb.DeviceLiveTest do
   test "переименование и перенос в папку", %{conn: conn} do
     device = approved_device(%{name: "old"})
     approved_device(%{name: "taken"})
-    {:ok, folder} = Fleet.create_folder("Склад")
+    {:ok, folder} = Fleet.create_folder(system(), "Склад")
 
     {:ok, view, _} = live(conn, ~p"/devices/#{device.id}/settings")
 

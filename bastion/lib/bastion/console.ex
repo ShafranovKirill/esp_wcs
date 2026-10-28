@@ -1,7 +1,7 @@
 defmodule Bastion.Console do
   use Boundary,
     top_level?: true,
-    deps: [Bastion.Events, Bastion.Fleet, Bastion.Link],
+    deps: [Bastion.Events, Bastion.Fleet, Bastion.Link, Bastion.Access],
     exports: [Events.ConsoleTaken, Events.LockChanged]
 
   alias Bastion.Console.Application.Locks
@@ -12,14 +12,23 @@ defmodule Bastion.Console do
   @spec subscribe(String.t()) :: :ok
   def subscribe(id), do: Bastion.Events.subscribe({:console_lock, id})
 
-  @spec attach(String.t()) :: {:ok, binary()} | {:busy, DateTime.t()}
-  defdelegate attach(id), to: Locks
+  @type actor :: Bastion.Access.Actor.t()
 
-  @spec take(String.t()) :: {:ok, binary()}
-  defdelegate take(id), to: Locks
+  @spec attach(actor(), String.t()) ::
+          {:ok, binary()} | {:busy, DateTime.t()} | {:error, :forbidden | :not_found}
+  def attach(actor, id) do
+    with :ok <- Bastion.Fleet.authorize(actor, "console.write", id),
+         do: Locks.attach(id, actor)
+  end
 
-  @spec release(String.t()) :: :ok
-  defdelegate release(id), to: Locks
+  @spec take(actor(), String.t()) :: {:ok, binary()} | {:error, :forbidden | :not_found}
+  def take(actor, id) do
+    with :ok <- Bastion.Fleet.authorize(actor, "console.write", id),
+         do: Locks.take(id, actor)
+  end
+
+  @spec release(actor() | nil, String.t()) :: :ok
+  def release(actor \\ nil, id), do: Locks.release(id, actor)
 
   @spec lost(String.t()) :: :ok
   defdelegate lost(id), to: Locks
@@ -34,22 +43,30 @@ defmodule Bastion.Console do
       else: {:error, :not_owner}
   end
 
-  @spec send_break(String.t(), pid()) :: :ok | {:error, term()}
-  def send_break(id, owner \\ self()) do
-    if Locks.owner?(id, owner) do
-      with :ok <- Bastion.Link.command(id, "console_break", %{ms: Line.break_ms()}) do
-        Bastion.Fleet.record_event(id, :command, %{op: "console_break"})
+  @spec send_break(actor(), String.t(), pid()) :: :ok | {:error, term()}
+  def send_break(actor, id, owner \\ self()) do
+    with :ok <- Bastion.Fleet.authorize(actor, "console.write", id) do
+      if Locks.owner?(id, owner) do
+        with :ok <- Bastion.Link.command(id, "console_break", %{ms: Line.break_ms()}) do
+          Bastion.Fleet.record_event(id, :command, %{op: "console_break"}, actor)
+        end
+      else
+        {:error, :not_owner}
       end
-    else
-      {:error, :not_owner}
     end
   end
 
-  @spec configure(String.t(), map()) :: :ok | {:error, term()}
-  def configure(id, params) do
-    with {:ok, line} <- Line.new(params),
+  @spec configure(actor(), String.t(), map()) :: :ok | {:error, term()}
+  def configure(actor, id, params) do
+    with :ok <- Bastion.Fleet.authorize(actor, "device.configure", id),
+         {:ok, line} <- Line.new(params),
          :ok <- Bastion.Link.command(id, "console_config", Line.to_args(line)) do
-      Bastion.Fleet.record_event(id, :command, %{op: "console_config", line: Line.format(line)})
+      Bastion.Fleet.record_event(
+        id,
+        :command,
+        %{op: "console_config", line: Line.format(line)},
+        actor
+      )
     end
   end
 

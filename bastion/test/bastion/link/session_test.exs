@@ -35,7 +35,7 @@ defmodule Bastion.Link.SessionTest do
       assert device.status == :pending
       assert device.last_ip == @ip
 
-      {:ok, approved} = Fleet.approve(device.id, device.device_code)
+      {:ok, approved} = Fleet.approve(system(), device.id, device.device_code)
       assert_receive {:event, %Fleet.Events.DeviceApproved{} = event}
 
       {%{"status" => "approved", "cert" => cert}, _} =
@@ -50,7 +50,7 @@ defmodule Bastion.Link.SessionTest do
       {_, state} = push!(Session.handle_in(hello(id), state))
       {_, state} = push!(Session.handle_in(text(%{t: "enroll", name: "x", csr: csr(id)}), state))
 
-      {:ok, :deleted} = Fleet.reject(Fleet.find_by_device_id(id).id)
+      {:ok, :deleted} = Fleet.reject(system(), Fleet.find_by_device_id(id).id)
       assert_receive {:event, %Fleet.Events.DeviceChanged{change: :deleted} = event}
       assert {%{"status" => "rejected"}, _} = push!(Session.handle_info({:event, event}, state))
     end
@@ -137,7 +137,7 @@ defmodule Bastion.Link.SessionTest do
     test "сертификат отозванного устройства не принимается" do
       device = approved_device()
       der = cert_der(device)
-      {:ok, _} = Fleet.revoke(device.id)
+      {:ok, _} = Fleet.revoke(system(), device.id)
       assert {:stop, :normal, {4003, _}, _} = Session.init(%{ip: @ip, cert_der: der})
     end
 
@@ -146,7 +146,7 @@ defmodule Bastion.Link.SessionTest do
       {:ok, state} = Session.init(%{ip: @ip, cert_der: cert_der(device)})
       {_, state} = push!(Session.handle_in(hello(device.device_id), state))
 
-      {:ok, _} = Fleet.revoke(device.id)
+      {:ok, _} = Fleet.revoke(system(), device.id)
       assert_receive {:event, %Fleet.Events.DeviceRevoked{} = event}
       assert {:stop, :normal, {4003, _}, _} = Session.handle_info({:event, event}, state)
     end

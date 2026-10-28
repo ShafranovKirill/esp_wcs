@@ -1,11 +1,12 @@
 defmodule Bastion.Fleet.Application.DeviceCommands do
   import Ecto.Query
 
-  alias Bastion.Fleet.Application.UnitOfWork
+  alias Bastion.Fleet.Application.{Policy, UnitOfWork}
   alias Bastion.Fleet.Device
   alias Bastion.Fleet.Domain.{DeviceId, Name}
   alias Bastion.Fleet.Events.{DeviceApproved, DeviceChanged, DeviceRequested, DeviceRevoked}
   alias Bastion.Fleet.Infrastructure.{DeviceEventRecord, DeviceRecord, FolderRecord}
+  alias Bastion.Access.Actor
   alias Bastion.Repo
 
   @type request_attrs :: %{
@@ -101,16 +102,17 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end
   end
 
-  @spec approve(String.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
-  def approve(id, device_code) do
+  @spec approve(Actor.t(), String.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
+  def approve(actor, id, device_code) do
     UnitOfWork.run(fn ->
-      with {:ok, record} <- lock(id),
+      with :ok <- Policy.authorize_global(actor, "enrollment.approve"),
+           {:ok, record} <- lock(id),
            device = DeviceRecord.to_domain(record),
            true <- device.device_code == device_code || {:error, :code_changed},
            {:ok, cert} <- sign(device),
            {:ok, device} <- Device.approve(device, cert, now()),
            {:ok, saved} <- persist(record, device) do
-        journal(saved.id, :approved, %{serial: saved.certificate_serial})
+        journal(saved.id, :approved, %{serial: saved.certificate_serial}, actor)
 
         {:ok, saved,
          [
@@ -131,10 +133,11 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
 
   defp sign(_device), do: {:error, :not_pending}
 
-  @spec reject(String.t()) :: {:ok, :deleted | Device.t()} | {:error, atom()}
-  def reject(id) do
+  @spec reject(Actor.t(), String.t()) :: {:ok, :deleted | Device.t()} | {:error, atom()}
+  def reject(actor, id) do
     UnitOfWork.run(fn ->
-      with {:ok, record} <- lock(id) do
+      with :ok <- Policy.authorize_global(actor, "enrollment.approve"),
+           {:ok, record} <- lock(id) do
         case Device.reject(DeviceRecord.to_domain(record), now()) do
           :delete ->
             Repo.delete!(record)
@@ -142,7 +145,7 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
 
           {:ok, device} ->
             with {:ok, saved} <- persist(record, device) do
-              journal(saved.id, :rejected, %{})
+              journal(saved.id, :rejected, %{}, actor)
               {:ok, saved, [changed(saved.id, :rejected)]}
             end
 
@@ -153,13 +156,14 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  @spec revoke(String.t()) :: {:ok, Device.t()} | {:error, atom()}
-  def revoke(id) do
+  @spec revoke(Actor.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
+  def revoke(actor, id) do
     UnitOfWork.run(fn ->
       with {:ok, record} <- lock(id),
+           :ok <- Policy.authorize(actor, "device.revoke", DeviceRecord.to_domain(record)),
            {:ok, device} <- Device.revoke(DeviceRecord.to_domain(record), now()),
            {:ok, saved} <- persist(record, device) do
-        journal(saved.id, :revoked, %{serial: record.certificate_serial})
+        journal(saved.id, :revoked, %{serial: record.certificate_serial}, actor)
 
         {:ok, saved,
          [
@@ -171,10 +175,11 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  @spec delete(String.t()) :: {:ok, :deleted} | {:error, atom()}
-  def delete(id) do
+  @spec delete(Actor.t(), String.t()) :: {:ok, :deleted} | {:error, atom()}
+  def delete(actor, id) do
     UnitOfWork.run(fn ->
       with {:ok, record} <- lock(id),
+           :ok <- Policy.authorize(actor, "device.revoke", DeviceRecord.to_domain(record)),
            :delete <- Device.delete(DeviceRecord.to_domain(record)) do
         Repo.delete!(record)
         {:ok, :deleted, [changed(id, :deleted)]}
@@ -182,16 +187,17 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  @spec rename(String.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
-  def rename(id, name) do
+  @spec rename(Actor.t(), String.t(), String.t()) :: {:ok, Device.t()} | {:error, atom()}
+  def rename(actor, id, name) do
     UnitOfWork.run(fn ->
       with {:ok, name} <- Name.normalize(name),
-           {:ok, record} <- lock(id) do
+           {:ok, record} <- lock(id),
+           :ok <- Policy.authorize(actor, "device.configure", DeviceRecord.to_domain(record)) do
         if record.name == name do
           {:ok, DeviceRecord.to_domain(record), []}
         else
           with {:ok, saved} <- persist(record, %{DeviceRecord.to_domain(record) | name: name}) do
-            journal(saved.id, :renamed, %{from: record.name, to: name})
+            journal(saved.id, :renamed, %{from: record.name, to: name}, actor)
             {:ok, saved, [changed(saved.id, :renamed)]}
           end
         end
@@ -199,12 +205,13 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  @spec set_folders(String.t(), [String.t()]) :: {:ok, Device.t()} | {:error, atom()}
-  def set_folders(id, folder_ids) do
+  @spec set_folders(Actor.t(), String.t(), [String.t()]) :: {:ok, Device.t()} | {:error, atom()}
+  def set_folders(actor, id, folder_ids) do
     UnitOfWork.run(fn ->
       with {:ok, record} <- lock(id),
-           {:ok, folders} <- folders(folder_ids) do
-        record = Repo.preload(record, :folders)
+           :ok <- Policy.authorize(actor, "device.configure", DeviceRecord.to_domain(record)),
+           {:ok, folders} <- folders(folder_ids),
+           :ok <- authorize_membership(actor, record.folders, folders) do
         before = record.folders |> Enum.map(& &1.id) |> Enum.sort()
 
         if before == Enum.map(folders, & &1.id) do
@@ -216,9 +223,24 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
             |> Ecto.Changeset.put_assoc(:folders, folders)
             |> Repo.update!()
 
-          journal(saved.id, :moved, %{folders: Enum.map(folders, & &1.name)})
+          journal(saved.id, :moved, %{folders: Enum.map(folders, & &1.name)}, actor)
           {:ok, DeviceRecord.to_domain(saved), [changed(saved.id, :moved)]}
         end
+      end
+    end)
+  end
+
+  defp authorize_membership(actor, before, after_) do
+    before_ids = MapSet.new(before, & &1.id)
+    after_ids = MapSet.new(after_, & &1.id)
+
+    (before ++ after_)
+    |> Enum.uniq_by(& &1.id)
+    |> Enum.filter(&(MapSet.member?(before_ids, &1.id) != MapSet.member?(after_ids, &1.id)))
+    |> Enum.reduce_while(:ok, fn folder, :ok ->
+      case Policy.authorize_folder(actor, "folder.manage", folder.path) do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
       end
     end)
   end
@@ -244,9 +266,9 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
     end)
   end
 
-  @spec record_event(String.t(), Bastion.Fleet.DeviceEvent.type(), map()) :: :ok
-  def record_event(id, type, data) do
-    journal(id, type, data)
+  @spec record_event(String.t(), Bastion.Fleet.DeviceEvent.type(), map(), Actor.t() | nil) :: :ok
+  def record_event(id, type, data, actor \\ nil) do
+    journal(id, type, data, actor)
     Bastion.Events.publish({:device, id}, %DeviceChanged{id: id, change: :seen})
     :ok
   end
@@ -305,7 +327,13 @@ defmodule Bastion.Fleet.Application.DeviceCommands do
       else: {:error, :invalid}
   end
 
-  defp journal(id, type, data),
+  defp journal(id, type, data, actor \\ nil)
+
+  defp journal(id, type, data, %Actor{user_id: user_id, username: username})
+       when is_binary(user_id),
+       do: journal(id, type, Map.put(data, :by, username))
+
+  defp journal(id, type, data, _actor),
     do: Repo.insert!(%DeviceEventRecord{device_id: id, type: type, data: data})
 
   defp changed(id, change), do: {[:fleet, {:device, id}], %DeviceChanged{id: id, change: change}}

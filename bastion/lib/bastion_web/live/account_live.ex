@@ -16,7 +16,7 @@ defmodule BastionWeb.AccountLive do
 
     result =
       if new == confirm,
-        do: Accounts.change_password(socket.assigns.current_user, current, new),
+        do: Accounts.change_password(socket.assigns.current_actor, current, new),
         else: {:error, :mismatch}
 
     case result do
@@ -43,6 +43,7 @@ defmodule BastionWeb.AccountLive do
     <Layouts.app
       flash={@flash}
       current_user={@current_user}
+      current_actor={@current_actor}
       locale={@locale}
       current_path={@current_path}
     >

@@ -25,6 +25,20 @@ defmodule BastionWeb.ConnCase do
     }
   end
 
+  def log_in_employee(conn, username) do
+    {:ok, user, password} = Bastion.Accounts.create_user(system(), username)
+    {:ok, token} = Bastion.Accounts.login(username, password, "127.0.0.3")
+
+    conn =
+      conn
+      |> Phoenix.ConnTest.init_test_session(%{})
+      |> Plug.Conn.put_session("user_token", token)
+
+    {conn, user}
+  end
+
+  def system, do: Bastion.Access.system()
+
   setup tags do
     Bastion.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}

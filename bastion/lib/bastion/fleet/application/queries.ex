@@ -1,6 +1,8 @@
 defmodule Bastion.Fleet.Application.Queries do
   import Ecto.Query
 
+  alias Bastion.Access.Actor
+  alias Bastion.Fleet.Application.Policy
   alias Bastion.Fleet.{Device, DeviceEvent, Folder}
   alias Bastion.Fleet.Infrastructure.{DeviceEventRecord, DeviceRecord, FolderRecord}
   alias Bastion.Repo
@@ -8,18 +10,28 @@ defmodule Bastion.Fleet.Application.Queries do
   @type overview :: %{
           requests: [Device.t()],
           folders: [Folder.t()],
+          dim: MapSet.t(String.t()),
           devices: %{String.t() => [Device.t()]},
           unfiled: [Device.t()],
           total: non_neg_integer()
         }
 
-  @spec overview() :: overview()
-  def overview do
+  @spec overview(Actor.t()) :: overview()
+  def overview(actor) do
+    %{folders: folders, dim: dim} = Policy.visible_folders(actor, list_folders())
+    full = folders |> MapSet.new(& &1.id) |> MapSet.difference(dim)
+
     devices =
-      Repo.all(from d in DeviceRecord, order_by: fragment("lower(?)", d.name), preload: :folders)
+      from(d in DeviceRecord, order_by: fragment("lower(?)", d.name), preload: :folders)
+      |> visible_to(actor)
+      |> Repo.all()
       |> Enum.map(&DeviceRecord.to_domain/1)
+      |> Enum.map(fn d -> %{d | folder_ids: Enum.filter(d.folder_ids, &(&1 in full))} end)
 
     {requests, devices} = Enum.split_with(devices, &(&1.status == :pending))
+
+    requests =
+      if Bastion.Access.can?(actor, "enrollment.approve"), do: requests, else: []
 
     by_folder =
       devices
@@ -28,11 +40,35 @@ defmodule Bastion.Fleet.Application.Queries do
 
     %{
       requests: Enum.sort_by(requests, & &1.requested_at, {:desc, DateTime}),
-      folders: list_folders(),
+      folders: folders,
+      dim: dim,
       devices: by_folder,
       unfiled: Enum.filter(devices, &(&1.folder_ids == [])),
       total: length(devices)
     }
+  end
+
+  defp visible_to(query, actor) do
+    if Bastion.Access.can?(actor, "view") do
+      query
+    else
+      ids = Actor.granted_folder_ids(actor, "view")
+
+      patterns =
+        Repo.all(from f in FolderRecord, where: f.id in ^ids, select: f.path)
+        |> Enum.flat_map(&[&1, &1 <> "/%"])
+
+      scoped =
+        from df in "device_folders",
+          join: f in FolderRecord,
+          on: f.id == df.folder_id,
+          where: fragment("? LIKE ANY(?)", f.path, ^patterns),
+          select: type(df.device_id, :binary_id)
+
+      if Bastion.Access.can?(actor, "enrollment.approve"),
+        do: where(query, [d], d.id in subquery(scoped) or d.status == :pending),
+        else: where(query, [d], d.id in subquery(scoped))
+    end
   end
 
   @spec list_folders() :: [Folder.t()]
@@ -41,6 +77,19 @@ defmodule Bastion.Fleet.Application.Queries do
     |> Enum.map(&FolderRecord.to_domain/1)
     |> Folder.tree()
     |> Folder.flatten()
+  end
+
+  @spec visible_folders(Actor.t()) :: Policy.visibility()
+  def visible_folders(actor), do: Policy.visible_folders(actor, list_folders())
+
+  @spec fetch_device(Actor.t(), String.t()) :: Device.t() | nil
+  def fetch_device(actor, id) do
+    with %Device{} = device <- get_device(id),
+         true <- Policy.can?(actor, "view", device) do
+      device
+    else
+      _ -> nil
+    end
   end
 
   @spec get_device(String.t()) :: Device.t() | nil

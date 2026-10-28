@@ -48,11 +48,11 @@ defmodule Bastion.ConsoleTest do
     first = start_tab()
     second = start_tab()
 
-    assert {:ok, ""} = in_tab(first, fn -> Console.attach(device.id) end)
+    assert {:ok, ""} = in_tab(first, fn -> Console.attach(system(), device.id) end)
     assert_receive {:event, %LockChanged{owned: true}}
 
-    assert {:busy, %DateTime{}} = in_tab(second, fn -> Console.attach(device.id) end)
-    assert {:ok, _} = in_tab(second, fn -> Console.take(device.id) end)
+    assert {:busy, %DateTime{}} = in_tab(second, fn -> Console.attach(system(), device.id) end)
+    assert {:ok, _} = in_tab(second, fn -> Console.take(system(), device.id) end)
 
     assert_receive {:tab_message, ^first, {:event, %ConsoleTaken{}}}
     assert {:owned, ^second, _} = Console.lock(device.id)
@@ -65,7 +65,7 @@ defmodule Bastion.ConsoleTest do
   } do
     FakeDevice.send_binary(fake, <<1, "before">>)
     Process.sleep(20)
-    {:ok, "before"} = Console.attach(device.id)
+    {:ok, "before"} = Console.attach(system(), device.id)
 
     FakeDevice.send_binary(fake, <<1, "after">>)
     assert_receive {:event, %ConsoleOutput{data: "after"}}
@@ -80,7 +80,7 @@ defmodule Bastion.ConsoleTest do
   } do
     Console.subscribe(device.id)
     pid = start_tab()
-    {:ok, _} = in_tab(pid, fn -> Console.attach(device.id) end)
+    {:ok, _} = in_tab(pid, fn -> Console.attach(system(), device.id) end)
     assert_receive {:event, %LockChanged{owned: true}}
 
     send(pid, :exit)
@@ -97,19 +97,19 @@ defmodule Bastion.ConsoleTest do
     device: device,
     fake: fake
   } do
-    assert Console.send_break(device.id) == {:error, :not_owner}
-    assert Console.configure(device.id, %{"baud" => "12345"}) == {:error, :invalid_line}
+    assert Console.send_break(system(), device.id) == {:error, :not_owner}
+    assert Console.configure(system(), device.id, %{"baud" => "12345"}) == {:error, :invalid_line}
 
-    {:ok, _} = Console.attach(device.id)
+    {:ok, _} = Console.attach(system(), device.id)
     owner = self()
-    task = Task.async(fn -> Console.send_break(device.id, owner) end)
+    task = Task.async(fn -> Console.send_break(system(), device.id, owner) end)
     assert_receive {:fake_frame, ^fake, {:text, frame}}
     assert %{"op" => "console_break", "args" => %{"ms" => 300}, "id" => id} = JSON.decode!(frame)
     FakeDevice.send_text(fake, %{t: "cmd_result", id: id, ok: true})
     assert Task.await(task) == :ok
 
     params = %{"baud" => "115200", "data_bits" => "8", "parity" => "even", "stop_bits" => "1"}
-    task = Task.async(fn -> Console.configure(device.id, params) end)
+    task = Task.async(fn -> Console.configure(system(), device.id, params) end)
     assert_receive {:fake_frame, ^fake, {:text, frame}}
 
     assert %{

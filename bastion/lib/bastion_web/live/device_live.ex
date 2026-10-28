@@ -10,7 +10,7 @@ defmodule BastionWeb.DeviceLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    case Fleet.get_device(id) do
+    case Fleet.fetch_device(socket.assigns.current_actor, id) do
       nil ->
         {:ok,
          socket
@@ -28,12 +28,13 @@ defmodule BastionWeb.DeviceLive do
          socket
          |> assign(
            device: device,
-           folders: Fleet.list_folders(),
+           folders: Fleet.visible_folders(socket.assigns.current_actor).folders,
            online: Bastion.Link.presence(device.id),
            console: :idle,
            console_since: nil
          )
-         |> assign_forms()}
+         |> assign_forms()
+         |> assign_can()}
     end
   end
 
@@ -57,23 +58,55 @@ defmodule BastionWeb.DeviceLive do
     wanted? = connected?(socket) and tab == :console and device.status == :approved
 
     cond do
-      wanted? and console != :owner -> attach_console(socket)
-      not wanted? and console == :owner -> release_console(socket)
-      not wanted? -> assign(socket, console: :idle)
-      true -> socket
+      wanted? and not socket.assigns.can.console_write ->
+        socket |> drop_console() |> assign(console: :forbidden)
+
+      wanted? and console != :owner ->
+        attach_console(socket)
+
+      not wanted? and console == :owner ->
+        release_console(socket)
+
+      not wanted? ->
+        assign(socket, console: :idle)
+
+      true ->
+        socket
     end
   end
 
   defp attach_console(socket) do
-    case Console.attach(socket.assigns.device.id) do
+    case Console.attach(socket.assigns.current_actor, socket.assigns.device.id) do
       {:ok, history} -> owner(socket, history)
       {:busy, since} -> busy(socket, since)
+      {:error, _} -> assign(socket, console: :forbidden)
     end
   end
 
   defp release_console(socket) do
-    Console.release(socket.assigns.device.id)
+    Console.release(socket.assigns.current_actor, socket.assigns.device.id)
     socket |> assign(console: :idle) |> push_event("console-state", %{owner: false})
+  end
+
+  defp drop_console(%{assigns: %{console: :owner}} = socket), do: release_console(socket)
+  defp drop_console(socket), do: socket
+
+  defp assign_can(socket) do
+    actor = socket.assigns.current_actor
+    device = socket.assigns.device
+    can = &Fleet.can?(actor, &1, device)
+
+    assign(socket,
+      can: %{
+        approve: Bastion.Access.can?(actor, "enrollment.approve"),
+        console_write: can.("console.write"),
+        configure: can.("device.configure"),
+        wifi: can.("device.wifi"),
+        reboot: can.("device.reboot"),
+        revoke: can.("device.revoke"),
+        settings: Enum.any?(~w(device.configure device.wifi device.reboot device.revoke), can)
+      }
+    )
   end
 
   defp owner(socket, history) do
@@ -99,12 +132,21 @@ defmodule BastionWeb.DeviceLive do
   end
 
   defp reload(socket) do
-    case Fleet.get_device(socket.assigns.device.id) do
+    actor = socket.assigns.current_actor
+
+    case Fleet.fetch_device(actor, socket.assigns.device.id) do
       nil ->
-        socket |> put_flash(:info, gettext("The device was deleted")) |> push_navigate(to: ~p"/")
+        socket
+        |> drop_console()
+        |> put_flash(:info, gettext("The device was deleted or you no longer have access to it"))
+        |> push_navigate(to: ~p"/")
 
       device ->
-        socket = socket |> assign(device: device, folders: Fleet.list_folders()) |> assign_forms()
+        socket =
+          socket
+          |> assign(device: device, folders: Fleet.visible_folders(actor).folders)
+          |> assign_forms()
+          |> assign_can()
 
         if socket.assigns.tab == :journal,
           do: assign(socket, events: Fleet.list_events(device.id)),
@@ -164,25 +206,29 @@ defmodule BastionWeb.DeviceLive do
   def handle_event("console-ping", _params, socket), do: {:noreply, socket}
 
   def handle_event("console-take", _params, socket) do
-    {:ok, history} = Console.take(socket.assigns.device.id)
-    {:noreply, owner(socket, history)}
+    case Console.take(socket.assigns.current_actor, socket.assigns.device.id) do
+      {:ok, history} -> {:noreply, owner(socket, history)}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
+    end
   end
 
   def handle_event("console-break", _params, %{assigns: %{console: :owner}} = socket) do
     id = socket.assigns.device.id
+    actor = socket.assigns.current_actor
     lv = self()
-    {:noreply, start_async(socket, :console_break, fn -> Console.send_break(id, lv) end)}
+    {:noreply, start_async(socket, :console_break, fn -> Console.send_break(actor, id, lv) end)}
   end
 
   def handle_event("console-break", _params, socket), do: {:noreply, socket}
 
   def handle_event("console-line", %{"line" => params}, socket) do
     id = socket.assigns.device.id
-    {:noreply, start_async(socket, :console_line, fn -> Console.configure(id, params) end)}
+    actor = socket.assigns.current_actor
+    {:noreply, start_async(socket, :console_line, fn -> Console.configure(actor, id, params) end)}
   end
 
   def handle_event("rename", %{"device" => %{"name" => name}}, socket) do
-    case Fleet.rename(socket.assigns.device.id, name) do
+    case Fleet.rename(socket.assigns.current_actor, socket.assigns.device.id, name) do
       {:ok, _} ->
         {:noreply, socket |> reload() |> put_flash(:info, gettext("Name saved"))}
 
@@ -200,40 +246,42 @@ defmodule BastionWeb.DeviceLive do
   def handle_event("set-folders", params, socket) do
     ids = get_in(params, ["device", "folder_ids"]) || []
 
-    case Fleet.set_folders(socket.assigns.device.id, ids) do
+    case Fleet.set_folders(socket.assigns.current_actor, socket.assigns.device.id, ids) do
       {:ok, _} -> {:noreply, socket |> reload() |> put_flash(:info, gettext("Folders changed"))}
       {:error, reason} -> {:noreply, put_flash(socket, :error, BastionWeb.Errors.message(reason))}
     end
   end
 
   def handle_event("approve", %{"code" => code}, socket),
-    do: lifecycle(socket, &Fleet.approve(&1, code), gettext("Device approved"))
+    do: lifecycle(socket, &Fleet.approve(&1, &2, code), gettext("Device approved"))
 
   def handle_event("reject", _params, socket),
-    do: lifecycle(socket, &Fleet.reject/1, gettext("Request rejected"))
+    do: lifecycle(socket, &Fleet.reject/2, gettext("Request rejected"))
 
   def handle_event("revoke", _params, socket),
-    do: lifecycle(socket, &Fleet.revoke/1, gettext("Device revoked"))
+    do: lifecycle(socket, &Fleet.revoke/2, gettext("Device revoked"))
 
   def handle_event("reboot", _params, socket) do
     id = socket.assigns.device.id
-    {:noreply, start_async(socket, :reboot, fn -> Bastion.Control.reboot(id) end)}
+    actor = socket.assigns.current_actor
+    {:noreply, start_async(socket, :reboot, fn -> Bastion.Control.reboot(actor, id) end)}
   end
 
   def handle_event("wifi", %{"wifi" => params}, socket) do
     id = socket.assigns.device.id
+    actor = socket.assigns.current_actor
     params = Map.take(params, ["ssid", "password"])
 
     socket =
       socket
       |> assign(wifi_form: to_form(Map.put(params, "password", ""), as: :wifi))
-      |> start_async(:wifi, fn -> Bastion.Control.set_wifi(id, params) end)
+      |> start_async(:wifi, fn -> Bastion.Control.set_wifi(actor, id, params) end)
 
     {:noreply, socket}
   end
 
   def handle_event("delete", _params, socket) do
-    case Fleet.delete(socket.assigns.device.id) do
+    case Fleet.delete(socket.assigns.current_actor, socket.assigns.device.id) do
       {:ok, :deleted} ->
         {:noreply,
          socket |> put_flash(:info, gettext("Device deleted")) |> push_navigate(to: ~p"/")}
@@ -260,7 +308,7 @@ defmodule BastionWeb.DeviceLive do
   defp lifecycle(socket, fun, success) do
     socket = push_event(socket, "close-dialog", %{id: "approve-dialog"})
 
-    case fun.(socket.assigns.device.id) do
+    case fun.(socket.assigns.current_actor, socket.assigns.device.id) do
       {:ok, :deleted} ->
         {:noreply, socket |> put_flash(:info, success) |> push_navigate(to: ~p"/")}
 
@@ -280,6 +328,7 @@ defmodule BastionWeb.DeviceLive do
     <Layouts.app
       flash={@flash}
       current_user={@current_user}
+      current_actor={@current_actor}
       locale={@locale}
       current_path={@current_path}
     >
@@ -309,7 +358,7 @@ defmodule BastionWeb.DeviceLive do
             <.code code={@device.device_code} />
           </p>
         </div>
-        <div class="flex gap-2">
+        <div :if={@can.approve} class="flex gap-2">
           <button
             type="button"
             class="btn btn-ghost btn-sm"
@@ -332,6 +381,7 @@ defmodule BastionWeb.DeviceLive do
       <div role="tablist" class="tabs tabs-border" id="device-tabs">
         <.link
           :for={tab <- @tabs}
+          :if={tab != :settings or @can.settings}
           patch={tab_path(@device, tab)}
           role="tab"
           id={"tab-#{tab}"}
@@ -348,9 +398,11 @@ defmodule BastionWeb.DeviceLive do
         online={@online}
         console={@console}
         since={@console_since}
+        can={@can}
       />
       <.settings_tab
-        :if={@tab == :settings}
+        :if={@tab == :settings and @can.settings}
+        can={@can}
         device={@device}
         online={@online}
         wifi_form={@wifi_form}
@@ -389,6 +441,7 @@ defmodule BastionWeb.DeviceLive do
   attr :online, :map, default: nil
   attr :console, :atom, required: true
   attr :since, :any, default: nil
+  attr :can, :map, required: true
 
   defp console_tab(assigns) do
     banner = ["\e[1;36mESP WCS\e[0m · #{assigns.device.name}", ""]
@@ -409,7 +462,7 @@ defmodule BastionWeb.DeviceLive do
         phx-change="console-line"
         class="flex flex-wrap items-center gap-2"
       >
-        <.line_fields form={@line_form} disabled={!@online} />
+        <.line_fields form={@line_form} disabled={!@online or !@can.configure} />
         <span :if={@line} class="text-sm text-base-content/50" id="console-line-current">
           {Console.format_line(@line)}
         </span>
@@ -450,6 +503,15 @@ defmodule BastionWeb.DeviceLive do
         >
           <.icon name="hero-hand-raised" class="size-4" /> {gettext("Take the console")}
         </button>
+      </div>
+
+      <div
+        :if={@console == :forbidden}
+        id="console-forbidden"
+        class="alert alert-soft"
+      >
+        <.icon name="hero-lock-closed" class="size-6" />
+        <span>{gettext("You do not have the right to control this console.")}</span>
       </div>
 
       <div
@@ -559,6 +621,7 @@ defmodule BastionWeb.DeviceLive do
   attr :name_form, :map, required: true
   attr :wifi_form, :map, required: true
   attr :folders, :list, required: true
+  attr :can, :map, required: true
 
   defp settings_tab(assigns) do
     line = assigns.online && assigns.online[:console]
@@ -566,7 +629,7 @@ defmodule BastionWeb.DeviceLive do
 
     ~H"""
     <section class="grid gap-4 lg:grid-cols-2" id="settings">
-      <.card title={gettext("Name")}>
+      <.card :if={@can.configure} title={gettext("Name")}>
         <.form for={@name_form} id="rename-form" phx-submit="rename" class="flex items-start gap-2">
           <div class="flex-1">
             <.input
@@ -580,7 +643,7 @@ defmodule BastionWeb.DeviceLive do
         </.form>
       </.card>
 
-      <.card title={gettext("Folders")}>
+      <.card :if={@can.configure} title={gettext("Folders")}>
         <p :if={@folders == []} class="text-sm text-base-content/60">
           {gettext("No folders yet — create them on the devices page")}
         </p>
@@ -609,6 +672,7 @@ defmodule BastionWeb.DeviceLive do
       </.card>
 
       <.card
+        :if={@can.configure}
         title={gettext("Console port")}
         note={!@online && gettext("Available when the device is online")}
       >
@@ -623,6 +687,7 @@ defmodule BastionWeb.DeviceLive do
       </.card>
 
       <.card
+        :if={@can.wifi}
         title={gettext("Device Wi-Fi")}
         note={!@online && gettext("Available when the device is online")}
       >
@@ -666,10 +731,15 @@ defmodule BastionWeb.DeviceLive do
         </.form>
       </.card>
 
-      <div class="rounded-box border border-error/40 bg-base-100 p-4 lg:col-span-2" id="danger-zone">
+      <div
+        :if={@can.reboot or @can.revoke}
+        class="rounded-box border border-error/40 bg-base-100 p-4 lg:col-span-2"
+        id="danger-zone"
+      >
         <h2 class="font-semibold text-error">{gettext("Danger zone")}</h2>
         <div class="mt-3 divide-y divide-base-300">
           <.danger_action
+            :if={@can.reboot}
             title={gettext("Reboot")}
             description={
               if @online,
@@ -689,6 +759,7 @@ defmodule BastionWeb.DeviceLive do
             </button>
           </.danger_action>
           <.danger_action
+            :if={@can.revoke}
             title={gettext("Revoke")}
             description={
               gettext(
@@ -713,6 +784,7 @@ defmodule BastionWeb.DeviceLive do
             </button>
           </.danger_action>
           <.danger_action
+            :if={@can.revoke}
             title={gettext("Delete")}
             description={gettext("Only a revoked device can be deleted. The journal is deleted too.")}
           >

@@ -53,7 +53,7 @@ defmodule BastionWeb.Errors do
 
   def message(:username_taken), do: gettext("This username is already taken")
   def message(:self), do: gettext("You cannot do this with your own account")
-  def message(:last_user), do: gettext("At least one active account must remain")
+  def message(:last_user), do: gettext("At least one active superadmin must remain")
   def message(:invalid_current), do: gettext("The current password is wrong")
   def message(:missing), do: gettext("Enter a password")
 
@@ -67,6 +67,20 @@ defmodule BastionWeb.Errors do
   def message(:same), do: gettext("The new password matches the current one")
   def message(:mismatch), do: gettext("The passwords do not match")
   def message(:user_not_found), do: gettext("Account not found")
+
+  def message(:forbidden), do: gettext("You do not have the right to do this")
+  def message(:role_not_found), do: gettext("Role not found")
+  def message(:group_not_found), do: gettext("Group not found")
+  def message(:grant_not_found), do: gettext("Access entry not found")
+  def message(:grant_exists), do: gettext("This access is already granted")
+  def message(:grantee_required), do: gettext("Choose an employee or a group")
+  def message(:builtin_role), do: gettext("This built-in role cannot be changed or deleted")
+
+  def message(:global_role),
+    do: gettext("This role has only global actions: grant it everywhere, not in a folder")
+
+  def message(:last_superadmin),
+    do: gettext("At least one superadmin must remain")
 
   def message(_), do: gettext("Something went wrong, try again")
 end

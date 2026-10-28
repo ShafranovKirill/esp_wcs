@@ -8,29 +8,29 @@ defmodule Bastion.Console.Application.Locks do
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
-  @spec attach(String.t()) :: {:ok, binary()} | {:busy, DateTime.t()}
-  def attach(id) do
+  @spec attach(String.t(), term()) :: {:ok, binary()} | {:busy, DateTime.t()}
+  def attach(id, actor \\ nil) do
     case GenServer.call(__MODULE__, {:attach, id, self()}) do
-      :ok -> {:ok, became_owner(id, :console_taken)}
+      :ok -> {:ok, became_owner(id, :console_taken, actor)}
       :already -> {:ok, history(id)}
       {:busy, since} -> {:busy, since}
     end
   end
 
-  @spec take(String.t()) :: {:ok, binary()}
-  def take(id) do
+  @spec take(String.t(), term()) :: {:ok, binary()}
+  def take(id, actor \\ nil) do
     case GenServer.call(__MODULE__, {:take, id, self()}) do
       :already -> {:ok, history(id)}
-      :ok -> {:ok, became_owner(id, :console_taken)}
+      :ok -> {:ok, became_owner(id, :console_taken, actor)}
     end
   end
 
-  @spec release(String.t()) :: :ok
-  def release(id) do
+  @spec release(String.t(), term()) :: :ok
+  def release(id, actor \\ nil) do
     Bastion.Link.unsubscribe_console(id)
 
     if GenServer.call(__MODULE__, {:release, id, self()}) == :ok,
-      do: Bastion.Fleet.record_event(id, :console_released, %{})
+      do: Bastion.Fleet.record_event(id, :console_released, %{}, actor)
 
     :ok
   end
@@ -49,9 +49,9 @@ defmodule Bastion.Console.Application.Locks do
     end
   end
 
-  defp became_owner(id, event) do
+  defp became_owner(id, event, actor) do
     Bastion.Link.subscribe_console(id)
-    Bastion.Fleet.record_event(id, event, %{})
+    Bastion.Fleet.record_event(id, event, %{}, actor)
     history(id)
   end
 

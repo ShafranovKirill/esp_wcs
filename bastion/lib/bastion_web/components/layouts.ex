@@ -5,6 +5,7 @@ defmodule BastionWeb.Layouts do
 
   attr :flash, :map, required: true, doc: "the map of flash messages"
   attr :current_user, :map, default: nil, doc: "вошедший сотрудник"
+  attr :current_actor, :any, default: nil, doc: "права вошедшего сотрудника"
   attr :locale, :string, default: "ru"
   attr :current_path, :string, default: "/"
   slot :inner_block, required: true
@@ -34,10 +35,18 @@ defmodule BastionWeb.Layouts do
             active={@current_path == "/connect"}
           />
           <.nav_link
+            :if={can?(@current_actor, "users.manage")}
             to={~p"/users"}
             icon="hero-users"
             label={gettext("Staff")}
             active={String.starts_with?(@current_path, "/users")}
+          />
+          <.nav_link
+            :if={can?(@current_actor, "users.manage") or can?(@current_actor, "roles.manage")}
+            to={~p"/access"}
+            icon="hero-shield-check"
+            label={gettext("Access")}
+            active={String.starts_with?(@current_path, "/access")}
           />
         </nav>
 
@@ -78,6 +87,9 @@ defmodule BastionWeb.Layouts do
     <.flash_group flash={@flash} />
     """
   end
+
+  defp can?(nil, _action), do: false
+  defp can?(actor, action), do: Bastion.Access.can?(actor, action)
 
   attr :to, :string, required: true
   attr :icon, :string, required: true

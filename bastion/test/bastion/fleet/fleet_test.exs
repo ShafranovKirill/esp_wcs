@@ -25,7 +25,7 @@ defmodule Bastion.FleetTest do
       assert_receive {:event, %DeviceRequested{device_id: id}}
       assert id == attrs.device_id
 
-      assert %{requests: [device], folders: [], unfiled: [], total: 0} = Fleet.overview()
+      assert %{requests: [device], folders: [], unfiled: [], total: 0} = Fleet.overview(system())
       assert device.status == :pending
       assert device.device_code =~ ~r/\A[0-9A-F]{4}(-[0-9A-F]{4}){4}\z/
       assert [%{type: :requested}] = Fleet.list_events(device.id)
@@ -45,7 +45,7 @@ defmodule Bastion.FleetTest do
 
     test "одобрение подписывает сертификат и сообщает о нём" do
       device = pending_device()
-      assert {:ok, approved} = Fleet.approve(device.id, device.device_code)
+      assert {:ok, approved} = Fleet.approve(system(), device.id, device.device_code)
       assert approved.status == :approved
       assert approved.certificate_pem =~ "BEGIN CERTIFICATE"
       assert_receive {:event, %DeviceApproved{certificate_pem: pem}}
@@ -89,7 +89,7 @@ defmodule Bastion.FleetTest do
       device = pending_device()
 
       assert {:error, :code_changed} =
-               Fleet.approve(device.id, "AAAA-BBBB-CCCC-DDDD-EEEE")
+               Fleet.approve(system(), device.id, "AAAA-BBBB-CCCC-DDDD-EEEE")
 
       assert Fleet.get_device(device.id).status == :pending
     end
@@ -101,7 +101,7 @@ defmodule Bastion.FleetTest do
 
     test "отклонение новой заявки удаляет устройство" do
       device = pending_device()
-      assert {:ok, :deleted} = Fleet.reject(device.id)
+      assert {:ok, :deleted} = Fleet.reject(system(), device.id)
       assert Fleet.get_device(device.id) == nil
       assert_receive {:event, %DeviceChanged{change: :deleted}}
     end
@@ -117,22 +117,22 @@ defmodule Bastion.FleetTest do
   describe "отзыв и удаление" do
     test "отзыв: событие для Link, сертификат забыт, удалить можно только после отзыва" do
       device = approved_device()
-      assert {:error, :not_revoked} = Fleet.delete(device.id)
+      assert {:error, :not_revoked} = Fleet.delete(system(), device.id)
 
-      assert {:ok, revoked} = Fleet.revoke(device.id)
+      assert {:ok, revoked} = Fleet.revoke(system(), device.id)
       assert revoked.status == :revoked
       assert revoked.certificate_pem == nil
       assert_receive {:event, %DeviceRevoked{}}
 
-      assert {:ok, :deleted} = Fleet.delete(device.id)
+      assert {:ok, :deleted} = Fleet.delete(system(), device.id)
       assert Fleet.get_device(device.id) == nil
     end
 
     test "несуществующее устройство" do
       assert {:error, :not_found} =
-               Fleet.approve(Ecto.UUID.generate(), "AAAA-BBBB-CCCC-DDDD-EEEE")
+               Fleet.approve(system(), Ecto.UUID.generate(), "AAAA-BBBB-CCCC-DDDD-EEEE")
 
-      assert {:error, :not_found} = Fleet.revoke("garbage")
+      assert {:error, :not_found} = Fleet.revoke(system(), "garbage")
     end
   end
 
@@ -141,10 +141,10 @@ defmodule Bastion.FleetTest do
       a = approved_device(%{name: "alpha"})
       b = approved_device(%{name: "beta"})
 
-      assert {:error, :name_taken} = Fleet.rename(b.id, "ALPHA")
-      assert {:error, :blank} = Fleet.rename(b.id, "   ")
-      assert {:error, :too_long} = Fleet.rename(b.id, String.duplicate("x", 65))
-      assert {:ok, %{name: "core sw 01"}} = Fleet.rename(a.id, "  core   sw 01 ")
+      assert {:error, :name_taken} = Fleet.rename(system(), b.id, "ALPHA")
+      assert {:error, :blank} = Fleet.rename(system(), b.id, "   ")
+      assert {:error, :too_long} = Fleet.rename(system(), b.id, String.duplicate("x", 65))
+      assert {:ok, %{name: "core sw 01"}} = Fleet.rename(system(), a.id, "  core   sw 01 ")
 
       assert %{type: :renamed, data: %{"from" => "alpha", "to" => "core sw 01"}} =
                hd(Fleet.list_events(a.id))
@@ -152,27 +152,29 @@ defmodule Bastion.FleetTest do
 
     test "папки: устройства группируются, непустую папку удалить нельзя" do
       device = approved_device()
-      assert {:ok, folder} = Fleet.create_folder("Серверная 1")
+      assert {:ok, folder} = Fleet.create_folder(system(), "Серверная 1")
       assert_receive {:event, %FoldersChanged{}}
-      assert {:error, :name_taken} = Fleet.create_folder("серверная 1")
+      assert {:error, :name_taken} = Fleet.create_folder(system(), "серверная 1")
 
-      assert {:ok, %{folder_ids: [fid]}} = Fleet.set_folders(device.id, [folder.id])
+      assert {:ok, %{folder_ids: [fid]}} = Fleet.set_folders(system(), device.id, [folder.id])
       assert fid == folder.id
-      assert %{devices: %{^fid => [%{id: id}]}, unfiled: [], total: 1} = Fleet.overview()
+      assert %{devices: %{^fid => [%{id: id}]}, unfiled: [], total: 1} = Fleet.overview(system())
       assert id == device.id
       assert %{type: :moved, data: %{"folders" => ["Серверная 1"]}} = hd(Fleet.list_events(id))
 
-      assert {:error, :folder_not_found} = Fleet.set_folders(device.id, [Ecto.UUID.generate()])
-      assert {:error, :folder_not_empty} = Fleet.delete_folder(folder.id)
+      assert {:error, :folder_not_found} =
+               Fleet.set_folders(system(), device.id, [Ecto.UUID.generate()])
 
-      assert {:ok, %{folder_ids: []}} = Fleet.set_folders(device.id, [])
-      assert :ok = Fleet.delete_folder(folder.id)
-      assert %{folders: [], unfiled: [%{id: ^id, folder_ids: []}]} = Fleet.overview()
+      assert {:error, :folder_not_empty} = Fleet.delete_folder(system(), folder.id)
+
+      assert {:ok, %{folder_ids: []}} = Fleet.set_folders(system(), device.id, [])
+      assert :ok = Fleet.delete_folder(system(), folder.id)
+      assert %{folders: [], unfiled: [%{id: ^id, folder_ids: []}]} = Fleet.overview(system())
     end
 
     test "переименование папки" do
-      {:ok, folder} = Fleet.create_folder("Склад")
-      assert {:ok, %{name: "Склад 2"}} = Fleet.rename_folder(folder.id, "Склад 2")
+      {:ok, folder} = Fleet.create_folder(system(), "Склад")
+      assert {:ok, %{name: "Склад 2"}} = Fleet.rename_folder(system(), folder.id, "Склад 2")
     end
   end
 end

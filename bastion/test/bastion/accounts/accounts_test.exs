@@ -3,6 +3,8 @@ defmodule Bastion.AccountsTest do
 
   alias Bastion.Accounts
 
+  defp actor(user), do: Bastion.Access.actor(user)
+
   @password "correct horse battery"
 
   defp ip, do: "10.0.0.#{System.unique_integer([:positive]) |> rem(250)}"
@@ -17,7 +19,7 @@ defmodule Bastion.AccountsTest do
     test "reset перезаписывает пароль своей учётной записи, остальных не трогает" do
       {:ok, :created} = Accounts.ensure_admin("admin", @password)
       admin = Accounts.list_users() |> hd()
-      {:ok, other, other_password} = Accounts.create_user(admin, "ivanov")
+      {:ok, other, other_password} = Accounts.create_user(actor(admin), "ivanov")
       {:ok, other_token} = Accounts.login("ivanov", other_password, ip())
 
       assert {:ok, :reset} = Accounts.ensure_admin("admin", "brand new password", reset: true)
@@ -29,8 +31,8 @@ defmodule Bastion.AccountsTest do
     test "reset разблокирует и создаёт, если такого логина нет" do
       {:ok, :created} = Accounts.ensure_admin("admin", @password)
       admin = Accounts.list_users() |> hd()
-      {:ok, other, _} = Accounts.create_user(admin, "root")
-      {:ok, _} = Accounts.block(admin, other.id)
+      {:ok, other, _} = Accounts.create_user(actor(admin), "root")
+      {:ok, _} = Accounts.block(actor(admin), other.id)
 
       assert {:ok, :reset} = Accounts.ensure_admin("root", "brand new password", reset: true)
       assert {:ok, _} = Accounts.login("root", "brand new password", ip())

@@ -4,6 +4,7 @@ defmodule BastionWeb do
       Bastion.Events,
       Bastion.PKI,
       Bastion.Accounts,
+      Bastion.Access,
       Bastion.Fleet,
       Bastion.Link,
       Bastion.Console,

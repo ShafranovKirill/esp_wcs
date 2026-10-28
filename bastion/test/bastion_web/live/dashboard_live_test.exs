@@ -32,8 +32,8 @@ defmodule BastionWeb.DashboardLiveTest do
 
   test "папки: создать и увидеть устройство в папке", %{conn: conn} do
     device = approved_device(%{name: "edge-rt"})
-    {:ok, folder} = Fleet.create_folder("Склад")
-    {:ok, _} = Fleet.set_folders(device.id, [folder.id])
+    {:ok, folder} = Fleet.create_folder(system(), "Склад")
+    {:ok, _} = Fleet.set_folders(system(), device.id, [folder.id])
 
     {:ok, view, _html} = live(conn, ~p"/")
     assert has_element?(view, "#folder-#{folder.id} #device-#{folder.id}-#{device.id}")
@@ -46,8 +46,8 @@ defmodule BastionWeb.DashboardLiveTest do
     conn: conn
   } do
     device = approved_device(%{name: "core-sw"})
-    {:ok, building} = Fleet.create_folder("Здание А")
-    {:ok, core} = Fleet.create_folder("Ядро сети")
+    {:ok, building} = Fleet.create_folder(system(), "Здание А")
+    {:ok, core} = Fleet.create_folder(system(), "Ядро сети")
     {:ok, view, _html} = live(conn, ~p"/")
 
     view |> element("#new-subfolder-#{building.id}") |> render_click()
@@ -56,7 +56,7 @@ defmodule BastionWeb.DashboardLiveTest do
     assert floor.parent_id == building.id
     assert has_element?(view, "#folder-#{building.id} #folder-#{floor.id}")
 
-    {:ok, _} = Fleet.set_folders(device.id, [floor.id, core.id])
+    {:ok, _} = Fleet.set_folders(system(), device.id, [floor.id, core.id])
     assert has_element?(view, "#folder-#{floor.id} #device-#{floor.id}-#{device.id}")
     assert has_element?(view, "#folder-#{core.id} #device-#{core.id}-#{device.id}")
     assert has_element?(view, "#folder-#{building.id} > div > button .badge", "1")
