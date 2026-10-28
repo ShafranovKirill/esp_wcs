@@ -19,6 +19,7 @@ defmodule Bastion.Release do
 
     {:ok, result, _} =
       Ecto.Migrator.with_repo(Bastion.Repo, fn _repo ->
+        {:ok, _} = start_pubsub()
         Bastion.Accounts.ensure_admin(config[:username], config[:password], opts)
       end)
 
@@ -59,6 +60,17 @@ defmodule Bastion.Release do
   defp halt(message) do
     IO.puts(:stderr, "Ошибка: " <> message)
     System.halt(1)
+  end
+
+  defp start_pubsub do
+    case Process.whereis(Bastion.PubSub) do
+      nil ->
+        {:ok, _} = Application.ensure_all_started(:phoenix_pubsub)
+        Supervisor.start_link([{Phoenix.PubSub, name: Bastion.PubSub}], strategy: :one_for_one)
+
+      pid ->
+        {:ok, pid}
+    end
   end
 
   defp load_app do
