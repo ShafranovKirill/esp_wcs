@@ -4,7 +4,7 @@ defmodule BastionWeb.Layouts do
   embed_templates "layouts/*"
 
   attr :flash, :map, required: true, doc: "the map of flash messages"
-  attr :current_admin, :map, default: nil, doc: "вошедший администратор"
+  attr :current_user, :map, default: nil, doc: "вошедший сотрудник"
   attr :locale, :string, default: "ru"
   attr :current_path, :string, default: "/"
   slot :inner_block, required: true
@@ -33,16 +33,29 @@ defmodule BastionWeb.Layouts do
             label={gettext("How to connect")}
             active={@current_path == "/connect"}
           />
+          <.nav_link
+            to={~p"/users"}
+            icon="hero-users"
+            label={gettext("Staff")}
+            active={String.starts_with?(@current_path, "/users")}
+          />
         </nav>
 
         <div class="ml-auto flex items-center gap-2">
           <.locale_switch locale={@locale} return_to={@current_path} />
           <.theme_toggle />
-          <span :if={@current_admin} class="hidden text-sm text-base-content/60 md:inline">
-            {@current_admin.username}
-          </span>
           <.link
-            :if={@current_admin}
+            :if={@current_user}
+            navigate={~p"/account"}
+            id="account-link"
+            class="btn btn-ghost btn-sm"
+            title={gettext("Account")}
+          >
+            <.icon name="hero-user-circle" class="size-4" />
+            <span class="hidden md:inline">{@current_user.username}</span>
+          </.link>
+          <.link
+            :if={@current_user}
             href={~p"/logout"}
             method="delete"
             id="logout"

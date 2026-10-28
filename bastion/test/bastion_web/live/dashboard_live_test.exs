@@ -6,7 +6,7 @@ defmodule BastionWeb.DashboardLiveTest do
 
   alias Bastion.Fleet
 
-  setup :log_in_admin
+  setup :log_in_user
 
   test "пусто — приглашение подключить устройство", %{conn: conn} do
     {:ok, _view, html} = live(conn, ~p"/")

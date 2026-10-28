@@ -14,12 +14,35 @@ defmodule Bastion.AccountsTest do
       assert {:ok, _} = Accounts.login("admin", @password, ip())
     end
 
+    test "reset перезаписывает пароль своей учётной записи, остальных не трогает" do
+      {:ok, :created} = Accounts.ensure_admin("admin", @password)
+      admin = Accounts.list_users() |> hd()
+      {:ok, other, other_password} = Accounts.create_user(admin, "ivanov")
+      {:ok, other_token} = Accounts.login("ivanov", other_password, ip())
+
+      assert {:ok, :reset} = Accounts.ensure_admin("admin", "brand new password", reset: true)
+      assert Accounts.user_by_session(other_token)
+      assert length(Accounts.list_users()) == 2
+      assert Accounts.get_user(other.id)
+    end
+
+    test "reset разблокирует и создаёт, если такого логина нет" do
+      {:ok, :created} = Accounts.ensure_admin("admin", @password)
+      admin = Accounts.list_users() |> hd()
+      {:ok, other, _} = Accounts.create_user(admin, "root")
+      {:ok, _} = Accounts.block(admin, other.id)
+
+      assert {:ok, :reset} = Accounts.ensure_admin("root", "brand new password", reset: true)
+      assert {:ok, _} = Accounts.login("root", "brand new password", ip())
+      assert {:ok, :created} = Accounts.ensure_admin("third", "brand new password", reset: true)
+    end
+
     test "reset перезаписывает пароль и завершает сессии" do
       {:ok, :created} = Accounts.ensure_admin("admin", @password)
       {:ok, token} = Accounts.login("admin", @password, ip())
 
       assert {:ok, :reset} = Accounts.ensure_admin("admin", "brand new password", reset: true)
-      assert Accounts.admin_by_session(token) == nil
+      assert Accounts.user_by_session(token) == nil
       assert {:error, :invalid_credentials} = Accounts.login("admin", @password, ip())
       assert {:ok, _} = Accounts.login("admin", "brand new password", ip())
     end
@@ -49,7 +72,7 @@ defmodule Bastion.AccountsTest do
 
     test "логин без учёта регистра, токен даёт администратора" do
       assert {:ok, token} = Accounts.login("admin", @password, ip())
-      assert %{username: "Admin"} = Accounts.admin_by_session(token)
+      assert %{username: "Admin"} = Accounts.user_by_session(token)
     end
 
     test "неверный пароль и несуществующий логин — одна и та же ошибка" do
@@ -59,11 +82,12 @@ defmodule Bastion.AccountsTest do
 
     test "после 5 ошибок с одного адреса — пауза, даже для верного пароля; другой адрес не затронут" do
       attacker = ip()
+      guess = fn -> "guess-#{System.unique_integer([:positive])}" end
 
       for _ <- 1..5,
-          do: assert({:error, :invalid_credentials} = Accounts.login("Admin", "wrong", attacker))
+          do: assert({:error, :invalid_credentials} = Accounts.login(guess.(), "wrong", attacker))
 
-      assert {:error, {:locked, 5}} = Accounts.login("Admin", "wrong", attacker)
+      assert {:error, {:locked, 5}} = Accounts.login(guess.(), "wrong", attacker)
       assert {:error, {:locked, _}} = Accounts.login("Admin", @password, attacker)
       assert {:ok, _} = Accounts.login("Admin", @password, ip())
     end
@@ -71,21 +95,24 @@ defmodule Bastion.AccountsTest do
     test "сессия истекает после 30 минут бездействия" do
       {:ok, token} = Accounts.login("Admin", @password, ip())
       long_ago = DateTime.add(DateTime.utc_now(:second), -31 * 60)
-      Repo.update_all(Bastion.Accounts.Infrastructure.AdminSession, set: [last_seen_at: long_ago])
 
-      assert Accounts.admin_by_session(token) == nil
+      Repo.update_all(Bastion.Accounts.Infrastructure.SessionRecord,
+        set: [last_seen_at: long_ago]
+      )
+
+      assert Accounts.user_by_session(token) == nil
     end
 
     test "проверка без продления не двигает время сессии" do
       {:ok, token} = Accounts.login("Admin", @password, ip())
       almost = DateTime.add(DateTime.utc_now(:second), -29 * 60)
-      Repo.update_all(Bastion.Accounts.Infrastructure.AdminSession, set: [last_seen_at: almost])
+      Repo.update_all(Bastion.Accounts.Infrastructure.SessionRecord, set: [last_seen_at: almost])
 
-      assert Accounts.admin_by_session(token, touch: false)
-      assert [%{last_seen_at: ^almost}] = Repo.all(Bastion.Accounts.Infrastructure.AdminSession)
+      assert Accounts.user_by_session(token, touch: false)
+      assert [%{last_seen_at: ^almost}] = Repo.all(Bastion.Accounts.Infrastructure.SessionRecord)
 
-      assert Accounts.admin_by_session(token)
-      assert [%{last_seen_at: touched}] = Repo.all(Bastion.Accounts.Infrastructure.AdminSession)
+      assert Accounts.user_by_session(token)
+      assert [%{last_seen_at: touched}] = Repo.all(Bastion.Accounts.Infrastructure.SessionRecord)
       assert DateTime.compare(touched, almost) == :gt
     end
 
@@ -93,17 +120,17 @@ defmodule Bastion.AccountsTest do
       {:ok, token} = Accounts.login("Admin", @password, ip())
 
       refute Enum.any?(
-               Repo.all(Bastion.Accounts.Infrastructure.AdminSession),
+               Repo.all(Bastion.Accounts.Infrastructure.SessionRecord),
                &(&1.token_hash == token)
              )
 
       :ok = Accounts.logout(token)
-      assert Accounts.admin_by_session(token) == nil
+      assert Accounts.user_by_session(token) == nil
     end
 
     test "мусорный токен" do
-      assert Accounts.admin_by_session("garbage") == nil
-      assert Accounts.admin_by_session(nil) == nil
+      assert Accounts.user_by_session("garbage") == nil
+      assert Accounts.user_by_session(nil) == nil
     end
   end
 end

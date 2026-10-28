@@ -7,7 +7,7 @@ defmodule BastionWeb.DeviceLiveTest do
   alias Bastion.FakeDevice
   alias Bastion.Fleet
 
-  setup :log_in_admin
+  setup :log_in_user
 
   describe "консоль" do
     test "владелец вводит команды, вторая вкладка видит «Устройство занято» и забирает консоль",

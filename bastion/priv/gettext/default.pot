@@ -71,8 +71,8 @@ msgstr ""
 msgid "Approved, certificate issued"
 msgstr ""
 
-#: lib/bastion_web/components/layouts.ex:159
-#: lib/bastion_web/components/layouts.ex:174
+#: lib/bastion_web/components/layouts.ex:172
+#: lib/bastion_web/components/layouts.ex:187
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
 msgstr ""
@@ -113,6 +113,7 @@ msgstr ""
 #: lib/bastion_web/live/dashboard_live.ex:289
 #: lib/bastion_web/live/dashboard_live.ex:319
 #: lib/bastion_web/live/device_live.ex:372
+#: lib/bastion_web/live/users_live.ex:269
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr ""
@@ -432,6 +433,7 @@ msgid "No devices yet"
 msgstr ""
 
 #: lib/bastion_web/live/device_live.ex:821
+#: lib/bastion_web/live/users_live.ex:231
 #, elixir-autogen, elixir-format
 msgid "No events yet"
 msgstr ""
@@ -469,6 +471,7 @@ msgstr ""
 
 #: lib/bastion_web/controllers/session_html/new.html.heex:25
 #: lib/bastion_web/live/device_live.ex:624
+#: lib/bastion_web/live/users_live.ex:277
 #, elixir-autogen, elixir-format
 msgid "Password"
 msgstr ""
@@ -593,18 +596,18 @@ msgstr ""
 msgid "Sign in, choose Bastion connection and connect the device to a Wi-Fi network from which this bastion is reachable."
 msgstr ""
 
-#: lib/bastion_web/components/layouts.ex:50
-#: lib/bastion_web/components/layouts.ex:53
+#: lib/bastion_web/components/layouts.ex:63
+#: lib/bastion_web/components/layouts.ex:66
 #, elixir-autogen, elixir-format
 msgid "Sign out"
 msgstr ""
 
-#: lib/bastion_web/components/layouts.ex:166
+#: lib/bastion_web/components/layouts.ex:179
 #, elixir-autogen, elixir-format
 msgid "Something went wrong!"
 msgstr ""
 
-#: lib/bastion_web/errors.ex:42
+#: lib/bastion_web/errors.ex:62
 #, elixir-autogen, elixir-format
 msgid "Something went wrong, try again"
 msgstr ""
@@ -679,17 +682,18 @@ msgstr ""
 msgid "This name is already taken"
 msgstr ""
 
-#: lib/bastion_web/controllers/session_controller.ex:37
+#: lib/bastion_web/controllers/session_controller.ex:38
 #, elixir-autogen, elixir-format
 msgid "Too many attempts. Try again in %{seconds} s"
 msgstr ""
 
 #: lib/bastion_web/controllers/session_html/new.html.heex:17
+#: lib/bastion_web/live/users_live.ex:258
 #, elixir-autogen, elixir-format
 msgid "Username"
 msgstr ""
 
-#: lib/bastion_web/components/layouts.ex:151
+#: lib/bastion_web/components/layouts.ex:164
 #, elixir-autogen, elixir-format
 msgid "We can't find the internet"
 msgstr ""
@@ -949,7 +953,7 @@ msgstr ""
 msgid "Before installing, compare the SHA-256 fingerprint with the one shown by your system. A trusted root certificate lets its owner impersonate any site for this computer — install only the certificate of your own bastion."
 msgstr ""
 
-#: lib/bastion_web/controllers/session_html/new.html.heex:35
+#: lib/bastion_web/controllers/session_html/new.html.heex:39
 #, elixir-autogen, elixir-format
 msgid "Browser warns about the certificate? Install the root certificate"
 msgstr ""
@@ -992,4 +996,272 @@ msgstr ""
 #: lib/bastion_web/live/connect_live.ex:62
 #, elixir-autogen, elixir-format
 msgid "mDNS is turned off on this bastion (BASTION_MDNS=off)."
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:344
+#, elixir-autogen, elixir-format
+msgid "%{actor} blocked %{name}"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:335
+#, elixir-autogen, elixir-format
+msgid "%{actor} created %{name}"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:341
+#, elixir-autogen, elixir-format
+msgid "%{actor} reset the password of %{name}"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:347
+#, elixir-autogen, elixir-format
+msgid "%{actor} unblocked %{name}"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:119
+#, elixir-autogen, elixir-format
+msgid "%{count} account"
+msgid_plural "%{count} accounts"
+msgstr[0] ""
+msgstr[1] ""
+
+#: lib/bastion_web/live/users_live.ex:76
+#, elixir-autogen, elixir-format
+msgid "%{name} blocked"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:338
+#, elixir-autogen, elixir-format
+msgid "%{name} changed their password"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:323
+#, elixir-autogen, elixir-format
+msgid "%{name} signed in"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:332
+#, elixir-autogen, elixir-format
+msgid "%{name} signed out"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:86
+#, elixir-autogen, elixir-format
+msgid "%{name} unblocked"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:264
+#, elixir-autogen, elixir-format
+msgid "A password is generated and shown once. The employee changes it on the account page."
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:309
+#, elixir-autogen, elixir-format
+msgid "Access journal"
+msgstr ""
+
+#: lib/bastion_web/components/layouts.ex:52
+#: lib/bastion_web/live/account_live.ex:8
+#: lib/bastion_web/live/account_live.ex:50
+#, elixir-autogen, elixir-format
+msgid "Account"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:281
+#, elixir-autogen, elixir-format
+msgid "Account %{name} created. Its password:"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:60
+#, elixir-autogen, elixir-format
+msgid "Account not found"
+msgstr ""
+
+#: lib/bastion_web/live/account_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "At least %{min} characters."
+msgstr ""
+
+#: lib/bastion_web/errors.ex:47
+#, elixir-autogen, elixir-format
+msgid "At least one active account must remain"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:208
+#, elixir-autogen, elixir-format
+msgid "Block"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:203
+#, elixir-autogen, elixir-format
+msgid "Block %{name}? Their sessions will be closed immediately."
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:166
+#, elixir-autogen, elixir-format
+msgid "Blocked"
+msgstr ""
+
+#: lib/bastion_web/live/account_live.ex:56
+#: lib/bastion_web/live/account_live.ex:83
+#, elixir-autogen, elixir-format
+msgid "Change password"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:272
+#, elixir-autogen, elixir-format
+msgid "Create"
+msgstr ""
+
+#: lib/bastion_web/live/account_live.ex:61
+#, elixir-autogen, elixir-format
+msgid "Current password"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:297
+#, elixir-autogen, elixir-format
+msgid "Done"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:308
+#, elixir-autogen, elixir-format
+msgid "Employees"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:49
+#, elixir-autogen, elixir-format
+msgid "Enter a password"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:329
+#, elixir-autogen, elixir-format
+msgid "Failed sign-in as %{name}"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:173
+#, elixir-autogen, elixir-format
+msgid "Issued password"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:128
+#: lib/bastion_web/live/users_live.ex:254
+#, elixir-autogen, elixir-format
+msgid "New employee"
+msgstr ""
+
+#: lib/bastion_web/live/account_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "New password"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:282
+#, elixir-autogen, elixir-format
+msgid "New password of %{name}:"
+msgstr ""
+
+#: lib/bastion_web/live/account_live.ex:25
+#, elixir-autogen, elixir-format
+msgid "Password changed"
+msgstr ""
+
+#: lib/bastion_web/live/account_live.ex:76
+#, elixir-autogen, elixir-format
+msgid "Repeat the new password"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:193
+#, elixir-autogen, elixir-format
+msgid "Reset password"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:187
+#, elixir-autogen, elixir-format
+msgid "Reset the password of %{name}? Their sessions will be closed and a new password will be shown once."
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:326
+#, elixir-autogen, elixir-format
+msgid "Sign-in of blocked %{name} refused"
+msgstr ""
+
+#: lib/bastion_web/components/layouts.ex:39
+#: lib/bastion_web/live/users_live.ex:16
+#: lib/bastion_web/live/users_live.ex:117
+#, elixir-autogen, elixir-format
+msgid "Staff"
+msgstr ""
+
+#: lib/bastion_web/controllers/session_controller.ex:35
+#, elixir-autogen, elixir-format
+msgid "The account is blocked"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:48
+#, elixir-autogen, elixir-format
+msgid "The current password is wrong"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:171
+#, elixir-autogen, elixir-format
+msgid "The employee has not changed the issued password yet"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:58
+#, elixir-autogen, elixir-format
+msgid "The new password matches the current one"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:290
+#, elixir-autogen, elixir-format
+msgid "The password is shown only now. Pass it to the employee — they should change it after signing in."
+msgstr ""
+
+#: lib/bastion_web/errors.ex:53
+#, elixir-autogen, elixir-format
+msgid "The password is too short (at least %{min} characters)"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:59
+#, elixir-autogen, elixir-format
+msgid "The passwords do not match"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:57
+#, elixir-autogen, elixir-format
+msgid "This password is too common, choose another"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:45
+#, elixir-autogen, elixir-format
+msgid "This username is already taken"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:218
+#, elixir-autogen, elixir-format
+msgid "Unblock"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:43
+#, elixir-autogen, elixir-format
+msgid "Username: 1–64 characters — letters, digits, dot, underscore, hyphen"
+msgstr ""
+
+#: lib/bastion_web/errors.ex:46
+#, elixir-autogen, elixir-format
+msgid "You cannot do this with your own account"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:349
+#, elixir-autogen, elixir-format
+msgid "deleted account"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:177
+#, elixir-autogen, elixir-format
+msgid "since"
+msgstr ""
+
+#: lib/bastion_web/live/users_live.ex:162
+#, elixir-autogen, elixir-format
+msgid "you"
 msgstr ""

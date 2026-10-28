@@ -39,5 +39,25 @@ defmodule BastionWeb.Errors do
   def message("invalid_args"), do: gettext("The device rejected the parameters")
   def message("unknown_op"), do: gettext("The device firmware does not support this command")
 
+  def message(:invalid_username),
+    do: gettext("Username: 1–64 characters — letters, digits, dot, underscore, hyphen")
+
+  def message(:username_taken), do: gettext("This username is already taken")
+  def message(:self), do: gettext("You cannot do this with your own account")
+  def message(:last_user), do: gettext("At least one active account must remain")
+  def message(:invalid_current), do: gettext("The current password is wrong")
+  def message(:missing), do: gettext("Enter a password")
+
+  def message(:too_short),
+    do:
+      gettext("The password is too short (at least %{min} characters)",
+        min: Bastion.Accounts.password_min_length()
+      )
+
+  def message(:placeholder), do: gettext("This password is too common, choose another")
+  def message(:same), do: gettext("The new password matches the current one")
+  def message(:mismatch), do: gettext("The passwords do not match")
+  def message(:user_not_found), do: gettext("Account not found")
+
   def message(_), do: gettext("Something went wrong, try again")
 end

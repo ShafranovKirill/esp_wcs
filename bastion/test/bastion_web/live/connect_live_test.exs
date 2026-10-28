@@ -3,7 +3,7 @@ defmodule BastionWeb.ConnectLiveTest do
 
   import Phoenix.LiveViewTest
 
-  setup :log_in_admin
+  setup :log_in_user
 
   test "инструкция, адреса с портом WCS Link и код бастиона", %{conn: conn} do
     {:ok, _view, html} = live(conn, ~p"/connect")

@@ -131,7 +131,7 @@ defmodule BastionWeb.DashboardLive do
     ~H"""
     <Layouts.app
       flash={@flash}
-      current_admin={@current_admin}
+      current_user={@current_user}
       locale={@locale}
       current_path={@current_path}
     >

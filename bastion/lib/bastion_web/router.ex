@@ -1,8 +1,8 @@
 defmodule BastionWeb.Router do
   use BastionWeb, :router
 
-  import BastionWeb.AdminAuth,
-    only: [fetch_current_admin: 2, require_admin: 2, redirect_if_admin: 2]
+  import BastionWeb.UserAuth,
+    only: [fetch_current_user: 2, require_user: 2, redirect_if_user: 2]
 
   @csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " <>
          "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
@@ -15,15 +15,15 @@ defmodule BastionWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers, %{"content-security-policy" => @csp}
     plug BastionWeb.Locale
-    plug :fetch_current_admin
+    plug :fetch_current_user
   end
 
   pipeline :authenticated do
-    plug :require_admin
+    plug :require_user
   end
 
   pipeline :guest do
-    plug :redirect_if_admin
+    plug :redirect_if_user
   end
 
   scope "/", BastionWeb do
@@ -47,13 +47,16 @@ defmodule BastionWeb.Router do
 
     delete "/logout", SessionController, :delete
 
-    live_session :admin, on_mount: [BastionWeb.Locale, {BastionWeb.AdminAuth, :require_admin}] do
+    live_session :staff, on_mount: [BastionWeb.Locale, {BastionWeb.UserAuth, :require_user}] do
       live "/", DashboardLive, :index
       live "/connect", ConnectLive, :index
       live "/devices/:id", DeviceLive, :console
       live "/devices/:id/settings", DeviceLive, :settings
       live "/devices/:id/info", DeviceLive, :info
       live "/devices/:id/journal", DeviceLive, :journal
+      live "/users", UsersLive, :staff
+      live "/users/journal", UsersLive, :journal
+      live "/account", AccountLive, :index
     end
   end
 

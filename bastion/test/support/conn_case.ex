@@ -13,7 +13,7 @@ defmodule BastionWeb.ConnCase do
     end
   end
 
-  def log_in_admin(%{conn: conn}) do
+  def log_in_user(%{conn: conn}) do
     {:ok, _} = Bastion.Accounts.ensure_admin("admin", "correct horse battery")
     {:ok, token} = Bastion.Accounts.login("admin", "correct horse battery", "127.0.0.1")
 
@@ -21,7 +21,7 @@ defmodule BastionWeb.ConnCase do
       conn:
         conn
         |> Phoenix.ConnTest.init_test_session(%{})
-        |> Plug.Conn.put_session("admin_token", token)
+        |> Plug.Conn.put_session("user_token", token)
     }
   end
 

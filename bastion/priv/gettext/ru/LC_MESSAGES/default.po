@@ -72,8 +72,8 @@ msgstr "Одобрено"
 msgid "Approved, certificate issued"
 msgstr "Одобрено, сертификат выдан"
 
-#: lib/bastion_web/components/layouts.ex:159
-#: lib/bastion_web/components/layouts.ex:174
+#: lib/bastion_web/components/layouts.ex:172
+#: lib/bastion_web/components/layouts.ex:187
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
 msgstr "Переподключение"
@@ -114,6 +114,7 @@ msgstr "Скорость"
 #: lib/bastion_web/live/dashboard_live.ex:289
 #: lib/bastion_web/live/dashboard_live.ex:319
 #: lib/bastion_web/live/device_live.ex:372
+#: lib/bastion_web/live/users_live.ex:269
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "Отмена"
@@ -433,6 +434,7 @@ msgid "No devices yet"
 msgstr "Устройств пока нет"
 
 #: lib/bastion_web/live/device_live.ex:821
+#: lib/bastion_web/live/users_live.ex:231
 #, elixir-autogen, elixir-format
 msgid "No events yet"
 msgstr "Событий пока нет"
@@ -470,6 +472,7 @@ msgstr "Откройте настройку устройства"
 
 #: lib/bastion_web/controllers/session_html/new.html.heex:25
 #: lib/bastion_web/live/device_live.ex:624
+#: lib/bastion_web/live/users_live.ex:277
 #, elixir-autogen, elixir-format
 msgid "Password"
 msgstr "Пароль"
@@ -594,18 +597,18 @@ msgstr "Войдите, чтобы управлять устройствами"
 msgid "Sign in, choose Bastion connection and connect the device to a Wi-Fi network from which this bastion is reachable."
 msgstr "Войдите, выберите Bastion connection и подключите устройство к сети Wi-Fi, из которой доступен этот бастион."
 
-#: lib/bastion_web/components/layouts.ex:50
-#: lib/bastion_web/components/layouts.ex:53
+#: lib/bastion_web/components/layouts.ex:63
+#: lib/bastion_web/components/layouts.ex:66
 #, elixir-autogen, elixir-format
 msgid "Sign out"
 msgstr "Выйти"
 
-#: lib/bastion_web/components/layouts.ex:166
+#: lib/bastion_web/components/layouts.ex:179
 #, elixir-autogen, elixir-format
 msgid "Something went wrong!"
 msgstr "Что-то пошло не так!"
 
-#: lib/bastion_web/errors.ex:42
+#: lib/bastion_web/errors.ex:62
 #, elixir-autogen, elixir-format
 msgid "Something went wrong, try again"
 msgstr "Что-то пошло не так, попробуйте ещё раз"
@@ -680,17 +683,18 @@ msgstr "Заявка уже обработана"
 msgid "This name is already taken"
 msgstr "Это имя уже занято"
 
-#: lib/bastion_web/controllers/session_controller.ex:37
+#: lib/bastion_web/controllers/session_controller.ex:38
 #, elixir-autogen, elixir-format
 msgid "Too many attempts. Try again in %{seconds} s"
 msgstr "Слишком много попыток. Повторите через %{seconds} с"
 
 #: lib/bastion_web/controllers/session_html/new.html.heex:17
+#: lib/bastion_web/live/users_live.ex:258
 #, elixir-autogen, elixir-format
 msgid "Username"
 msgstr "Логин"
 
-#: lib/bastion_web/components/layouts.ex:151
+#: lib/bastion_web/components/layouts.ex:164
 #, elixir-autogen, elixir-format
 msgid "We can't find the internet"
 msgstr "Нет связи с бастионом"
@@ -950,7 +954,7 @@ msgstr "Корневой сертификат бастиона"
 msgid "Before installing, compare the SHA-256 fingerprint with the one shown by your system. A trusted root certificate lets its owner impersonate any site for this computer — install only the certificate of your own bastion."
 msgstr "Перед установкой сверьте отпечаток SHA-256 с тем, что покажет система. Доверенный корневой сертификат позволяет его владельцу выдавать себя за любой сайт на этом компьютере — устанавливайте только сертификат своего бастиона."
 
-#: lib/bastion_web/controllers/session_html/new.html.heex:35
+#: lib/bastion_web/controllers/session_html/new.html.heex:39
 #, elixir-autogen, elixir-format
 msgid "Browser warns about the certificate? Install the root certificate"
 msgstr "Браузер предупреждает о сертификате? Установите корневой сертификат"
@@ -994,3 +998,272 @@ msgstr "Бастион сам подписывает свой HTTPS-сертиф
 #, elixir-autogen, elixir-format
 msgid "mDNS is turned off on this bastion (BASTION_MDNS=off)."
 msgstr "На этом бастионе mDNS выключен (BASTION_MDNS=off)."
+
+#: lib/bastion_web/live/users_live.ex:344
+#, elixir-autogen, elixir-format
+msgid "%{actor} blocked %{name}"
+msgstr "%{actor} заблокировал(а) %{name}"
+
+#: lib/bastion_web/live/users_live.ex:335
+#, elixir-autogen, elixir-format
+msgid "%{actor} created %{name}"
+msgstr "%{actor} создал(а) %{name}"
+
+#: lib/bastion_web/live/users_live.ex:341
+#, elixir-autogen, elixir-format
+msgid "%{actor} reset the password of %{name}"
+msgstr "%{actor} сбросил(а) пароль %{name}"
+
+#: lib/bastion_web/live/users_live.ex:347
+#, elixir-autogen, elixir-format
+msgid "%{actor} unblocked %{name}"
+msgstr "%{actor} разблокировал(а) %{name}"
+
+#: lib/bastion_web/live/users_live.ex:119
+#, elixir-autogen, elixir-format
+msgid "%{count} account"
+msgid_plural "%{count} accounts"
+msgstr[0] "%{count} учётная запись"
+msgstr[1] "%{count} учётные записи"
+msgstr[2] "%{count} учётных записей"
+
+#: lib/bastion_web/live/users_live.ex:76
+#, elixir-autogen, elixir-format
+msgid "%{name} blocked"
+msgstr "%{name} заблокирован(а)"
+
+#: lib/bastion_web/live/users_live.ex:338
+#, elixir-autogen, elixir-format
+msgid "%{name} changed their password"
+msgstr "%{name} сменил(а) свой пароль"
+
+#: lib/bastion_web/live/users_live.ex:323
+#, elixir-autogen, elixir-format
+msgid "%{name} signed in"
+msgstr "%{name} вошёл(ла)"
+
+#: lib/bastion_web/live/users_live.ex:332
+#, elixir-autogen, elixir-format
+msgid "%{name} signed out"
+msgstr "%{name} вышел(ла)"
+
+#: lib/bastion_web/live/users_live.ex:86
+#, elixir-autogen, elixir-format
+msgid "%{name} unblocked"
+msgstr "%{name} разблокирован(а)"
+
+#: lib/bastion_web/live/users_live.ex:264
+#, elixir-autogen, elixir-format
+msgid "A password is generated and shown once. The employee changes it on the account page."
+msgstr "Пароль создаётся автоматически и показывается один раз. Сотрудник меняет его на странице учётной записи."
+
+#: lib/bastion_web/live/users_live.ex:309
+#, elixir-autogen, elixir-format
+msgid "Access journal"
+msgstr "Журнал доступа"
+
+#: lib/bastion_web/components/layouts.ex:52
+#: lib/bastion_web/live/account_live.ex:8
+#: lib/bastion_web/live/account_live.ex:50
+#, elixir-autogen, elixir-format
+msgid "Account"
+msgstr "Учётная запись"
+
+#: lib/bastion_web/live/users_live.ex:281
+#, elixir-autogen, elixir-format
+msgid "Account %{name} created. Its password:"
+msgstr "Учётная запись %{name} создана. Её пароль:"
+
+#: lib/bastion_web/errors.ex:60
+#, elixir-autogen, elixir-format
+msgid "Account not found"
+msgstr "Учётная запись не найдена"
+
+#: lib/bastion_web/live/account_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "At least %{min} characters."
+msgstr "Не короче %{min} символов."
+
+#: lib/bastion_web/errors.ex:47
+#, elixir-autogen, elixir-format
+msgid "At least one active account must remain"
+msgstr "Должна остаться хотя бы одна активная учётная запись"
+
+#: lib/bastion_web/live/users_live.ex:208
+#, elixir-autogen, elixir-format
+msgid "Block"
+msgstr "Заблокировать"
+
+#: lib/bastion_web/live/users_live.ex:203
+#, elixir-autogen, elixir-format
+msgid "Block %{name}? Their sessions will be closed immediately."
+msgstr "Заблокировать %{name}? Все его сессии сразу закроются."
+
+#: lib/bastion_web/live/users_live.ex:166
+#, elixir-autogen, elixir-format
+msgid "Blocked"
+msgstr "Заблокирован"
+
+#: lib/bastion_web/live/account_live.ex:56
+#: lib/bastion_web/live/account_live.ex:83
+#, elixir-autogen, elixir-format
+msgid "Change password"
+msgstr "Сменить пароль"
+
+#: lib/bastion_web/live/users_live.ex:272
+#, elixir-autogen, elixir-format
+msgid "Create"
+msgstr "Создать"
+
+#: lib/bastion_web/live/account_live.ex:61
+#, elixir-autogen, elixir-format
+msgid "Current password"
+msgstr "Текущий пароль"
+
+#: lib/bastion_web/live/users_live.ex:297
+#, elixir-autogen, elixir-format
+msgid "Done"
+msgstr "Готово"
+
+#: lib/bastion_web/live/users_live.ex:308
+#, elixir-autogen, elixir-format
+msgid "Employees"
+msgstr "Сотрудники"
+
+#: lib/bastion_web/errors.ex:49
+#, elixir-autogen, elixir-format
+msgid "Enter a password"
+msgstr "Введите пароль"
+
+#: lib/bastion_web/live/users_live.ex:329
+#, elixir-autogen, elixir-format
+msgid "Failed sign-in as %{name}"
+msgstr "Неудачный вход как %{name}"
+
+#: lib/bastion_web/live/users_live.ex:173
+#, elixir-autogen, elixir-format
+msgid "Issued password"
+msgstr "Выданный пароль"
+
+#: lib/bastion_web/live/users_live.ex:128
+#: lib/bastion_web/live/users_live.ex:254
+#, elixir-autogen, elixir-format
+msgid "New employee"
+msgstr "Новый сотрудник"
+
+#: lib/bastion_web/live/account_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "New password"
+msgstr "Новый пароль"
+
+#: lib/bastion_web/live/users_live.ex:282
+#, elixir-autogen, elixir-format
+msgid "New password of %{name}:"
+msgstr "Новый пароль %{name}:"
+
+#: lib/bastion_web/live/account_live.ex:25
+#, elixir-autogen, elixir-format
+msgid "Password changed"
+msgstr "Пароль изменён"
+
+#: lib/bastion_web/live/account_live.ex:76
+#, elixir-autogen, elixir-format
+msgid "Repeat the new password"
+msgstr "Повторите новый пароль"
+
+#: lib/bastion_web/live/users_live.ex:193
+#, elixir-autogen, elixir-format
+msgid "Reset password"
+msgstr "Сбросить пароль"
+
+#: lib/bastion_web/live/users_live.ex:187
+#, elixir-autogen, elixir-format
+msgid "Reset the password of %{name}? Their sessions will be closed and a new password will be shown once."
+msgstr "Сбросить пароль %{name}? Его сессии закроются, новый пароль будет показан один раз."
+
+#: lib/bastion_web/live/users_live.ex:326
+#, elixir-autogen, elixir-format
+msgid "Sign-in of blocked %{name} refused"
+msgstr "Отказано во входе заблокированному %{name}"
+
+#: lib/bastion_web/components/layouts.ex:39
+#: lib/bastion_web/live/users_live.ex:16
+#: lib/bastion_web/live/users_live.ex:117
+#, elixir-autogen, elixir-format
+msgid "Staff"
+msgstr "Сотрудники"
+
+#: lib/bastion_web/controllers/session_controller.ex:35
+#, elixir-autogen, elixir-format
+msgid "The account is blocked"
+msgstr "Учётная запись заблокирована"
+
+#: lib/bastion_web/errors.ex:48
+#, elixir-autogen, elixir-format
+msgid "The current password is wrong"
+msgstr "Неверный текущий пароль"
+
+#: lib/bastion_web/live/users_live.ex:171
+#, elixir-autogen, elixir-format
+msgid "The employee has not changed the issued password yet"
+msgstr "Сотрудник ещё не сменил выданный пароль"
+
+#: lib/bastion_web/errors.ex:58
+#, elixir-autogen, elixir-format
+msgid "The new password matches the current one"
+msgstr "Новый пароль совпадает с текущим"
+
+#: lib/bastion_web/live/users_live.ex:290
+#, elixir-autogen, elixir-format
+msgid "The password is shown only now. Pass it to the employee — they should change it after signing in."
+msgstr "Пароль показывается только сейчас. Передайте его сотруднику — после входа он должен его сменить."
+
+#: lib/bastion_web/errors.ex:53
+#, elixir-autogen, elixir-format
+msgid "The password is too short (at least %{min} characters)"
+msgstr "Пароль слишком короткий (не меньше %{min} символов)"
+
+#: lib/bastion_web/errors.ex:59
+#, elixir-autogen, elixir-format
+msgid "The passwords do not match"
+msgstr "Пароли не совпадают"
+
+#: lib/bastion_web/errors.ex:57
+#, elixir-autogen, elixir-format
+msgid "This password is too common, choose another"
+msgstr "Слишком простой пароль, выберите другой"
+
+#: lib/bastion_web/errors.ex:45
+#, elixir-autogen, elixir-format
+msgid "This username is already taken"
+msgstr "Этот логин уже занят"
+
+#: lib/bastion_web/live/users_live.ex:218
+#, elixir-autogen, elixir-format
+msgid "Unblock"
+msgstr "Разблокировать"
+
+#: lib/bastion_web/errors.ex:43
+#, elixir-autogen, elixir-format
+msgid "Username: 1–64 characters — letters, digits, dot, underscore, hyphen"
+msgstr "Логин: 1–64 символа — буквы, цифры, точка, подчёркивание, дефис"
+
+#: lib/bastion_web/errors.ex:46
+#, elixir-autogen, elixir-format
+msgid "You cannot do this with your own account"
+msgstr "Со своей учётной записью так нельзя"
+
+#: lib/bastion_web/live/users_live.ex:349
+#, elixir-autogen, elixir-format
+msgid "deleted account"
+msgstr "удалённая учётная запись"
+
+#: lib/bastion_web/live/users_live.ex:177
+#, elixir-autogen, elixir-format
+msgid "since"
+msgstr "с"
+
+#: lib/bastion_web/live/users_live.ex:162
+#, elixir-autogen, elixir-format
+msgid "you"
+msgstr "вы"

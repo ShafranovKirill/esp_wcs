@@ -1,22 +1,31 @@
 defmodule Bastion.Accounts do
-  use Boundary, top_level?: true, deps: [Bastion.Repo]
+  use Boundary,
+    top_level?: true,
+    deps: [Bastion.Repo, Bastion.Events],
+    exports: [User, AccessEvent, Events.SessionsClosed, Events.UsersChanged]
 
-  alias Bastion.Accounts.Application.{Authentication, Provisioning}
+  alias Bastion.Accounts.Application.{Authentication, Journal, Provisioning, Staff}
   alias Bastion.Accounts.Domain.PasswordPolicy
   alias Bastion.Accounts.Infrastructure.ThrottleStore
 
-  @type admin :: %{id: String.t(), username: String.t()}
+  @type current :: Authentication.current()
 
   def child_spec(_opts) do
     %{id: __MODULE__, start: {ThrottleStore, :start_link, [[]]}}
   end
 
+  def subscribe, do: Bastion.Events.subscribe(:accounts)
+
+  def subscribe(user_id), do: Bastion.Events.subscribe({:user, user_id})
+
   @spec login(String.t(), String.t(), String.t()) ::
-          {:ok, binary()} | {:error, :invalid_credentials} | {:error, {:locked, pos_integer()}}
+          {:ok, binary()}
+          | {:error, :invalid_credentials | :blocked}
+          | {:error, {:locked, pos_integer()}}
   defdelegate login(username, password, remote_ip), to: Authentication
 
-  @spec admin_by_session(binary() | nil, keyword()) :: admin() | nil
-  defdelegate admin_by_session(token, opts \\ []), to: Authentication, as: :admin_by_token
+  @spec user_by_session(binary() | nil, keyword()) :: current() | nil
+  defdelegate user_by_session(token, opts \\ []), to: Authentication, as: :user_by_token
 
   @spec session_id(binary()) :: String.t()
   defdelegate session_id(token), to: Authentication
@@ -35,4 +44,15 @@ defmodule Bastion.Accounts do
 
   @spec ensure_admin(String.t() | nil, String.t() | nil, keyword()) :: Provisioning.result()
   defdelegate ensure_admin(username, password, opts \\ []), to: Provisioning
+
+  defdelegate list_users(), to: Staff, as: :list
+  defdelegate get_user(id), to: Staff, as: :get
+  defdelegate create_user(actor, username), to: Staff, as: :create
+  defdelegate reset_password(actor, id), to: Staff
+  defdelegate block(actor, id), to: Staff
+  defdelegate unblock(actor, id), to: Staff
+  defdelegate change_password(actor, current, new), to: Staff
+
+  @spec list_access_events(pos_integer()) :: [Bastion.Accounts.AccessEvent.t()]
+  defdelegate list_access_events(limit \\ 200), to: Journal, as: :list
 end

@@ -1,12 +1,13 @@
-defmodule BastionWeb.AdminAuth do
+defmodule BastionWeb.UserAuth do
   use BastionWeb, :verified_routes
 
   import Plug.Conn
   import Phoenix.Controller
 
   alias Bastion.Accounts
+  alias Bastion.Accounts.Events.SessionsClosed
 
-  @token_key "admin_token"
+  @token_key "user_token"
   @check_interval :timer.minutes(1)
 
   def log_in(conn, token) do
@@ -30,13 +31,13 @@ defmodule BastionWeb.AdminAuth do
     |> redirect(to: ~p"/login")
   end
 
-  def fetch_current_admin(conn, _opts) do
-    admin = conn |> get_session(@token_key) |> Accounts.admin_by_session()
-    assign(conn, :current_admin, admin)
+  def fetch_current_user(conn, _opts) do
+    user = conn |> get_session(@token_key) |> Accounts.user_by_session()
+    assign(conn, :current_user, user)
   end
 
-  def require_admin(conn, _opts) do
-    if conn.assigns[:current_admin] do
+  def require_user(conn, _opts) do
+    if conn.assigns[:current_user] do
       conn
     else
       conn
@@ -45,8 +46,8 @@ defmodule BastionWeb.AdminAuth do
     end
   end
 
-  def redirect_if_admin(conn, _opts) do
-    if conn.assigns[:current_admin] do
+  def redirect_if_user(conn, _opts) do
+    if conn.assigns[:current_user] do
       conn
       |> redirect(to: ~p"/")
       |> halt()
@@ -63,28 +64,31 @@ defmodule BastionWeb.AdminAuth do
     |> clear_session()
   end
 
-  defp live_socket_id(token), do: "admin_session:" <> Accounts.session_id(token)
+  defp live_socket_id(token), do: "user_session:" <> Accounts.session_id(token)
 
-  def on_mount(:require_admin, _params, session, socket) do
+  def on_mount(:require_user, _params, session, socket) do
     token = session[@token_key]
 
-    case Accounts.admin_by_session(token) do
+    case Accounts.user_by_session(token) do
       nil ->
         {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/login")}
 
-      admin ->
-        if Phoenix.LiveView.connected?(socket), do: schedule_check()
+      user ->
+        if Phoenix.LiveView.connected?(socket) do
+          Accounts.subscribe(user.id)
+          schedule_check()
+        end
 
         socket =
           socket
-          |> Phoenix.Component.assign(:current_admin, admin)
+          |> Phoenix.Component.assign(:current_user, user)
           |> Phoenix.LiveView.attach_hook(
-            :admin_session_check,
+            :user_session_check,
             :handle_info,
             &check_session(&1, &2, token)
           )
           |> Phoenix.LiveView.attach_hook(
-            :admin_session_touch,
+            :user_session_touch,
             :handle_event,
             &touch_session(&1, &2, &3, token)
           )
@@ -93,8 +97,8 @@ defmodule BastionWeb.AdminAuth do
     end
   end
 
-  defp check_session(:check_admin_session, socket, token) do
-    if Accounts.admin_by_session(token, touch: false) do
+  defp check_session(:check_user_session, socket, token) do
+    if Accounts.user_by_session(token, touch: false) do
       schedule_check()
       {:halt, socket}
     else
@@ -102,15 +106,18 @@ defmodule BastionWeb.AdminAuth do
     end
   end
 
+  defp check_session({:event, %SessionsClosed{}}, socket, _token),
+    do: {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/login")}
+
   defp check_session(_message, socket, _token), do: {:cont, socket}
 
   defp touch_session(_event, _params, socket, token) do
-    if Accounts.admin_by_session(token) do
+    if Accounts.user_by_session(token) do
       {:cont, socket}
     else
       {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/login")}
     end
   end
 
-  defp schedule_check, do: Process.send_after(self(), :check_admin_session, @check_interval)
+  defp schedule_check, do: Process.send_after(self(), :check_user_session, @check_interval)
 end

@@ -27,10 +27,14 @@ defmodule Bastion.Release do
         IO.puts("Администратор «#{config[:username]}» создан")
 
       {:ok, :reset} ->
-        IO.puts("Пароль администратора «#{config[:username]}» перезаписан, все сессии завершены")
+        IO.puts(
+          "Пароль «#{config[:username]}» перезаписан, учётная запись разблокирована, её сессии завершены"
+        )
 
       {:ok, :unchanged} ->
-        IO.puts("Администратор уже есть, ничего не изменено (перезаписать: --reset)")
+        IO.puts(
+          "Сотрудники уже есть, ничего не изменено (перезаписать пароль «#{config[:username]}»: --reset)"
+        )
 
       {:error, reason} ->
         fail(reason)

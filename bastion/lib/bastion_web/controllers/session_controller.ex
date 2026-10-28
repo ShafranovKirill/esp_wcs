@@ -2,7 +2,7 @@ defmodule BastionWeb.SessionController do
   use BastionWeb, :controller
 
   alias Bastion.Accounts
-  alias BastionWeb.AdminAuth
+  alias BastionWeb.UserAuth
 
   def new(conn, _params) do
     render(conn, :new,
@@ -15,7 +15,7 @@ defmodule BastionWeb.SessionController do
       when is_binary(username) and is_binary(password) do
     case Accounts.login(username, password, remote_ip(conn)) do
       {:ok, token} ->
-        AdminAuth.log_in(conn, token)
+        UserAuth.log_in(conn, token)
 
       {:error, reason} ->
         conn
@@ -29,9 +29,10 @@ defmodule BastionWeb.SessionController do
 
   def create(conn, _params), do: new(conn, %{})
 
-  def delete(conn, _params), do: AdminAuth.log_out(conn)
+  def delete(conn, _params), do: UserAuth.log_out(conn)
 
   defp error_text(:invalid_credentials), do: gettext("Invalid username or password")
+  defp error_text(:blocked), do: gettext("The account is blocked")
 
   defp error_text({:locked, seconds}),
     do: gettext("Too many attempts. Try again in %{seconds} s", seconds: seconds)
