@@ -405,7 +405,7 @@ static esp_err_t sta_connect(const char *ssid, const char *password, bool auto_r
 
     wifi_config_t wifi_config = {
         .sta = {
-            .threshold.authmode = pass_len ? WIFI_AUTH_WPA_PSK : WIFI_AUTH_OPEN,
+            .threshold.authmode = pass_len ? WIFI_AUTH_WPA2_PSK : WIFI_AUTH_OPEN,
             .sae_pwe_h2e = WPA3_SAE_PWE_BOTH,
             .pmf_cfg = { .capable = true, .required = false },
         },

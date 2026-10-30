@@ -399,6 +399,7 @@ esp_err_t wcs_web_start(const wcs_web_config_t *config)
     cfg.servercert_len = cred.cert_len;
     cfg.prvtkey_pem = (const uint8_t *)cred.key_pem;
     cfg.prvtkey_len = cred.key_len;
+    cfg.tls_version = ESP_TLS_VER_TLS_1_3;
     cfg.httpd.stack_size = SERVER_STACK_SIZE;
     cfg.httpd.max_uri_handlers = MAX_URI_HANDLERS;
     cfg.httpd.max_open_sockets = MAX_OPEN_SOCKETS;

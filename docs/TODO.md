@@ -53,7 +53,7 @@
 - Заголовки: CSP (`default-src 'self'; connect-src 'self' wss://<host>; frame-ancestors 'none'`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`
 - WebSocket: `Origin` должен быть `https://192.168.4.1`, вход проверяется до рукопожатия (`ws_pre_handshake_cb`); защита от CSWSH
 - Маршруты по уровню доступа, проверка в одном месте (`dispatch`); в рабочих режимах страниц настройки нет вообще
-- HTTPS: ECDSA P-256, самоподписанный до 2099, создаётся на устройстве (`wcs_tls`, NVS), переживает сброс; порт 80 только перенаправляет. mbedTLS: включены TLS 1.2 и 1.3
+- HTTPS: ECDSA P-256, самоподписанный до 2099, создаётся на устройстве (`wcs_tls`, NVS), переживает сброс; порт 80 только перенаправляет. только TLS 1.3
 - Wi-Fi AP: `WPA2_WPA3_PSK`, PMF capable (не required — возможен откат до WPA2), максимум 1 клиент, таймер 10 мин
 - Хранение: настройки, пароли Wi-Fi, ключ устройства, HTTPS-ключ — NVS открытым текстом до Flash/NVS Encryption (этап 3). JTAG через USB включён
 - `CONFIG_ESP_SYSTEM_MEMPROT_PMS` включена; Secure Boot не включён
