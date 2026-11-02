@@ -33,6 +33,8 @@ esp_err_t wcs_storage_load(wcs_settings_t *settings)
     ESP_RETURN_ON_FALSE(settings, ESP_ERR_INVALID_ARG, TAG, "settings is NULL");
     memset(settings, 0, sizeof(*settings));
 
+    settings->direct_range_m = WCS_DIRECT_RANGE_DEFAULT_M;
+
     nvs_handle_t nvs;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
@@ -59,6 +61,14 @@ esp_err_t wcs_storage_load(wcs_settings_t *settings)
     }
     if (err == ESP_OK) {
         err = read_str(nvs, KEY_DIRECT_PASS, settings->direct_password, sizeof(settings->direct_password));
+    }
+    if (err == ESP_OK) {
+        err = nvs_get_u16(nvs, "direct_range", &settings->direct_range_m);
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+        if (settings->direct_range_m < WCS_DIRECT_RANGE_MIN_M ||
+            settings->direct_range_m > WCS_DIRECT_RANGE_MAX_M) {
+            settings->direct_range_m = WCS_DIRECT_RANGE_DEFAULT_M;
+        }
     }
     nvs_close(nvs);
     ESP_RETURN_ON_ERROR(err, TAG, "read failed");
@@ -89,6 +99,9 @@ esp_err_t wcs_storage_save(const wcs_settings_t *settings)
     }
     if (err == ESP_OK) {
         err = nvs_set_str(nvs, KEY_DIRECT_PASS, settings->direct_password);
+    }
+    if (err == ESP_OK) {
+        err = nvs_set_u16(nvs, "direct_range", settings->direct_range_m);
     }
     if (err == ESP_OK) {
         err = nvs_commit(nvs);

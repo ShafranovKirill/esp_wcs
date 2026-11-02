@@ -90,3 +90,11 @@
 
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
+
+.map-canvas { background-color: var(--color-base-200); background-image: radial-gradient(color-mix(in srgb, var(--color-base-content) 12%, transparent) 1px, transparent 1px); background-size: 24px 24px; cursor: grab; }
+.map-canvas:active { cursor: grabbing; }
+.map-canvas:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+#map-workspace:fullscreen { background: var(--color-base-100); padding: 12px; }
+#map-workspace:fullscreen .map-canvas { height: calc(100dvh - 5rem); }
+[data-marker]:hover { filter: brightness(1.12); outline: 3px solid color-mix(in srgb, var(--color-primary) 30%, transparent); }
+[data-map-id][aria-pressed="true"] { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); }

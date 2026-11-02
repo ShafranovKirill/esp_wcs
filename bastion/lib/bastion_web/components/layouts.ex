@@ -8,11 +8,16 @@ defmodule BastionWeb.Layouts do
   attr :current_actor, :any, default: nil, doc: "права вошедшего сотрудника"
   attr :locale, :string, default: "ru"
   attr :current_path, :string, default: "/"
+  attr :map_mode, :boolean, default: false
+  attr :wide, :boolean, default: false
   slot :inner_block, required: true
 
   def app(assigns) do
     ~H"""
-    <header class="sticky top-0 z-30 border-b border-base-300 bg-base-100/90 backdrop-blur">
+    <header
+      :if={!@map_mode}
+      class="sticky top-0 z-30 border-b border-base-300 bg-base-100/90 backdrop-blur"
+    >
       <div class="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:px-6 lg:px-8">
         <.link navigate={~p"/"} class="flex items-center gap-2 font-semibold">
           <span class="grid size-8 place-items-center rounded-lg bg-primary text-primary-content">
@@ -78,8 +83,8 @@ defmodule BastionWeb.Layouts do
       </div>
     </header>
 
-    <main class="px-4 py-6 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-6xl space-y-6">
+    <main class={if @map_mode, do: "h-dvh overflow-hidden", else: "px-4 py-6 sm:px-6 lg:px-8"}>
+      <div class={["mx-auto space-y-6", !@wide && "max-w-6xl"]}>
         {render_slot(@inner_block)}
       </div>
     </main>

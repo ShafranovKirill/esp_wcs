@@ -9,7 +9,7 @@ defmodule Mix.Tasks.Bastion.Demo do
   @requirements ["app.config"]
 
   @impl Mix.Task
-  def run(_args) do
+  def run(args) do
     if Mix.env() == :prod, do: Mix.raise("bastion.demo — только для разработки")
 
     Logger.configure(level: :warning)
@@ -24,16 +24,25 @@ defmodule Mix.Tasks.Bastion.Demo do
         strategy: :one_for_one
       )
 
-    case Bastion.Demo.seed() do
-      {:ok, staff} ->
-        Mix.shell().info("Созданы папки, устройства, группа «Сетевики А» и сотрудники:")
-        for {name, password} <- staff, do: Mix.shell().info("  #{name} / #{password}")
-        Bastion.Accounts.sync_journal()
+    if "--campus" in args do
+      {:ok, campus} = Bastion.Demo.seed_campus(Path.expand("../examples/photos"))
 
-      {:error, :already_seeded} ->
-        Mix.raise(
-          "Демо уже создано: есть папка «Здание А», «Здание Б», «Ядро сети» или сотрудник из демо"
-        )
+      if "--refresh-covers" in args,
+        do: Bastion.Demo.refresh_campus_covers(Path.expand("../examples/photos"))
+
+      Mix.shell().info("Демо-карты готовы: /folders/#{campus.id}/map")
+    else
+      case Bastion.Demo.seed() do
+        {:ok, staff} ->
+          Mix.shell().info("Созданы папки, устройства, группа «Сетевики А» и сотрудники:")
+          for {name, password} <- staff, do: Mix.shell().info("  #{name} / #{password}")
+          Bastion.Accounts.sync_journal()
+
+        {:error, :already_seeded} ->
+          Mix.raise(
+            "Демо уже создано: есть папка «Здание А», «Здание Б», «Ядро сети» или сотрудник из демо"
+          )
+      end
     end
   end
 end

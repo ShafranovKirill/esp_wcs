@@ -10,6 +10,7 @@
 typedef struct {
     const char *ssid;
     const char *password;
+    uint16_t range_m; /* 0: full power (setup AP), otherwise approximate outdoor range */
     uint8_t channel;
     uint8_t max_clients;
 } wcs_wifi_ap_config_t;

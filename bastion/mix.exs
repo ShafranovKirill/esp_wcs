@@ -62,6 +62,7 @@ defmodule Bastion.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
+      {:req, "~> 0.7"},
       {:bandit, "~> 1.5"},
       {:boundary, "~> 0.10", runtime: false},
       {:argon2_elixir, "~> 4.1"},

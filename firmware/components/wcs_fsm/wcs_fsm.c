@@ -87,6 +87,7 @@ static int s_ap_clients;
 static bool s_error;
 static char s_setup_ssid[33];
 static char s_direct_ssid[33];
+static uint16_t s_direct_range_m = WCS_DIRECT_RANGE_DEFAULT_M;
 static char s_direct_ap_ssid[WCS_SSID_MAX_LEN + 1];
 static char s_direct_ap_password[WCS_WIFI_PASSWORD_MAX_LEN + 1];
 static char s_device_name[33];
@@ -223,6 +224,7 @@ static bool start_access_point(const char *ssid, const char *password, const wcs
     const wcs_wifi_ap_config_t ap = {
         .ssid = ssid,
         .password = password,
+        .range_m = web->mode == WCS_WEB_MODE_DIRECT ? s_direct_range_m : 0,
         .channel = CONFIG_WCS_FSM_AP_CHANNEL,
         .max_clients = CONFIG_WCS_FSM_AP_MAX_CLIENTS,
     };
@@ -243,6 +245,7 @@ static void load_direct_credentials(void)
     if (wcs_storage_load(&settings) != ESP_OK) {
         memset(&settings, 0, sizeof(settings));
     }
+    s_direct_range_m = settings.direct_range_m ? settings.direct_range_m : WCS_DIRECT_RANGE_DEFAULT_M;
     strlcpy(s_direct_ap_ssid, settings.direct_ssid[0] ? settings.direct_ssid : s_direct_ssid,
             sizeof(s_direct_ap_ssid));
     strlcpy(s_direct_ap_password,

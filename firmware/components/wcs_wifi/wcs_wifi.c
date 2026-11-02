@@ -1,3 +1,4 @@
+#include <math.h>
 #include "wcs_wifi.h"
 
 #include <stdlib.h>
@@ -268,6 +269,14 @@ static esp_err_t ap_start(const wcs_wifi_ap_config_t *config)
     if (err == ESP_OK) {
         err = esp_wifi_start();
         s_started = err == ESP_OK;
+    }
+    if (err == ESP_OK) {
+        /* Preliminary free-space scale: 100 m at 20 dBm; P varies as distance squared.
+         * The driver quantizes/clamps this limit; this is not a measured coverage radius. */
+        float dbm = config->range_m ? 20.0f + 20.0f * log10f(config->range_m / 100.0f) : 20.0f;
+        if (dbm < 2.0f) dbm = 2.0f;
+        if (dbm > 20.0f) dbm = 20.0f;
+        err = esp_wifi_set_max_tx_power((int8_t)lroundf(dbm * 4.0f));
     }
     memset(&wifi_config, 0, sizeof(wifi_config));
     if (err != ESP_OK) {

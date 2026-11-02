@@ -4,7 +4,7 @@ PORT ?= /dev/ttyACM0
 ARGS ?=
 
 .DEFAULT_GOAL := help
-.PHONY: help db db-stop setup admin admin-reset run device test precommit db-reset seed fw-build fw-flash
+.PHONY: help db db-stop setup admin admin-reset run device test precommit s3 db-reset seed fw-build fw-flash
 
 help:
 	@echo "Бастион:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make admin        создать администратора, если его нет"
 	@echo "  make admin-reset  перезаписать пароль администратора из bastion/.env"
 	@echo "  make db           поднять PostgreSQL (127.0.0.1:5434)"
+	@echo "  make s3           поднять SeaweedFS и подготовить бакет карт"
 	@echo "  make db-stop      остановить PostgreSQL"
 	@echo "  make db-reset     пересоздать пустую БД и администратора (все устройства пропадут)"
 	@echo "  make seed         добавить тестовые папки и устройства (MAC aabbcc…)"
@@ -29,9 +30,13 @@ db:
 db-stop:
 	cd $(BASTION) && docker compose stop db
 
+s3:
+	cd $(BASTION) && docker compose up -d --wait s3 && mix bastion.storage
+
 setup: db
 	test -f $(BASTION)/.env || cp $(BASTION)/.env.example $(BASTION)/.env
 	cd $(BASTION) && mix setup && mix bastion.admin
+	$(MAKE) s3
 
 admin: db
 	cd $(BASTION) && mix bastion.admin
@@ -39,7 +44,7 @@ admin: db
 admin-reset: db
 	cd $(BASTION) && mix bastion.admin --reset
 
-run: db
+run: db s3
 	cd $(BASTION) && mix phx.server
 
 device:

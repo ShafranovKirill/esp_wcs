@@ -22,7 +22,8 @@ defmodule BastionWeb.DashboardLive do
         folder_mode: {:new, nil},
         move_form: to_form(%{"parent_id" => ""}, as: :move),
         moving_folder: nil,
-        collapsed: MapSet.new()
+        known_folders: MapSet.new(),
+        collapsed: MapSet.new(["none"])
       )
       |> load()
 
@@ -33,7 +34,14 @@ defmodule BastionWeb.DashboardLive do
     actor = socket.assigns.current_actor
     overview = Fleet.overview(actor)
 
+    ids = MapSet.new(overview.folders, & &1.id)
+
+    collapsed =
+      MapSet.union(socket.assigns.collapsed, MapSet.difference(ids, socket.assigns.known_folders))
+
     assign(socket,
+      known_folders: ids,
+      collapsed: collapsed,
       overview: overview,
       tree: Folder.tree(overview.folders),
       folders_by_id: Map.new(overview.folders, &{&1.id, &1}),
@@ -475,6 +483,15 @@ defmodule BastionWeb.DashboardLive do
             {@subtree_count}
           </span>
         </button>
+        <.link
+          :if={!@dim?}
+          navigate={~p"/folders/#{@folder.id}/map"}
+          id={"folder-map-#{@folder.id}"}
+          class="btn btn-ghost btn-xs"
+          title={gettext("Folder map")}
+        >
+          <.icon name="hero-map" class="size-4" />
+        </.link>
         <div :if={@manage?} class="dropdown dropdown-end">
           <div
             tabindex="0"
@@ -538,7 +555,7 @@ defmodule BastionWeb.DashboardLive do
         </div>
       </div>
 
-      <div :if={!@collapsed?} class="border-t border-base-300">
+      <div hidden={@collapsed?} class="border-t border-base-300">
         <div :if={@children != []} class="space-y-2 p-2 pl-6">
           <.folder_node
             :for={child <- @children}
@@ -597,7 +614,7 @@ defmodule BastionWeb.DashboardLive do
           <span class="badge badge-ghost badge-sm">{@all_count}</span>
         </button>
       </div>
-      <div :if={!@collapsed} class="border-t border-base-300">
+      <div hidden={@collapsed} class="border-t border-base-300">
         <p :if={@devices == []} class="px-4 py-4 text-sm text-base-content/50">
           {gettext("Nothing found")}
         </p>

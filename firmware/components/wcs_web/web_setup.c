@@ -76,10 +76,10 @@ static esp_err_t info_get(httpd_req_t *req)
 
     char json[2048];
     snprintf(json, sizeof(json),
-             "{\"direct\":{\"ssid\":\"%s\",\"password\":\"%s\",\"url\":\"%s\"},"
+             "{\"direct\":{\"ssid\":\"%s\",\"password\":\"%s\",\"url\":\"%s\",\"range_m\":%u},"
              "\"saved\":{\"mode\":\"%s\",\"sta_ssid\":\"%s\",\"bastion\":\"%s\"},"
              "\"bastion_default_port\":%d,\"device\":{\"id\":\"%s\",\"code\":\"%s\"}}",
-             ssid, password, url, mode_name(saved.mode), sta_ssid, bastion, CONFIG_WCS_BASTION_DEFAULT_PORT,
+             ssid, password, url, saved.direct_range_m ? saved.direct_range_m : WCS_DIRECT_RANGE_DEFAULT_M, mode_name(saved.mode), sta_ssid, bastion, CONFIG_WCS_BASTION_DEFAULT_PORT,
              device_id, device_code);
     return web_send_json(req, NULL, json);
 }
@@ -231,6 +231,16 @@ static esp_err_t apply_post(httpd_req_t *req)
         char password[FORM_PASS_MAX] = "";
         web_form_value(body, "direct_ssid", ssid, sizeof(ssid));
         web_form_value(body, "direct_password", password, sizeof(password));
+        char range[16] = "";
+        web_form_value(body, "direct_range_m", range, sizeof(range));
+        char *end;
+        long meters = strtol(range, &end, 10);
+        if (!range[0] || *end || meters < WCS_DIRECT_RANGE_MIN_M || meters > WCS_DIRECT_RANGE_MAX_M) {
+            memset(password, 0, sizeof(password));
+            memset(body, 0, sizeof(body));
+            return web_send_json(req, "400 Bad Request", "{\"error\":\"invalid_direct_range\"}");
+        }
+        settings.direct_range_m = (uint16_t)meters;
         memset(body, 0, sizeof(body));
         size_t ssid_len = strlen(ssid);
         size_t pass_len = strlen(password);

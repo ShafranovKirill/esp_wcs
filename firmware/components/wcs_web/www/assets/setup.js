@@ -111,6 +111,8 @@
   });
 
   $('apply-direct').addEventListener('click', function () {
+    if (!$('direct-form').reportValidity()) return;
+    var range = Number($('direct-range').value);
     var ssid = $('direct-ssid').value;
     var password = $('direct-password').value;
     var bytes = function (s) { return new TextEncoder().encode(s).length; };
@@ -124,7 +126,7 @@
       $('apply-error').hidden = false;
       return;
     }
-    apply({ mode: 'direct', direct_ssid: ssid, direct_password: password }, function () {
+    apply({ mode: 'direct', direct_ssid: ssid, direct_password: password, direct_range_m: range }, function () {
       return 'Интерфейс настройки закрыт. Подключитесь к Wi-Fi «' + ssid +
         '» (пароль ' + password + ') и откройте ' + info.direct.url;
     });
@@ -354,6 +356,7 @@
     document.querySelector('[data-direct="url"]').textContent = info.direct.url;
     $('direct-ssid').value = info.direct.ssid;
     $('direct-password').value = info.direct.password;
+    $('direct-range').value = info.direct.range_m || 100;
     var port = info.bastion_default_port;
     $('bastion-hint').textContent = 'Порт по умолчанию — ' + port + '. Другой укажите через двоеточие: bastion.local:8443. ' +
       'Если mDNS в сети не работает, введите IP со страницы «Как подключить» на бастионе';

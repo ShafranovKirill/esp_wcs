@@ -9,6 +9,10 @@
 #define WCS_WIFI_PASSWORD_MAX_LEN 64
 #define WCS_BASTION_ADDR_MAX_LEN  128
 
+#define WCS_DIRECT_RANGE_DEFAULT_M 100
+#define WCS_DIRECT_RANGE_MIN_M 10
+#define WCS_DIRECT_RANGE_MAX_M 100
+
 typedef enum {
     WCS_MODE_FACTORY = 0,
     WCS_MODE_DIRECT = 1,
@@ -20,6 +24,7 @@ typedef struct {
     char sta_ssid[WCS_SSID_MAX_LEN + 1];
     char sta_password[WCS_WIFI_PASSWORD_MAX_LEN + 1];
     char bastion_addr[WCS_BASTION_ADDR_MAX_LEN + 1];
+    uint16_t direct_range_m;
     char direct_ssid[WCS_SSID_MAX_LEN + 1];
     char direct_password[WCS_WIFI_PASSWORD_MAX_LEN + 1];
 } wcs_settings_t;

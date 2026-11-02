@@ -52,6 +52,10 @@
         <label>Пароль (от 8 до 63 символов)
           <input id="direct-password" minlength="8" maxlength="63" autocomplete="off" required>
         </label>
+        <label>Примерная дальность на открытом пространстве, м
+          <input id="direct-range" type="number" min="10" max="100" step="1" value="100" required aria-describedby="direct-range-help">
+        </label>
+        <p id="direct-range-help" class="muted">От 10 до 100 м. Регулирует мощность Wi-Fi. Оценка для открытого пространства; стены и помехи уменьшают дальность.</p>
       </form>
       <dl>
         <dt>Адрес</dt><dd data-direct="url">…</dd>

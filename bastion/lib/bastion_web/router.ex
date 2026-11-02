@@ -5,7 +5,7 @@ defmodule BastionWeb.Router do
     only: [fetch_current_user: 2, require_user: 2, redirect_if_user: 2]
 
   @csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " <>
-         "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+         "img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -45,10 +45,13 @@ defmodule BastionWeb.Router do
   scope "/", BastionWeb do
     pipe_through [:browser, :authenticated]
 
+    get "/folders/:id/background", MapBackgroundController, :show
+
     delete "/logout", SessionController, :delete
 
     live_session :staff, on_mount: [BastionWeb.Locale, {BastionWeb.UserAuth, :require_user}] do
       live "/", DashboardLive, :index
+      live "/folders/:id/map", FolderMapLive, :index
       live "/connect", ConnectLive, :index
       live "/devices/:id", DeviceLive, :console
       live "/devices/:id/settings", DeviceLive, :settings

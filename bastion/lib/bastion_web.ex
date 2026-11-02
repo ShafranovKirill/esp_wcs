@@ -9,6 +9,7 @@ defmodule BastionWeb do
       Bastion.Link,
       Bastion.Console,
       Bastion.Control,
+      Bastion.Maps,
       Bastion.Discovery
     ],
     exports: [Endpoint, Telemetry, TLS]

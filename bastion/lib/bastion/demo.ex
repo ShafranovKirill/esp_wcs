@@ -1,5 +1,11 @@
 defmodule Bastion.Demo do
-  use Boundary, top_level?: true, deps: [Bastion.Accounts, Bastion.Access, Bastion.Fleet]
+  use Boundary,
+    top_level?: true,
+    deps: [Bastion.Accounts, Bastion.Access, Bastion.Fleet, Bastion.Maps]
+
+  defdelegate refresh_campus_covers(photo_dir), to: Bastion.Demo.Campus, as: :refresh_covers
+
+  defdelegate seed_campus(photo_dir), to: Bastion.Demo.Campus, as: :seed
 
   alias Bastion.{Access, Accounts, Fleet}
 

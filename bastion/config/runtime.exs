@@ -73,3 +73,18 @@ if config_env() == :prod do
     check_origin: :conn,
     secret_key_base: secret_key_base
 end
+
+if config_env() in [:dev, :prod] do
+  map_storage = env!("BASTION_MAP_STORAGE", :string, "local")
+  unless map_storage in ["local", "s3"], do: raise("BASTION_MAP_STORAGE must be local or s3")
+
+  config :bastion, Bastion.Maps,
+    storage: map_storage,
+    s3: [
+      endpoint: env!("S3_ENDPOINT", :string, "http://127.0.0.1:18333"),
+      bucket: env!("S3_BUCKET", :string, "bastion-maps"),
+      region: env!("S3_REGION", :string, "us-east-1"),
+      access_key_id: env!("S3_ACCESS_KEY", :string, ""),
+      secret_access_key: env!("S3_SECRET_KEY", :string, "")
+    ]
+end
