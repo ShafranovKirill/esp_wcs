@@ -35,7 +35,7 @@ defmodule BastionWeb.DashboardLiveTest do
     {:ok, folder} = Fleet.create_folder(system(), "Склад")
     {:ok, _} = Fleet.set_folders(system(), device.id, [folder.id])
 
-    {:ok, view, _html} = live(conn, ~p"/?view=folders")
+    {:ok, view, _html} = live(conn, ~p"/")
     assert has_element?(view, "#folder-#{folder.id} #device-#{folder.id}-#{device.id}")
 
     view |> element("#folder-form") |> render_submit(%{folder: %{name: "склад"}})
@@ -86,7 +86,7 @@ defmodule BastionWeb.DashboardLiveTest do
 
   test "таблица ограничивает выдачу и сохраняет страницу и фильтр в URL", %{conn: conn} do
     for n <- 1..27, do: approved_device(%{name: "switch-#{n}"})
-    {:ok, view, _} = live(conn, ~p"/")
+    {:ok, view, _} = live(conn, ~p"/?view=list")
     assert has_element?(view, "#device-table")
 
     assert render(view)

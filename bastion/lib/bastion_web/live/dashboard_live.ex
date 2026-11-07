@@ -17,7 +17,7 @@ defmodule BastionWeb.DashboardLive do
         page_title: gettext("Devices"),
         bastion_code: Bastion.PKI.bastion_code(),
         query: "",
-        view: "list",
+        view: "folders",
         status: "all",
         page: 1,
         approving: nil,
@@ -57,7 +57,7 @@ defmodule BastionWeb.DashboardLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    view = if params["view"] == "folders", do: "folders", else: "list"
+    view = if params["view"] == "list", do: "list", else: "folders"
     status = if params["status"] in ~w(online offline revoked), do: params["status"], else: "all"
 
     page =
