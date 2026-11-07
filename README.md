@@ -50,7 +50,8 @@
 ## Железо
 
 - ESP32-S3-DevKitC-1 v1.1, модуль ESP32-S3-WROOM-1-N16R8 (16 МБ Flash, 8 МБ Octal PSRAM)
-- модуль MAX3232 (питание строго 3.3 В) и кабель RJ45, распиновка Cisco
+- модуль MAX3232 с DB9 «мама» (питание строго 3.3 В), четыре провода Dupont «мама-мама» и кабель KS-is KS-444M (DB9 «папа» — RJ45 «папа»), распиновка Cisco
+- проверенная прозвонкой схема подключения — [`docs/hardware/console-wiring.md`](docs/hardware/console-wiring.md); проверка обмена с коммутатором ещё предстоит
 - консоль: UART1, GPIO17 (TX) / GPIO18 (RX)
 
 Справочник по плате и распиновка — [`docs/hardware/esp32-s3-n16r8-board.md`](docs/hardware/esp32-s3-n16r8-board.md).
