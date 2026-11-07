@@ -2,7 +2,7 @@ defmodule Bastion.Console do
   use Boundary,
     top_level?: true,
     deps: [Bastion.Events, Bastion.Fleet, Bastion.Link, Bastion.Access],
-    exports: [Events.ConsoleTaken, Events.LockChanged]
+    exports: [Events.ConsoleTaken, Events.LockChanged, Domain.Sequence]
 
   alias Bastion.Console.Application.Locks
   alias Bastion.Console.Domain.Line
@@ -54,6 +54,20 @@ defmodule Bastion.Console do
     if Locks.owner?(id, self()),
       do: Bastion.Link.console_input(id, data),
       else: {:error, :not_owner}
+  end
+
+  defdelegate prepare_sequence(text, params), to: Bastion.Console.Domain.Sequence, as: :new
+
+  def send_sequence_line(actor, id, data) do
+    with :ok <- Bastion.Fleet.authorize(actor, "console.write", id),
+         true <- Locks.owner?(id, self()) || {:error, :not_owner},
+         %{caps: caps} <- Bastion.Link.presence(id),
+         true <- ("credit" in caps and "console" in caps) || {:error, :sequence_no_credit} do
+      Bastion.Link.console_send(id, data)
+    else
+      nil -> {:error, :offline}
+      error -> error
+    end
   end
 
   @spec send_break(actor(), String.t(), pid()) :: :ok | {:error, term()}

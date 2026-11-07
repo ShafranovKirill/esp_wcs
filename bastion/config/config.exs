@@ -1,5 +1,7 @@
 import Config
 
+config :mime, :types, %{"text/x-wcs-config" => ["cfg", "conf"]}
+
 config :bastion,
   ecto_repos: [Bastion.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]

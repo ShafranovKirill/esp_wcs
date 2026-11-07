@@ -50,6 +50,9 @@ defmodule Bastion.Link do
     end
   end
 
+  def console_send(id, data) when is_binary(data) and byte_size(data) <= 1026,
+    do: request(id, &{:console_send, &1, &2, data})
+
   @spec console_history(String.t()) :: {:ok, binary()} | {:error, :offline | :timeout}
   def console_history(id), do: request(id, &{:console_history, &1, &2})
 
