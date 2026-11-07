@@ -32,6 +32,7 @@ esp_err_t wcs_link_forget_identity(void);
 
 typedef struct {
     const char *bastion_addr;
+    const char *ca_pem;
     const char *name;
     const char *firmware;
 } wcs_link_config_t;

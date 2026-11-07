@@ -31,6 +31,7 @@ defmodule BastionWeb.DeviceLive do
            folders: Fleet.visible_folders(socket.assigns.current_actor).folders,
            online: Bastion.Link.presence(device.id),
            console: :idle,
+           auto_baud: false,
            console_since: nil
          )
          |> assign_forms()
@@ -44,6 +45,7 @@ defmodule BastionWeb.DeviceLive do
 
     socket =
       socket
+      |> assign(auto_baud: if(tab == :console, do: socket.assigns.auto_baud, else: false))
       |> assign(tab: tab, page_title: "#{socket.assigns.device.name} · #{tab_title(tab)}")
       |> then(fn s ->
         if tab == :journal, do: assign(s, events: Fleet.list_events(s.assigns.device.id)), else: s
@@ -85,7 +87,10 @@ defmodule BastionWeb.DeviceLive do
 
   defp release_console(socket) do
     Console.release(socket.assigns.current_actor, socket.assigns.device.id)
-    socket |> assign(console: :idle) |> push_event("console-state", %{owner: false})
+
+    socket
+    |> assign(console: :idle, auto_baud: false)
+    |> push_event("console-state", %{owner: false})
   end
 
   defp drop_console(%{assigns: %{console: :owner}} = socket), do: release_console(socket)
@@ -118,7 +123,7 @@ defmodule BastionWeb.DeviceLive do
 
   defp busy(socket, since) do
     socket
-    |> assign(console: :busy, console_since: since)
+    |> assign(console: :busy, console_since: since, auto_baud: false)
     |> push_event("console-state", %{owner: false})
   end
 
@@ -221,10 +226,39 @@ defmodule BastionWeb.DeviceLive do
 
   def handle_event("console-break", _params, socket), do: {:noreply, socket}
 
+  def handle_event("console-line", _params, %{assigns: %{auto_baud: true}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("console-line", %{"line" => params}, socket) do
     id = socket.assigns.device.id
     actor = socket.assigns.current_actor
     {:noreply, start_async(socket, :console_line, fn -> Console.configure(actor, id, params) end)}
+  end
+
+  def handle_event("console-profile", %{"profile" => profile}, socket) do
+    if socket.assigns.auto_baud || socket.assigns.console != :owner do
+      {:noreply, socket}
+    else
+      actor = socket.assigns.current_actor
+      id = socket.assigns.device.id
+
+      {:noreply,
+       start_async(socket, :console_profile, fn -> Console.apply_profile(actor, id, profile) end)}
+    end
+  end
+
+  def handle_event("console-probe", %{"line" => line}, socket) do
+    result = Console.probe(socket.assigns.current_actor, socket.assigns.device.id, line)
+
+    case result do
+      :ok -> {:reply, %{ok: true}, assign(socket, auto_baud: true)}
+      {:error, reason} -> {:reply, %{ok: false, error: BastionWeb.Errors.message(reason)}, socket}
+    end
+  end
+
+  def handle_event("console-probe-end", _params, socket) do
+    result = Console.end_probe(socket.assigns.current_actor, socket.assigns.device.id)
+    {:reply, %{ok: result == :ok}, assign(socket, auto_baud: false)}
   end
 
   def handle_event("rename", %{"device" => %{"name" => name}}, socket) do
@@ -292,6 +326,17 @@ defmodule BastionWeb.DeviceLive do
   end
 
   @impl true
+  def handle_async(:console_profile, {:ok, {:ok, profile}}, socket) do
+    {:noreply,
+     socket
+     |> push_event("terminal-profile", %{
+       id: profile.id,
+       label: "#{profile.vendor} #{profile.model}",
+       backspace: profile.backspace
+     })
+     |> put_flash(:info, gettext("Device profile applied"))}
+  end
+
   def handle_async(op, {:ok, :ok}, socket), do: {:noreply, put_flash(socket, :info, done(op))}
 
   def handle_async(_op, {:ok, {:error, reason}}, socket),
@@ -398,6 +443,7 @@ defmodule BastionWeb.DeviceLive do
         online={@online}
         console={@console}
         since={@console_since}
+        auto_baud={@auto_baud}
         can={@can}
       />
       <.settings_tab
@@ -441,6 +487,7 @@ defmodule BastionWeb.DeviceLive do
   attr :online, :map, default: nil
   attr :console, :atom, required: true
   attr :since, :any, default: nil
+  attr :auto_baud, :boolean, default: false
   attr :can, :map, required: true
 
   defp console_tab(assigns) do
@@ -462,7 +509,7 @@ defmodule BastionWeb.DeviceLive do
         phx-change="console-line"
         class="flex flex-wrap items-center gap-2"
       >
-        <.line_fields form={@line_form} disabled={!@online or !@can.configure} />
+        <.line_fields form={@line_form} disabled={!@online or !@can.configure or @auto_baud} />
         <span :if={@line} class="text-sm text-base-content/50" id="console-line-current">
           {Console.format_line(@line)}
         </span>
@@ -478,6 +525,49 @@ defmodule BastionWeb.DeviceLive do
           <.icon name="hero-bolt" class="size-4" /> BREAK
         </button>
       </.form>
+
+      <div class="flex flex-wrap items-start gap-3 rounded-box border border-base-300 p-3">
+        <details id="console-profiles" class="min-w-48">
+          <summary class="cursor-pointer font-medium">{gettext("Device profiles")}</summary>
+          <details class="ml-3 mt-2">
+            <summary class="cursor-pointer">Eltex</summary>
+            <details :for={family <- ["MES", "ESR"]} class="ml-3 mt-2">
+              <summary class="cursor-pointer">{family}</summary>
+              <button
+                :for={profile <- Enum.filter(Console.profiles(), &(&1.family == family))}
+                id={"profile-#{profile.id}"}
+                type="button"
+                phx-click="console-profile"
+                phx-value-profile={profile.id}
+                disabled={!@online or !@can.configure or @console != :owner or @auto_baud}
+                class="btn btn-sm btn-ghost mt-1"
+              >{profile.model} · 115200 8N1 · BS</button>
+            </details>
+          </details>
+        </details>
+        <div
+          id="console-keyboard-preferences"
+          phx-update="ignore"
+          class="flex flex-wrap items-center gap-3"
+        >
+          <label class="text-sm">
+            Backspace
+            <select id="console-backspace" class="select select-sm w-44" aria-label="Backspace">
+              <option value="del">DEL (0x7F)</option>
+              <option value="bs">BS / Ctrl+H (0x08)</option>
+            </select>
+          </label>
+          <span id="console-profile-name" class="text-sm text-base-content/60"></span>
+        </div>
+        <button
+          id="console-autobaud"
+          type="button"
+          class="btn btn-sm btn-outline"
+          disabled={!@online or !@can.configure or @console != :owner or @auto_baud}
+          phx-click={JS.dispatch("wcs:autobaud", to: "#terminal-#{@device.id}")}
+        >{gettext("Detect baud rate")}</button>
+      </div>
+      <div id="console-detection" phx-update="ignore" class="space-y-2" aria-live="polite"></div>
 
       <div
         :if={@console == :busy}
@@ -539,6 +629,30 @@ defmodule BastionWeb.DeviceLive do
           phx-update="ignore"
           data-readonly="true"
           data-banner={@banner}
+          data-device-id={@device.id}
+          data-tools-labels={
+            JSON.encode!(%{
+              listening: gettext("Listening at"),
+              no_data:
+                gettext(
+                  "No reliable output detected. The original port settings have been restored. Start output on the connected device and try again."
+                ),
+              probable: gettext("Possible baud rate. Review the sample before applying."),
+              apply: gettext("Apply baud rate"),
+              cancel: gettext("Cancel"),
+              cancelled: gettext("Detection cancelled. Original port settings restored."),
+              passive:
+                gettext(
+                  "Detection listens only: it sends no Enter or commands. Start output on the connected device. Format: 8N1."
+                ),
+              restore_failed:
+                gettext(
+                  "Could not confirm restoration. The device restores temporary settings automatically after six seconds."
+                ),
+              failed: gettext("Could not detect the baud rate"),
+              saved: gettext("Saved in this browser for this device")
+            })
+          }
           class="size-full overflow-hidden"
         >
         </div>
@@ -865,6 +979,20 @@ defmodule BastionWeb.DeviceLive do
         <.info_row :if={@online && @online[:uptime]} label={gettext("Uptime")}>
           {format_uptime(@online[:uptime])}
         </.info_row>
+        <div :if={@online && @online[:uart]} id="uart-diagnostics" class="space-y-2">
+          <h3 class="font-semibold">{gettext("UART diagnostics")}</h3>
+          <.info_row label={gettext("Received bytes")}>{@online[:uart]["rx_bytes"]}</.info_row>
+          <.info_row label={gettext("Transmitted bytes")}>{@online[:uart]["tx_bytes"]}</.info_row>
+          <.info_row label={gettext("Frame errors")}>{@online[:uart]["frame_errors"]}</.info_row>
+          <.info_row label={gettext("Parity errors")}>{@online[:uart]["parity_errors"]}</.info_row>
+          <.info_row label={gettext("Buffer overflows")}>{@online[:uart]["overflows"]}</.info_row>
+          <.info_row label={gettext("RX pin level")}>{@online[:uart]["rx_level"]}</.info_row>
+          <p class="text-xs text-base-content/60">
+            {gettext(
+              "Counters since device boot. TX counts bytes accepted by the UART driver. RX pin level alone does not prove connectivity."
+            )}
+          </p>
+        </div>
         <.info_row label={gettext("IP address")}>{@device.last_ip || "—"}</.info_row>
         <.info_row label={gettext("Firmware")}>{@device.firmware_version || "—"}</.info_row>
         <.info_row label={gettext("Last seen")}>

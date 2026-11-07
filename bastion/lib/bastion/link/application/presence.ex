@@ -10,6 +10,8 @@ defmodule Bastion.Link.Application.Presence do
           optional(:rtt) => integer() | nil,
           optional(:rssi) => integer() | nil,
           optional(:uptime) => integer() | nil,
+          optional(:caps) => [String.t()],
+          optional(:uart) => map(),
           optional(:heap) => integer() | nil,
           optional(:ip) => String.t() | nil,
           optional(:fw) => String.t() | nil,

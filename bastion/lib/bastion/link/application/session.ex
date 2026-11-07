@@ -125,13 +125,15 @@ defmodule Bastion.Link.Application.Session do
   end
 
   defp handle_message({:hb, hb}, %{phase: :device, device: device} = state) do
-    Presence.update(device.id, %{
+    info = %{
       rtt: hb.rtt,
       rssi: hb.rssi,
       uptime: hb.uptime,
       heap: hb.heap,
       last_hb: DateTime.utc_now(:second)
-    })
+    }
+
+    Presence.update(device.id, Map.merge(info, Map.take(hb, [:uart])))
 
     {:push, {:text, Protocol.hb_ack(hb.seq, hb.ts, now_ms())}, reset_hb_timer(state)}
   end
@@ -229,6 +231,7 @@ defmodule Bastion.Link.Application.Session do
 
   defp start_device(hello, %{device: device} = state) do
     Presence.register(device.id, %{
+      caps: hello.caps,
       ip: state.ip,
       fw: hello.fw,
       connected_at: DateTime.utc_now(:second)

@@ -7,6 +7,7 @@
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -29,13 +30,19 @@ typedef struct {
 static const char *TAG = "wcs_console";
 
 static wcs_console_config_t s_config;
+static QueueHandle_t s_uart_events;
+static wcs_console_diagnostics_t s_diagnostics;
 static wcs_console_line_t s_line;
+static wcs_console_line_t s_probe_original;
+static int64_t s_probe_deadline;
 static SemaphoreHandle_t s_lock;
 static SemaphoreHandle_t s_tx_lock;
 static uint8_t *s_history;
 static size_t s_history_head;
 static size_t s_history_len;
 static listener_t s_listeners[CONFIG_WCS_CONSOLE_MAX_LISTENERS];
+
+static esp_err_t end_probe(bool expired_only);
 
 bool wcs_console_line_valid(const wcs_console_line_t *line)
 {
@@ -116,11 +123,21 @@ static void reader_task(void *arg)
     listener_t listeners[CONFIG_WCS_CONSOLE_MAX_LISTENERS];
 
     for (;;) {
+        end_probe(true);
+        uart_event_t event;
+        while (xQueueReceive(s_uart_events, &event, 0) == pdTRUE) {
+            xSemaphoreTake(s_lock, portMAX_DELAY);
+            if (event.type == UART_FRAME_ERR) s_diagnostics.frame_errors++;
+            if (event.type == UART_PARITY_ERR) s_diagnostics.parity_errors++;
+            if (event.type == UART_FIFO_OVF || event.type == UART_BUFFER_FULL) s_diagnostics.overflows++;
+            xSemaphoreGive(s_lock);
+        }
         int n = uart_read_bytes(s_config.uart_num, buf, sizeof(buf), pdMS_TO_TICKS(READ_TIMEOUT_MS));
         if (n <= 0) {
             continue;
         }
         xSemaphoreTake(s_lock, portMAX_DELAY);
+        s_diagnostics.rx_bytes += n;
         history_append(buf, n);
         memcpy(listeners, s_listeners, sizeof(listeners));
         xSemaphoreGive(s_lock);
@@ -158,7 +175,7 @@ esp_err_t wcs_console_init(const wcs_console_config_t *config)
         .source_clk = UART_SCLK_DEFAULT,
     };
     ESP_RETURN_ON_ERROR(uart_driver_install(config->uart_num, CONFIG_WCS_CONSOLE_RX_BUFFER,
-                                            CONFIG_WCS_CONSOLE_TX_BUFFER, 0, NULL, 0),
+                                            CONFIG_WCS_CONSOLE_TX_BUFFER, 32, &s_uart_events, 0),
                         TAG, "uart_driver_install failed");
     ESP_RETURN_ON_ERROR(uart_param_config(config->uart_num, &uart), TAG, "uart_param_config failed");
     ESP_RETURN_ON_ERROR(apply_line(&s_line), TAG, "line config failed");
@@ -190,6 +207,7 @@ esp_err_t wcs_console_set_line(const wcs_console_line_t *line)
     xSemaphoreTake(s_tx_lock, portMAX_DELAY);
     uart_wait_tx_done(s_config.uart_num, pdMS_TO_TICKS(TX_DONE_MS));
     esp_err_t err = apply_line(line);
+    if (err == ESP_OK) s_probe_deadline = 0;
     xSemaphoreGive(s_tx_lock);
     ESP_RETURN_ON_ERROR(err, TAG, "apply failed");
 
@@ -220,6 +238,11 @@ esp_err_t wcs_console_write(const uint8_t *data, size_t len)
     xSemaphoreTake(s_tx_lock, portMAX_DELAY);
     int n = uart_write_bytes(s_config.uart_num, data, len);
     xSemaphoreGive(s_tx_lock);
+    if (n > 0) {
+        xSemaphoreTake(s_lock, portMAX_DELAY);
+        s_diagnostics.tx_bytes += n;
+        xSemaphoreGive(s_lock);
+    }
     return n == (int)len ? ESP_OK : ESP_FAIL;
 }
 
@@ -285,4 +308,55 @@ void wcs_console_remove_listener(wcs_console_output_cb_t cb, void *ctx)
         }
     }
     xSemaphoreGive(s_lock);
+}
+
+void wcs_console_get_diagnostics(wcs_console_diagnostics_t *out)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    *out = s_diagnostics;
+    xSemaphoreGive(s_lock);
+    out->rx_level = gpio_get_level(s_config.rx_gpio);
+}
+
+esp_err_t wcs_console_probe_line(const wcs_console_line_t *line)
+{
+    ESP_RETURN_ON_FALSE(s_lock, ESP_ERR_INVALID_STATE, TAG, "not initialized");
+    ESP_RETURN_ON_FALSE(wcs_console_line_valid(line), ESP_ERR_INVALID_ARG, TAG, "invalid line");
+    xSemaphoreTake(s_tx_lock, portMAX_DELAY);
+    if (!s_probe_deadline) wcs_console_get_line(&s_probe_original);
+    uart_wait_tx_done(s_config.uart_num, pdMS_TO_TICKS(TX_DONE_MS));
+    esp_err_t err = apply_line(line);
+    if (err == ESP_OK) {
+        xSemaphoreTake(s_lock, portMAX_DELAY);
+        s_line = *line;
+        xSemaphoreGive(s_lock);
+        s_probe_deadline = esp_timer_get_time() + 6000000;
+    }
+    xSemaphoreGive(s_tx_lock);
+    return err;
+}
+
+static esp_err_t end_probe(bool expired_only)
+{
+    ESP_RETURN_ON_FALSE(s_lock, ESP_ERR_INVALID_STATE, TAG, "not initialized");
+    if (xSemaphoreTake(s_tx_lock, expired_only ? 0 : portMAX_DELAY) != pdTRUE) {
+        return ESP_OK;
+    }
+    esp_err_t err = ESP_OK;
+    if (s_probe_deadline && (!expired_only || esp_timer_get_time() >= s_probe_deadline)) {
+        err = apply_line(&s_probe_original);
+        if (err == ESP_OK) {
+            xSemaphoreTake(s_lock, portMAX_DELAY);
+            s_line = s_probe_original;
+            xSemaphoreGive(s_lock);
+            s_probe_deadline = 0;
+        }
+    }
+    xSemaphoreGive(s_tx_lock);
+    return err;
+}
+
+esp_err_t wcs_console_probe_end(void)
+{
+    return end_probe(false);
 }

@@ -194,3 +194,17 @@ $('break').addEventListener('click', () => send({ t: 'break' }));
 $('take').addEventListener('click', () => send({ t: 'take' }));
 
 connect();
+
+async function updateDiagnostics() {
+  if (!$('diagnostics').open) return;
+  try {
+    const response = await fetch('/api/console/diagnostics', { credentials: 'same-origin' });
+    if (!response.ok) throw new Error();
+    const d = await response.json();
+    $('uart-stats').textContent = `RX: ${d.rx_bytes} байт · TX: ${d.tx_bytes} байт · Ошибки кадра: ${d.frame_errors} · Чётности: ${d.parity_errors} · Переполнения: ${d.overflows} · RX GPIO: ${d.rx_level}`;
+  } catch {
+    $('uart-stats').textContent = 'Не удалось получить диагностику';
+  }
+}
+$('diagnostics').addEventListener('toggle', updateDiagnostics);
+setInterval(updateDiagnostics, 2000);

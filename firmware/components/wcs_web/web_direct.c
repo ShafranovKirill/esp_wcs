@@ -43,6 +43,21 @@ static esp_err_t console_get(httpd_req_t *req)
     return web_send_file(req, "pages/console.html");
 }
 
+static esp_err_t diagnostics_get(httpd_req_t *req)
+{
+    wcs_console_diagnostics_t d;
+    wcs_console_get_diagnostics(&d);
+    char json[320];
+    snprintf(json, sizeof(json),
+             "{\"rx_bytes\":%" PRIu64 ",\"tx_bytes\":%" PRIu64
+             ",\"frame_errors\":%" PRIu32 ",\"parity_errors\":%" PRIu32
+             ",\"overflows\":%" PRIu32 ",\"rx_level\":%d}",
+             d.rx_bytes, d.tx_bytes, d.frame_errors, d.parity_errors, d.overflows, d.rx_level);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, json);
+}
+
 static bool owner_alive(void)
 {
     return s_owner >= 0 && s_server && httpd_ws_get_fd_info(s_server, s_owner) == HTTPD_WS_CLIENT_WEBSOCKET;
@@ -257,6 +272,7 @@ static esp_err_t console_ws(httpd_req_t *req)
 }
 
 static const web_route_t s_routes[] = {
+    { .uri = "/api/console/diagnostics", .method = HTTP_GET, .handler = diagnostics_get },
     { .uri = "/console", .method = HTTP_GET, .handler = console_get, .access = WEB_ACCESS_PAGE },
     { .uri = "/ws/console", .method = HTTP_GET, .handler = console_ws, .websocket = true },
 };

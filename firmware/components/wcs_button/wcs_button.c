@@ -41,11 +41,7 @@ static void count_click(int64_t pressed_at_us, uint32_t held_ms)
     uint32_t gap_ms = (uint32_t)((pressed_at_us - s_last_click_us) / 1000);
     s_click_count = (s_click_count > 0 && gap_ms <= s_config.multi_click_gap_ms) ? s_click_count + 1 : 1;
     s_last_click_us = esp_timer_get_time();
-    if (s_click_count == 3) {
-        s_click_count = 0;
-        ESP_LOGI(TAG, "triple click");
-        post(WCS_BUTTON_EVENT_TRIPLE_CLICK, held_ms);
-    }
+
 }
 
 static void post_release(int64_t pressed_at_us, uint32_t held_ms)
@@ -65,7 +61,9 @@ static void post_release(int64_t pressed_at_us, uint32_t held_ms)
     }
 
     ESP_LOGI(TAG, "held %" PRIu32 " ms: event %d", held_ms, event);
-    post(event, held_ms);
+    if (event != WCS_BUTTON_EVENT_CLICK || !s_config.multi_click_gap_ms) {
+        post(event, held_ms);
+    }
 
     if (event != WCS_BUTTON_EVENT_CLICK) {
         s_click_count = 0;
@@ -97,6 +95,20 @@ static void button_task(void *arg)
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_PERIOD_MS));
+
+        if (!stable && s_click_count > 0 &&
+            esp_timer_get_time() - s_last_click_us > (int64_t)s_config.multi_click_gap_ms * 1000) {
+            int clicks = s_click_count;
+            s_click_count = 0;
+            ESP_LOGI(TAG, "click sequence: %d", clicks);
+            if (clicks == 3) {
+                post(WCS_BUTTON_EVENT_TRIPLE_CLICK, 0);
+            } else if (clicks == 6) {
+                post(WCS_BUTTON_EVENT_SIX_CLICK, 0);
+            } else if (clicks == 1) {
+                post(WCS_BUTTON_EVENT_CLICK, 0);
+            }
+        }
 
         if (stable) {
             check_hold(pressed_at_us, &thresholds_passed);
