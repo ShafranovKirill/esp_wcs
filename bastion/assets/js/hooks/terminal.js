@@ -1,3 +1,4 @@
+import {DETECTION_BAUDS, assessSample} from "./baud_detection"
 import {Terminal as XTerm} from "../../vendor/xterm/xterm.mjs"
 import {FitAddon} from "../../vendor/xterm/addon-fit.mjs"
 
@@ -16,6 +17,25 @@ const decode = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0))
 export const Terminal = {
   mounted() {
     this.owner = false
+    this.scan = null
+    this.labels = JSON.parse(this.el.dataset.toolsLabels || "{}")
+    this.preferenceKey = `wcs-terminal:${this.el.dataset.deviceId}`
+    this.preference = {backspace: "del", label: ""}
+    try {
+      const saved = JSON.parse(localStorage.getItem(this.preferenceKey) || "null")
+      if (saved && ["bs", "del"].includes(saved.backspace)) this.preference = saved
+    } catch {}
+    this.backspaceSelect = document.getElementById("console-backspace")
+    this.profileName = document.getElementById("console-profile-name")
+    this.backspaceSelect.value = this.preference.backspace
+    this.profileName.textContent = this.preference.label || ""
+    this.keyboardChange = () => {
+      this.preference.backspace = this.backspaceSelect.value
+      this.savePreference()
+    }
+    this.backspaceSelect.addEventListener("change", this.keyboardChange)
+    this.autoBaudListener = () => this.detectBaud()
+    this.el.addEventListener("wcs:autobaud", this.autoBaudListener)
     this.term = new XTerm({
       cursorBlink: true,
       fontFamily: 'ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace',
@@ -32,8 +52,16 @@ export const Terminal = {
     this.banner = JSON.parse(this.el.dataset.banner || "[]")
     this.writeBanner()
 
+    this.term.attachCustomKeyEventHandler(event => {
+      if (event.key !== "Backspace" || event.ctrlKey || event.altKey || event.metaKey) return true
+      if (event.type === "keydown" && this.owner && !this.scan) {
+        this.pushEvent("console-input", {data: this.preference.backspace === "bs" ? "\x08" : "\x7f"})
+      }
+      return false
+    })
+
     this.term.onData(data => {
-      if (this.owner) this.pushEvent("console-input", {data})
+      if (this.owner && !this.scan) this.pushEvent("console-input", {data})
     })
 
     this.handleEvent("console-reset", ({data}) => {
@@ -41,9 +69,21 @@ export const Terminal = {
       this.writeBanner()
       if (data) this.term.write(decode(data))
     })
-    this.handleEvent("console-output", ({data}) => this.term.write(decode(data)))
+    this.handleEvent("console-output", ({data}) => {
+      const bytes = decode(data)
+      if (this.scan?.collecting && this.scan.bytes.length < 4096) this.scan.bytes.push(...bytes.subarray(0, 4096 - this.scan.bytes.length))
+      this.term.write(bytes)
+    })
+    this.handleEvent("terminal-profile", profile => {
+      this.preference = {backspace: profile.backspace, label: profile.label}
+      this.backspaceSelect.value = profile.backspace
+      this.profileName.textContent = profile.label
+      this.savePreference()
+      this.term.focus()
+    })
     this.handleEvent("console-state", ({owner}) => {
       this.owner = owner
+      if (!owner && this.scan) this.scan.cancelled = true
       this.term.options.disableStdin = !owner
       this.term.options.cursorBlink = owner
       if (owner) this.term.focus()
@@ -59,10 +99,100 @@ export const Terminal = {
     this.themeObserver = new MutationObserver(() => (this.term.options.theme = currentTheme()))
     this.themeObserver.observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]})
   },
+  savePreference() {
+    try {localStorage.setItem(this.preferenceKey, JSON.stringify(this.preference))} catch {}
+  },
+  request(event, params) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(this.labels.failed)), 15000)
+      this.pushEvent(event, params, reply => {
+        clearTimeout(timeout)
+        if (reply.ok) resolve(reply)
+        else reject(new Error(reply.error || this.labels.failed))
+      })
+    })
+  },
+  async detectBaud() {
+    if (!this.owner || this.scan) return
+    const panel = document.getElementById("console-detection")
+    const status = document.createElement("p")
+    const note = document.createElement("p")
+    const cancel = document.createElement("button")
+    note.textContent = this.labels.passive
+    note.className = "text-sm text-base-content/60"
+    cancel.textContent = this.labels.cancel
+    cancel.className = "btn btn-sm"
+    const scan = {cancelled: false, collecting: false, bytes: []}
+    this.scan = scan
+    this.term.options.disableStdin = true
+    cancel.onclick = () => {scan.cancelled = true}
+    panel.replaceChildren(status, note, cancel)
+    let candidate = null
+    let failure = null
+    let restored = true
+    let probed = false
+    try {
+      for (const baud of DETECTION_BAUDS) {
+        if (scan.cancelled || !this.owner) break
+        status.textContent = `${this.labels.listening} ${baud} · 8N1`
+        await this.request("console-probe", {line: {baud, data_bits: 8, parity: "none", stop_bits: 1}})
+        probed = true
+        await new Promise(resolve => setTimeout(resolve, 200))
+        scan.bytes = []
+        scan.collecting = true
+        await new Promise(resolve => setTimeout(resolve, 1600))
+        scan.collecting = false
+        const assessment = assessSample(scan.bytes)
+        if (assessment) {
+          candidate = {baud, ...assessment}
+          break
+        }
+      }
+    } catch (error) {
+      failure = error.message
+    } finally {
+      scan.collecting = false
+      if (probed && !this.owner) restored = false
+      if (probed && this.owner && !this.destroyedFlag) {
+        try {await this.request("console-probe-end", {})} catch {restored = false}
+      }
+      this.scan = null
+      this.term.options.disableStdin = !this.owner
+    }
+    if (this.destroyedFlag) return
+    cancel.remove()
+    if (!restored) {
+      status.textContent = this.labels.restore_failed
+    } else if (scan.cancelled || !this.owner) {
+      status.textContent = this.labels.cancelled
+    } else if (failure) {
+      status.textContent = failure
+    } else if (candidate) {
+      status.textContent = `${candidate.baud} · ${this.labels.probable}`
+      const preview = document.createElement("pre")
+      preview.className = "overflow-auto rounded-box bg-base-200 p-3 text-xs"
+      preview.textContent = candidate.sample
+      const apply = document.createElement("button")
+      apply.className = "btn btn-primary btn-sm"
+      apply.textContent = `${this.labels.apply}: ${candidate.baud}`
+      apply.onclick = () => {
+        if (!this.owner || this.scan) return
+        this.pushEvent("console-line", {line: {baud: candidate.baud, data_bits: 8, parity: "none", stop_bits: 1}})
+        apply.disabled = true
+      }
+      panel.append(preview, apply)
+    } else {
+      status.textContent = this.labels.no_data
+    }
+  },
   writeBanner() {
     for (const line of this.banner) this.term.writeln(line)
   },
   destroyed() {
+    this.destroyedFlag = true
+    if (this.scan) this.scan.cancelled = true
+    this.backspaceSelect.removeEventListener("change", this.keyboardChange)
+    this.el.removeEventListener("wcs:autobaud", this.autoBaudListener)
     clearInterval(this.ping)
     this.resizeObserver.disconnect()
     this.themeObserver.disconnect()

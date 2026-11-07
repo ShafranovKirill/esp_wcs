@@ -70,6 +70,36 @@ defmodule Bastion.Console do
     end
   end
 
+  defdelegate profiles(), to: Bastion.Console.Domain.Profiles, as: :all
+
+  def apply_profile(actor, id, profile_id) do
+    with {:ok, profile} <- Bastion.Console.Domain.Profiles.fetch(profile_id),
+         :ok <- configure(actor, id, profile.line) do
+      {:ok, profile}
+    end
+  end
+
+  def probe(actor, id, params) do
+    with :ok <- Bastion.Fleet.authorize(actor, "device.configure", id),
+         true <- Locks.owner?(id, self()) || {:error, :not_owner},
+         %{caps: caps} <- Bastion.Link.presence(id),
+         true <- "console_probe" in caps || {:error, "unknown_op"},
+         {:ok, line} <- Line.new(params) do
+      Bastion.Link.command(id, "console_probe", Line.to_args(line))
+    else
+      nil -> {:error, :offline}
+      %{} -> {:error, "unknown_op"}
+      error -> error
+    end
+  end
+
+  def end_probe(actor, id) do
+    with :ok <- Bastion.Fleet.authorize(actor, "device.configure", id),
+         true <- Locks.owner?(id, self()) || {:error, :not_owner} do
+      Bastion.Link.command(id, "console_probe_end")
+    end
+  end
+
   defdelegate bauds(), to: Line
   defdelegate format_line(line), to: Line, as: :format
 end

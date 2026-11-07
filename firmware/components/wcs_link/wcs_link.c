@@ -85,6 +85,7 @@ typedef struct {
 } config_t;
 
 static config_t s_config;
+static char s_override_ca[WCS_BASTION_CA_PEM_MAX];
 static TaskHandle_t s_task;
 static QueueHandle_t s_queue;
 static SemaphoreHandle_t s_wake;
@@ -216,6 +217,7 @@ static void send_hello(esp_websocket_client_handle_t client, const char *device_
     cJSON *caps = cJSON_AddArrayToObject(json, "caps");
     cJSON_AddItemToArray(caps, cJSON_CreateString("console"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("credit"));
+    cJSON_AddItemToArray(caps, cJSON_CreateString("console_probe"));
     send_json(client, json);
 }
 
@@ -252,6 +254,15 @@ static void send_heartbeat(esp_websocket_client_handle_t client, uint32_t seq, i
     }
     cJSON_AddNumberToObject(json, "uptime", (double)(esp_timer_get_time() / 1000000));
     cJSON_AddNumberToObject(json, "heap", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    wcs_console_diagnostics_t d;
+    wcs_console_get_diagnostics(&d);
+    cJSON *uart = cJSON_AddObjectToObject(json, "uart");
+    cJSON_AddNumberToObject(uart, "rx_bytes", (double)d.rx_bytes);
+    cJSON_AddNumberToObject(uart, "tx_bytes", (double)d.tx_bytes);
+    cJSON_AddNumberToObject(uart, "frame_errors", d.frame_errors);
+    cJSON_AddNumberToObject(uart, "parity_errors", d.parity_errors);
+    cJSON_AddNumberToObject(uart, "overflows", d.overflows);
+    cJSON_AddNumberToObject(uart, "rx_level", d.rx_level);
     send_json(client, json);
 }
 
@@ -347,7 +358,7 @@ static void send_result(esp_websocket_client_handle_t client, double id, const c
     send_json(client, json);
 }
 
-static const char *cmd_console_config(const cJSON *args)
+static const char *cmd_console_config(const cJSON *args, bool probe)
 {
     const cJSON *baud = cJSON_GetObjectItem(args, "baud");
     const cJSON *data_bits = cJSON_GetObjectItem(args, "data_bits");
@@ -371,7 +382,7 @@ static const char *cmd_console_config(const cJSON *args)
     if (!wcs_console_line_valid(&line)) {
         return "invalid_args";
     }
-    return wcs_console_set_line(&line) == ESP_OK ? NULL : "failed";
+    return (probe ? wcs_console_probe_line(&line) : wcs_console_set_line(&line)) == ESP_OK ? NULL : "failed";
 }
 
 static const char *cmd_wifi_config(const cJSON *args)
@@ -408,8 +419,11 @@ static void handle_cmd(session_t *s, const cJSON *json)
     }
 
     const char *error = NULL;
-    if (strcmp(op->valuestring, "console_config") == 0) {
-        error = cmd_console_config(args);
+    if (strcmp(op->valuestring, "console_config") == 0 || strcmp(op->valuestring, "console_probe") == 0 ||
+        strcmp(op->valuestring, "console_probe_end") == 0) {
+        error = strcmp(op->valuestring, "console_probe_end") == 0
+                    ? (wcs_console_probe_end() == ESP_OK ? NULL : "failed")
+                    : cmd_console_config(args, strcmp(op->valuestring, "console_probe") == 0);
         send_result(s->client, id->valuedouble, error);
         if (!error) {
             send_status(s->client);
@@ -651,6 +665,7 @@ static outcome_t run_session(const char *ca_pem, const char *ca_code, const char
             }
             if (s.welcomed && s.device_session && now >= s.next_hb) {
                 send_heartbeat(client, s.hb_seq++, s.rtt);
+                send_status(client);
                 s.next_hb = now + s.hb_interval_ms;
             }
 
@@ -711,7 +726,10 @@ static void link_task(void *arg)
     char *ca_pem = calloc(1, WCS_BASTION_CA_PEM_MAX);
 
     wcs_link_device_id(device_id);
-    if (!ca_pem || wcs_storage_load_bastion_ca(ca_pem, WCS_BASTION_CA_PEM_MAX) != ESP_OK ||
+    if (ca_pem && s_override_ca[0]) {
+        strlcpy(ca_pem, s_override_ca, WCS_BASTION_CA_PEM_MAX);
+    }
+    if (!ca_pem || (!s_override_ca[0] && wcs_storage_load_bastion_ca(ca_pem, WCS_BASTION_CA_PEM_MAX) != ESP_OK) ||
         ca_code_of(ca_pem, ca_code) != ESP_OK) {
         ESP_LOGE(TAG, "no pinned bastion certificate — set up Bastion mode again");
         set_state(WCS_LINK_STATE_OFFLINE);
@@ -775,6 +793,7 @@ esp_err_t wcs_link_start(const wcs_link_config_t *config)
         s_output = xStreamBufferCreateWithCaps(OUTPUT_BUFFER_SIZE, 1, MALLOC_CAP_SPIRAM);
         ESP_RETURN_ON_FALSE(s_queue && s_wake && s_done && s_output, ESP_ERR_NO_MEM, TAG, "no memory");
     }
+    strlcpy(s_override_ca, config->ca_pem ? config->ca_pem : "", sizeof(s_override_ca));
     strlcpy(s_config.addr, config->bastion_addr, sizeof(s_config.addr));
     strlcpy(s_config.name, config->name ? config->name : "esp-wcs", sizeof(s_config.name));
     strlcpy(s_config.firmware, config->firmware ? config->firmware : "", sizeof(s_config.firmware));

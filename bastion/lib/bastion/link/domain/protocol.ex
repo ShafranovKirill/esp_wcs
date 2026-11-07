@@ -76,8 +76,11 @@ defmodule Bastion.Link.Domain.Protocol do
     with {:ok, rtt} <- opt_int(m, "rtt"),
          {:ok, rssi} <- opt_int(m, "rssi"),
          {:ok, uptime} <- opt_int(m, "uptime"),
-         {:ok, heap} <- opt_int(m, "heap") do
-      {:ok, {:hb, %{seq: seq, ts: ts, rtt: rtt, rssi: rssi, uptime: uptime, heap: heap}}}
+         {:ok, heap} <- opt_int(m, "heap"),
+         {:ok, uart} <- opt_uart(m) do
+      {:ok,
+       {:hb,
+        Map.merge(%{seq: seq, ts: ts, rtt: rtt, rssi: rssi, uptime: uptime, heap: heap}, uart)}}
     end
   end
 
@@ -146,6 +149,20 @@ defmodule Bastion.Link.Domain.Protocol do
   @spec welcome(:enroll | :device, pos_integer(), integer()) :: binary()
   def welcome(session, hb_s, now_ms),
     do: JSON.encode!(%{t: "welcome", v: @version, session: session, time: now_ms, hb: hb_s})
+
+  defp opt_uart(%{"uart" => uart}) when is_map(uart) do
+    keys = ~w(rx_bytes tx_bytes frame_errors parity_errors overflows rx_level)
+
+    if Enum.all?(keys, fn key -> is_integer(uart[key]) and uart[key] >= 0 end) and
+         uart["rx_level"] in [0, 1] do
+      {:ok, %{uart: Map.take(uart, keys)}}
+    else
+      {:error, :protocol}
+    end
+  end
+
+  defp opt_uart(%{"uart" => _}), do: {:error, :protocol}
+  defp opt_uart(_), do: {:ok, %{}}
 
   @spec enroll_status(:pending | :rejected) :: binary()
   def enroll_status(status) when status in [:pending, :rejected],

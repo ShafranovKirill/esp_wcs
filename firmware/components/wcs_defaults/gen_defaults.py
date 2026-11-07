@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import hashlib
 import os
+from pathlib import Path
+import json
 import sys
 
 SALT_LEN = 16
@@ -80,10 +82,24 @@ def main():
     if not 1000 <= iterations <= 1000000:
         fail('WCS_PBKDF2_ITERATIONS: от 1000 до 1000000')
 
+    laptop_ssid = env['WCS_LAPTOP_SSID']
+    if not 1 <= len(laptop_ssid.encode()) <= 32:
+        fail('WCS_LAPTOP_SSID: от 1 до 32 байт')
+    laptop_password = check_ap_password(env, 'WCS_LAPTOP_PASSWORD')
+    laptop_addr = env['WCS_LAPTOP_ADDR']
+    if not 1 <= len(laptop_addr) <= 128:
+        fail('WCS_LAPTOP_ADDR: от 1 до 128 символов')
+    ca_file = env.get('WCS_LAPTOP_CA_FILE', '')
+    ca = ''
+    if ca_file:
+        ca = (Path(sys.argv[1]).resolve().parent / ca_file).read_text()
+        if '-----BEGIN CERTIFICATE-----' not in ca or 'PRIVATE KEY' in ca or len(ca.encode()) >= 1536:
+            fail('WCS_LAPTOP_CA_FILE: нужен публичный PEM-сертификат до 1535 байт')
+
     salt = os.urandom(SALT_LEN)
     digest = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, iterations, HASH_LEN)
 
-    source = f'''/* Сгенерировано gen_defaults.py из .env — не редактировать. */
+    source = f'''
 #include "wcs_defaults.h"
 
 const wcs_defaults_t wcs_defaults = {{
@@ -91,6 +107,10 @@ const wcs_defaults_t wcs_defaults = {{
     .setup_ap_password = {c_string(setup_password, 'WCS_SETUP_AP_PASSWORD')},
     .direct_ap_ssid_prefix = {c_string(direct_prefix, 'WCS_DIRECT_AP_SSID_PREFIX')},
     .direct_ap_password = {c_string(direct_password, 'WCS_DIRECT_AP_PASSWORD')},
+    .laptop_ssid = {c_string(laptop_ssid, 'WCS_LAPTOP_SSID')},
+    .laptop_password = {c_string(laptop_password, 'WCS_LAPTOP_PASSWORD')},
+    .laptop_addr = {c_string(laptop_addr, 'WCS_LAPTOP_ADDR')},
+    .laptop_ca = {json.dumps(ca)},
     .admin_username = {c_string(username, 'WCS_ADMIN_USERNAME')},
     .admin_password = {{
         .iterations = {iterations},

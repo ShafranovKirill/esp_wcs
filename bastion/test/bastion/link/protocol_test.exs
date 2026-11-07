@@ -13,6 +13,29 @@ defmodule Bastion.Link.Domain.ProtocolTest do
              Protocol.decode(~s({"t":"hb","seq":1,"ts":5,"rssi":-60}))
   end
 
+  test "UART в heartbeat проверяется, старые прошивки работают без него" do
+    uart = %{
+      "rx_bytes" => 12,
+      "tx_bytes" => 8,
+      "frame_errors" => 1,
+      "parity_errors" => 0,
+      "overflows" => 0,
+      "rx_level" => 1
+    }
+
+    frame = %{"t" => "hb", "seq" => 1, "ts" => 5, "uart" => uart}
+    assert {:ok, {:hb, %{uart: ^uart}}} = Protocol.decode(JSON.encode!(frame))
+
+    for bad <- [
+          Map.put(uart, "rx_bytes", -1),
+          Map.put(uart, "rx_level", 2),
+          Map.delete(uart, "overflows"),
+          "invalid"
+        ] do
+      assert {:error, :protocol} = Protocol.decode(JSON.encode!(Map.put(frame, "uart", bad)))
+    end
+  end
+
   test "неверное — ошибка протокола" do
     for frame <- [
           "not json",

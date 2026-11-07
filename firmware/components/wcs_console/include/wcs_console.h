@@ -29,6 +29,17 @@ typedef struct {
     uint32_t break_ms;
 } wcs_console_config_t;
 
+typedef struct {
+    uint64_t rx_bytes;
+    uint64_t tx_bytes;
+    uint32_t frame_errors;
+    uint32_t parity_errors;
+    uint32_t overflows;
+    int rx_level;
+} wcs_console_diagnostics_t;
+
+void wcs_console_get_diagnostics(wcs_console_diagnostics_t *out);
+
 typedef void (*wcs_console_output_cb_t)(const uint8_t *data, size_t len, void *ctx);
 
 esp_err_t wcs_console_init(const wcs_console_config_t *config);
@@ -36,6 +47,8 @@ esp_err_t wcs_console_init(const wcs_console_config_t *config);
 void wcs_console_get_line(wcs_console_line_t *line);
 bool wcs_console_line_valid(const wcs_console_line_t *line);
 esp_err_t wcs_console_set_line(const wcs_console_line_t *line);
+esp_err_t wcs_console_probe_line(const wcs_console_line_t *line);
+esp_err_t wcs_console_probe_end(void);
 
 esp_err_t wcs_console_write(const uint8_t *data, size_t len);
 esp_err_t wcs_console_send_break(void);

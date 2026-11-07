@@ -146,22 +146,25 @@
 <text x="640" y="675" font-family="DejaVu Sans, sans-serif" font-size="16" fill="#111111" font-weight="400" text-anchor="start">GPIO4 / кнопка / G</text>
 <polyline points="1040,225 1040,180 1320,180 1320,275" fill="none" stroke="white" stroke-width="12" stroke-linejoin="round"/>
 <polyline points="1040,225 1040,180 1320,180 1320,275" fill="none" stroke="#111111" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
-<text x="1150" y="163" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#111111" font-weight="700" text-anchor="start">KS-is KS-444M</text>
+<text x="1220" y="158" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#111111" font-weight="700" text-anchor="start">KS-444M</text>
+<rect x="1000" y="162" width="125" height="45" rx="3" fill="white" stroke="#111111" stroke-width="2"/>
+<text x="1062" y="190" font-family="DejaVu Sans, sans-serif" font-size="16" fill="#111111" font-weight="700" text-anchor="middle">2↔3; 5↔5</text>
+<text x="1062" y="145" font-family="DejaVu Sans, sans-serif" font-size="16" fill="#111111" font-weight="700" text-anchor="middle">Нуль-модем</text>
 <rect x="1270" y="275" width="240" height="200" rx="12" fill="#ffffff" stroke="#111111" stroke-width="2"/>
 <text x="1390" y="310" font-family="DejaVu Sans, sans-serif" font-size="21" fill="#111111" font-weight="700" text-anchor="middle">Коммутатор</text>
 <rect x="1345" y="335" width="90" height="45" rx="3" fill="#ffffff" stroke="#111111" stroke-width="2"/>
 <text x="1390" y="364" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="700" text-anchor="middle">RJ45</text>
 <text x="1390" y="411" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="700" text-anchor="middle">CONSOLE RS-232</text>
-<text x="1270" y="510" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="700" text-anchor="start">DB9 2 — RJ45 6</text>
-<text x="1270" y="542" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="700" text-anchor="start">DB9 3 — RJ45 3</text>
-<text x="1270" y="574" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="700" text-anchor="start">DB9 5 — RJ45 5</text>
+<text x="1230" y="510" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="700" text-anchor="start">DB9 модуля 2 → RJ45 3</text>
+<text x="1230" y="542" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="700" text-anchor="start">DB9 модуля 3 ← RJ45 6</text>
+<text x="1230" y="574" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="700" text-anchor="start">DB9 модуля 5 — RJ45 4/5</text>
 <rect x="800" y="940" width="760" height="120" rx="0" fill="white" stroke="#111111" stroke-width="2"/>
 <polyline points="800,980 1560,980" fill="none" stroke="#111111" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/>
 <polyline points="1400,940 1400,1060" fill="none" stroke="#111111" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/>
 <polyline points="1400,1020 1560,1020" fill="none" stroke="#111111" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/>
 <text x="1100" y="967" font-family="DejaVu Sans, sans-serif" font-size="19" fill="#111111" font-weight="400" text-anchor="middle">ESP WCS — беспроводной консольный сервер</text>
 <text x="1100" y="1015" font-family="DejaVu Sans, sans-serif" font-size="20" fill="#111111" font-weight="400" text-anchor="middle">Схема подключения</text>
-<text x="1100" y="1044" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="400" text-anchor="middle">ESP32-S3 / MAX3232 / KS-444M</text>
+<text x="1100" y="1044" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="400" text-anchor="middle">ESP32-S3 / MAX3232 / перекрёст / KS-444M</text>
 <text x="1480" y="967" font-family="DejaVu Sans, sans-serif" font-size="19" fill="#111111" font-weight="400" text-anchor="middle">WCS.01</text>
 <text x="1480" y="1006" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="400" text-anchor="middle">Лист 1</text>
 <text x="1480" y="1046" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111111" font-weight="400" text-anchor="middle">Листов 1</text>

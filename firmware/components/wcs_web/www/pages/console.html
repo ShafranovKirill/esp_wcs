@@ -25,6 +25,14 @@
     </form>
   </header>
   <div id="message" class="message" hidden></div>
+  <details id="diagnostics" class="message">
+    <summary>Диагностика UART</summary>
+    <p>Счётчики с включения платы. TX — байты, принятые драйвером; RX — полученные байты.</p>
+    <p id="uart-stats">Откройте панель для проверки.</p>
+    <p>Для Eltex проверьте 115200, 8N1. Управление потоком отключено. Нажмите Enter.
+      RX не растёт: проверьте питание MAX3232, землю и подключение к Console.
+      Ошибки кадра: проверьте скорость и линию. Уровень RX сам по себе не подтверждает соединение.</p>
+  </details>
   <main class="terminal"><div id="terminal" class="terminal-host"></div></main>
 
   <div id="busy" class="overlay" hidden>

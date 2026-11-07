@@ -48,6 +48,67 @@ defmodule BastionWeb.DeviceLiveTest do
     end
   end
 
+  test "профиль Eltex применяет UART и настраивает Backspace", %{conn: conn} do
+    device = approved_device()
+    fake = device |> FakeDevice.start() |> FakeDevice.stop_on_exit()
+    {:ok, view, _} = live(conn, ~p"/devices/#{device.id}")
+    assert has_element?(view, "#console-autobaud")
+    assert has_element?(view, "#console-backspace")
+    assert has_element?(view, "#profile-eltex-esr12vf")
+    view |> element("#profile-eltex-mes2308r") |> render_click()
+    assert_receive {:fake_frame, ^fake, {:text, frame}}
+
+    assert %{
+             "op" => "console_config",
+             "id" => id,
+             "args" => %{
+               "baud" => 115_200,
+               "data_bits" => 8,
+               "parity" => "none",
+               "stop_bits" => 1
+             }
+           } = JSON.decode!(frame)
+
+    FakeDevice.send_text(fake, %{t: "cmd_result", id: id, ok: true})
+    render_async(view)
+    assert_push_event(view, "terminal-profile", %{id: "eltex-mes2308r", backspace: "bs"})
+  end
+
+  test "автоподбор не пишет постоянные параметры и запрещён чужой вкладке", %{conn: conn} do
+    device = approved_device()
+
+    fake =
+      device
+      |> FakeDevice.start(caps: ["console", "credit", "console_probe"])
+      |> FakeDevice.stop_on_exit()
+
+    {:ok, owner, _} = live(conn, ~p"/devices/#{device.id}")
+    {:ok, other, _} = live(conn, ~p"/devices/#{device.id}")
+
+    render_hook(other, "console-probe", %{
+      line: %{baud: 9600, data_bits: 8, parity: "none", stop_bits: 1}
+    })
+
+    refute_receive {:fake_frame, ^fake, {:text, _}}, 50
+
+    task =
+      Task.async(fn ->
+        render_hook(owner, "console-probe", %{
+          line: %{baud: 9600, data_bits: 8, parity: "none", stop_bits: 1}
+        })
+      end)
+
+    assert_receive {:fake_frame, ^fake, {:text, frame}}
+    assert %{"op" => "console_probe", "id" => id} = JSON.decode!(frame)
+    FakeDevice.send_text(fake, %{t: "cmd_result", id: id, ok: true})
+    Task.await(task)
+    task = Task.async(fn -> render_hook(owner, "console-probe-end", %{}) end)
+    assert_receive {:fake_frame, ^fake, {:text, frame}}
+    assert %{"op" => "console_probe_end", "id" => id} = JSON.decode!(frame)
+    FakeDevice.send_text(fake, %{t: "cmd_result", id: id, ok: true})
+    Task.await(task)
+  end
+
   test "вкладки: консоль нарисована, сведения, журнал", %{conn: conn} do
     device = approved_device(%{name: "core-sw-01"})
 

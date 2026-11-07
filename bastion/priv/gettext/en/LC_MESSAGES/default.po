@@ -28,45 +28,45 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:67
+#: lib/bastion_web/live/connect_live.ex:102
 #, elixir-autogen, elixir-format
 msgid "After “Check” the wizard shows the bastion code. It must match the code on the right — otherwise do not continue."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:339
+#: lib/bastion_web/live/device_live.ex:384
 #, elixir-autogen, elixir-format
 msgid "All devices"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:72
+#: lib/bastion_web/live/connect_live.ex:107
 #, elixir-autogen, elixir-format
 msgid "Apply the settings. The device sends a request — approve it on the Devices page after comparing the device code with the last step of the wizard."
 msgstr ""
 
 #: lib/bastion_web/live/dashboard_live.ex:293
-#: lib/bastion_web/live/device_live.ex:376
+#: lib/bastion_web/live/device_live.ex:421
 #, elixir-autogen, elixir-format
 msgid "Approve"
 msgstr ""
 
 #: lib/bastion_web/live/dashboard_live.ex:337
-#: lib/bastion_web/live/device_live.ex:415
+#: lib/bastion_web/live/device_live.ex:461
 #, elixir-autogen, elixir-format
 msgid "Approve the device?"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:71
+#: lib/bastion_web/live/connect_live.ex:106
 #, elixir-autogen, elixir-format
 msgid "Approve the request"
 msgstr ""
 
 #: lib/bastion_web/components/ui_components.ex:26
-#: lib/bastion_web/live/device_live.ex:877
+#: lib/bastion_web/live/device_live.ex:1005
 #, elixir-autogen, elixir-format
 msgid "Approved"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:971
+#: lib/bastion_web/live/device_live.ex:1099
 #, elixir-autogen, elixir-format
 msgid "Approved, certificate issued"
 msgstr ""
@@ -77,13 +77,13 @@ msgstr ""
 msgid "Attempting to reconnect"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:679
-#: lib/bastion_web/live/device_live.ex:694
+#: lib/bastion_web/live/device_live.ex:793
+#: lib/bastion_web/live/device_live.ex:808
 #, elixir-autogen, elixir-format
 msgid "Available when the device is online"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:749
+#: lib/bastion_web/live/device_live.ex:863
 #, elixir-autogen, elixir-format
 msgid "Available when the device is online."
 msgstr ""
@@ -93,19 +93,20 @@ msgstr ""
 msgid "Awaiting approval"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:81
+#: lib/bastion_web/live/connect_live.ex:133
+#: lib/bastion_web/live/connect_live.ex:153
 #, elixir-autogen, elixir-format
 msgid "Bastion address"
 msgstr ""
 
 #: lib/bastion_web/controllers/ca_html/page.html.heex:19
-#: lib/bastion_web/live/connect_live.ex:100
+#: lib/bastion_web/live/connect_live.ex:172
 #: lib/bastion_web/live/dashboard_live.ex:240
 #, elixir-autogen, elixir-format
 msgid "Bastion code"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:560
+#: lib/bastion_web/live/device_live.ex:674
 #, elixir-autogen, elixir-format
 msgid "Baud rate"
 msgstr ""
@@ -115,51 +116,52 @@ msgstr ""
 #: lib/bastion_web/live/dashboard_live.ex:355
 #: lib/bastion_web/live/dashboard_live.ex:390
 #: lib/bastion_web/live/dashboard_live.ex:411
-#: lib/bastion_web/live/device_live.ex:424
+#: lib/bastion_web/live/device_live.ex:470
+#: lib/bastion_web/live/device_live.ex:642
 #: lib/bastion_web/live/users_live.ex:294
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:883
+#: lib/bastion_web/live/device_live.ex:1011
 #, elixir-autogen, elixir-format
 msgid "Certificate serial"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:886
+#: lib/bastion_web/live/device_live.ex:1014
 #, elixir-autogen, elixir-format
 msgid "Certificate valid until"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:53
+#: lib/bastion_web/live/connect_live.ex:88
 #, elixir-autogen, elixir-format
 msgid "Choose Bastion connection"
 msgstr ""
 
 #: lib/bastion_web/components/ui_components.ex:154
 #: lib/bastion_web/components/ui_components.ex:154
-#: lib/bastion_web/live/folder_map_live.ex:320
+#: lib/bastion_web/live/folder_map_live.ex:319
 #, elixir-autogen, elixir-format
 msgid "Close"
 msgstr "Close"
 
 #: lib/bastion_web/live/dashboard_live.ex:367
-#: lib/bastion_web/live/device_live.ex:433
+#: lib/bastion_web/live/device_live.ex:479
 #, elixir-autogen, elixir-format
 msgid "Codes match, approve"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:993
+#: lib/bastion_web/live/device_live.ex:1121
 #, elixir-autogen, elixir-format
 msgid "Command: %{op}"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:66
+#: lib/bastion_web/live/connect_live.ex:101
 #, elixir-autogen, elixir-format
 msgid "Compare the bastion code"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:357
+#: lib/bastion_web/live/device_live.ex:402
 #, elixir-autogen, elixir-format
 msgid "Compare the device code with the last step of the setup wizard:"
 msgstr ""
@@ -169,32 +171,32 @@ msgstr ""
 msgid "Connect a device"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:49
+#: lib/bastion_web/live/connect_live.ex:84
 #, elixir-autogen, elixir-format
 msgid "Connect your phone or laptop to the “ESP-WCS-XXXX” network and open https://192.168.4.1 — the browser warns about the certificate once."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:989
+#: lib/bastion_web/live/device_live.ex:1117
 #, elixir-autogen, elixir-format
 msgid "Connected"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:947
+#: lib/bastion_web/live/device_live.ex:1075
 #, elixir-autogen, elixir-format
 msgid "Console"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:678
+#: lib/bastion_web/live/device_live.ex:792
 #, elixir-autogen, elixir-format
 msgid "Console port"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:992
+#: lib/bastion_web/live/device_live.ex:1120
 #, elixir-autogen, elixir-format
 msgid "Console released"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:991
+#: lib/bastion_web/live/device_live.ex:1119
 #, elixir-autogen, elixir-format
 msgid "Console taken"
 msgstr ""
@@ -210,55 +212,55 @@ msgstr ""
 msgid "Copy"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:59
+#: lib/bastion_web/live/connect_live.ex:94
 #, elixir-autogen, elixir-format
 msgid "Copy one of the addresses on the right. bastion.local works if mDNS is available in the network, otherwise use the IP address."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:741
+#: lib/bastion_web/live/device_live.ex:855
 #, elixir-autogen, elixir-format
 msgid "Danger zone"
 msgstr ""
 
 #: lib/bastion_web/live/dashboard_live.ex:548
-#: lib/bastion_web/live/device_live.ex:790
-#: lib/bastion_web/live/device_live.ex:803
+#: lib/bastion_web/live/device_live.ex:904
+#: lib/bastion_web/live/device_live.ex:917
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:800
+#: lib/bastion_web/live/device_live.ex:914
 #, elixir-autogen, elixir-format
 msgid "Delete %{name} and its journal permanently?"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:949
+#: lib/bastion_web/live/device_live.ex:1077
 #, elixir-autogen, elixir-format
 msgid "Details"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:852
+#: lib/bastion_web/live/device_live.ex:966
 #, elixir-autogen, elixir-format
 msgid "Device ID (MAC)"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:693
+#: lib/bastion_web/live/device_live.ex:807
 #, elixir-autogen, elixir-format
 msgid "Device Wi-Fi"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:256
+#: lib/bastion_web/live/device_live.ex:290
 #, elixir-autogen, elixir-format
 msgid "Device approved"
 msgstr ""
 
 #: lib/bastion_web/live/dashboard_live.ex:270
-#: lib/bastion_web/live/device_live.ex:855
+#: lib/bastion_web/live/device_live.ex:969
 #, elixir-autogen, elixir-format
 msgid "Device code"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:287
+#: lib/bastion_web/live/device_live.ex:321
 #, elixir-autogen, elixir-format
 msgid "Device deleted"
 msgstr ""
@@ -268,7 +270,7 @@ msgstr ""
 msgid "Device not found — it may have been deleted"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:262
+#: lib/bastion_web/live/device_live.ex:296
 #, elixir-autogen, elixir-format
 msgid "Device revoked"
 msgstr ""
@@ -280,12 +282,12 @@ msgstr ""
 msgid "Devices"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:990
+#: lib/bastion_web/live/device_live.ex:1118
 #, elixir-autogen, elixir-format
 msgid "Disconnected"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:129
+#: lib/bastion_web/live/connect_live.ex:201
 #, elixir-autogen, elixir-format
 msgid "Download"
 msgstr ""
@@ -301,12 +303,12 @@ msgstr ""
 msgid "Enter a name"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:58
+#: lib/bastion_web/live/connect_live.ex:93
 #, elixir-autogen, elixir-format
 msgid "Enter the bastion address"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:869
+#: lib/bastion_web/live/device_live.ex:997
 #, elixir-autogen, elixir-format
 msgid "Firmware"
 msgstr ""
@@ -321,7 +323,7 @@ msgstr ""
 msgid "Folder not found"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:44
+#: lib/bastion_web/live/connect_live.ex:79
 #, elixir-autogen, elixir-format
 msgid "Hold the button on the device for 5 seconds and release it. The LED starts breathing blue."
 msgstr ""
@@ -333,12 +335,12 @@ msgstr ""
 msgid "How to connect"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:33
+#: lib/bastion_web/live/connect_live.ex:68
 #, elixir-autogen, elixir-format
 msgid "How to connect a device"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:868
+#: lib/bastion_web/live/device_live.ex:996
 #, elixir-autogen, elixir-format
 msgid "IP address"
 msgstr ""
@@ -348,7 +350,7 @@ msgstr ""
 msgid "If the codes differ, someone else may be posing as your device — reject the request."
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:119
+#: lib/bastion_web/live/connect_live.ex:191
 #, elixir-autogen, elixir-format
 msgid "Install it as a trusted root on your computer so the browser stops warning about this bastion."
 msgstr ""
@@ -358,33 +360,33 @@ msgstr ""
 msgid "Invalid username or password"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:48
+#: lib/bastion_web/live/connect_live.ex:83
 #, elixir-autogen, elixir-format
 msgid "Join the setup Wi-Fi"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:950
+#: lib/bastion_web/live/device_live.ex:1078
 #, elixir-autogen, elixir-format
 msgid "Journal"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:870
+#: lib/bastion_web/live/device_live.ex:998
 #, elixir-autogen, elixir-format
 msgid "Last seen"
 msgstr ""
 
 #: lib/bastion_web/live/dashboard_live.ex:340
-#: lib/bastion_web/live/device_live.ex:417
+#: lib/bastion_web/live/device_live.ex:463
 #, elixir-autogen, elixir-format
 msgid "Make sure the code below matches the device code on the last step of the setup wizard of %{name}."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:984
+#: lib/bastion_web/live/device_live.ex:1112
 #, elixir-autogen, elixir-format
 msgid "Moved out of folders"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:987
+#: lib/bastion_web/live/device_live.ex:1115
 #, elixir-autogen, elixir-format
 msgid "Moved to folder “%{folder}”"
 msgstr ""
@@ -392,12 +394,12 @@ msgstr ""
 #: lib/bastion_web/live/access_live.ex:481
 #: lib/bastion_web/live/access_live.ex:532
 #: lib/bastion_web/live/dashboard_live.ex:384
-#: lib/bastion_web/live/device_live.ex:634
+#: lib/bastion_web/live/device_live.ex:748
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:233
+#: lib/bastion_web/live/device_live.ex:267
 #, elixir-autogen, elixir-format
 msgid "Name saved"
 msgstr ""
@@ -418,7 +420,7 @@ msgstr ""
 msgid "No devices yet"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:912
+#: lib/bastion_web/live/device_live.ex:1040
 #: lib/bastion_web/live/users_live.ex:256
 #, elixir-autogen, elixir-format
 msgid "No events yet"
@@ -429,7 +431,7 @@ msgstr ""
 msgid "No folder"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:92
+#: lib/bastion_web/live/connect_live.ex:164
 #, elixir-autogen, elixir-format
 msgid "No network addresses found. Set BASTION_HOSTS in .env."
 msgstr ""
@@ -440,7 +442,7 @@ msgstr ""
 msgid "Nothing found"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:791
+#: lib/bastion_web/live/device_live.ex:905
 #, elixir-autogen, elixir-format
 msgid "Only a revoked device can be deleted. The journal is deleted too."
 msgstr ""
@@ -450,33 +452,34 @@ msgstr ""
 msgid "Only an approved device can be revoked"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:43
+#: lib/bastion_web/live/connect_live.ex:78
 #, elixir-autogen, elixir-format
 msgid "Open the device setup"
 msgstr ""
 
 #: lib/bastion_web/controllers/session_html/new.html.heex:25
-#: lib/bastion_web/live/device_live.ex:708
+#: lib/bastion_web/live/connect_live.ex:130
+#: lib/bastion_web/live/device_live.ex:822
 #: lib/bastion_web/live/users_live.ex:302
 #, elixir-autogen, elixir-format
 msgid "Password"
 msgstr ""
 
 #: lib/bastion_web/live/access_live.ex:577
-#: lib/bastion_web/live/device_live.ex:745
-#: lib/bastion_web/live/device_live.ex:760
+#: lib/bastion_web/live/device_live.ex:859
+#: lib/bastion_web/live/device_live.ex:874
 #, elixir-autogen, elixir-format
 msgid "Reboot"
 msgstr ""
 
 #: lib/bastion_web/live/dashboard_live.ex:282
-#: lib/bastion_web/live/device_live.ex:368
+#: lib/bastion_web/live/device_live.ex:413
 #, elixir-autogen, elixir-format
 msgid "Reject"
 msgstr ""
 
 #: lib/bastion_web/live/dashboard_live.ex:280
-#: lib/bastion_web/live/device_live.ex:366
+#: lib/bastion_web/live/device_live.ex:411
 #, elixir-autogen, elixir-format
 msgid "Reject the request from %{name}?"
 msgstr ""
@@ -491,24 +494,24 @@ msgstr ""
 msgid "Rename folder"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:976
+#: lib/bastion_web/live/device_live.ex:1104
 #, elixir-autogen, elixir-format
 msgid "Renamed from “%{from}” to “%{to}”"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:969
+#: lib/bastion_web/live/device_live.ex:1097
 #, elixir-autogen, elixir-format
 msgid "Request received, device code %{code}"
 msgstr ""
 
 #: lib/bastion_web/live/dashboard_live.ex:87
-#: lib/bastion_web/live/device_live.ex:259
-#: lib/bastion_web/live/device_live.ex:972
+#: lib/bastion_web/live/device_live.ex:293
+#: lib/bastion_web/live/device_live.ex:1100
 #, elixir-autogen, elixir-format
 msgid "Request rejected"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:874
+#: lib/bastion_web/live/device_live.ex:1002
 #, elixir-autogen, elixir-format
 msgid "Request sent"
 msgstr ""
@@ -519,13 +522,13 @@ msgid "Requests"
 msgstr ""
 
 #: lib/bastion_web/live/access_live.ex:326
-#: lib/bastion_web/live/device_live.ex:765
-#: lib/bastion_web/live/device_live.ex:785
+#: lib/bastion_web/live/device_live.ex:879
+#: lib/bastion_web/live/device_live.ex:899
 #, elixir-autogen, elixir-format
 msgid "Revoke"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:779
+#: lib/bastion_web/live/device_live.ex:893
 #, elixir-autogen, elixir-format
 msgid "Revoke %{name}? It will disconnect and will not be able to reconnect without a new approval."
 msgstr ""
@@ -536,14 +539,14 @@ msgid "Revoke the device before deleting it"
 msgstr ""
 
 #: lib/bastion_web/components/ui_components.ex:27
-#: lib/bastion_web/live/device_live.ex:880
-#: lib/bastion_web/live/device_live.ex:973
+#: lib/bastion_web/live/device_live.ex:1008
+#: lib/bastion_web/live/device_live.ex:1101
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr ""
 
 #: lib/bastion_web/controllers/ca_controller.ex:23
-#: lib/bastion_web/live/connect_live.ex:117
+#: lib/bastion_web/live/connect_live.ex:189
 #, elixir-autogen, elixir-format
 msgid "Root certificate"
 msgstr ""
@@ -551,13 +554,13 @@ msgstr ""
 #: lib/bastion_web/live/access_live.ex:522
 #: lib/bastion_web/live/access_live.ex:537
 #: lib/bastion_web/live/dashboard_live.ex:393
-#: lib/bastion_web/live/device_live.ex:644
-#: lib/bastion_web/live/folder_map_live.ex:314
+#: lib/bastion_web/live/device_live.ex:758
+#: lib/bastion_web/live/folder_map_live.ex:313
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr "Save"
 
-#: lib/bastion_web/live/device_live.ex:476
+#: lib/bastion_web/live/device_live.ex:523
 #, elixir-autogen, elixir-format
 msgid "Send BREAK"
 msgstr ""
@@ -567,7 +570,7 @@ msgstr ""
 msgid "Set up an ESP WCS device in Bastion mode with this bastion's address — its request will appear here."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:948
+#: lib/bastion_web/live/device_live.ex:1076
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr ""
@@ -582,7 +585,7 @@ msgstr ""
 msgid "Sign in to manage devices"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:54
+#: lib/bastion_web/live/connect_live.ex:89
 #, elixir-autogen, elixir-format
 msgid "Sign in, choose Bastion connection and connect the device to a Wi-Fi network from which this bastion is reachable."
 msgstr ""
@@ -603,12 +606,12 @@ msgstr ""
 msgid "Something went wrong, try again"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:851
+#: lib/bastion_web/live/device_live.ex:965
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:504
+#: lib/bastion_web/live/device_live.ex:594
 #, elixir-autogen, elixir-format
 msgid "Take the console"
 msgstr ""
@@ -618,22 +621,22 @@ msgstr ""
 msgid "The certificate request does not match the device ID"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:767
+#: lib/bastion_web/live/device_live.ex:881
 #, elixir-autogen, elixir-format
 msgid "The device certificate stops being accepted. The device stays in the list with its journal and can send a new request."
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:35
+#: lib/bastion_web/live/connect_live.ex:70
 #, elixir-autogen, elixir-format
 msgid "The device connects to the bastion itself over Wi-Fi; the connection is encrypted and mutually authenticated."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:355
+#: lib/bastion_web/live/device_live.ex:400
 #, elixir-autogen, elixir-format
 msgid "The device is waiting for approval"
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:108
+#: lib/bastion_web/live/connect_live.ex:180
 #, elixir-autogen, elixir-format
 msgid "The device remembers the bastion by this code and will not connect to anything else."
 msgstr ""
@@ -679,7 +682,7 @@ msgstr ""
 msgid "We can't find the internet"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:715
+#: lib/bastion_web/live/device_live.ex:829
 #, elixir-autogen, elixir-format
 msgid "With a wrong password the device loses its connection and can only be recovered with the button on site."
 msgstr ""
@@ -694,7 +697,7 @@ msgstr ""
 msgid "compare it with the code shown in the device setup wizard"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:872
+#: lib/bastion_web/live/device_live.ex:1000
 #, elixir-autogen, elixir-format
 msgid "never"
 msgstr ""
@@ -709,12 +712,12 @@ msgstr ""
 msgid "offline"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:936
+#: lib/bastion_web/live/device_live.ex:1064
 #, elixir-autogen, elixir-format
 msgid "%{d} d %{h} h"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:937
+#: lib/bastion_web/live/device_live.ex:1065
 #, elixir-autogen, elixir-format
 msgid "%{h} h %{m} min"
 msgstr ""
@@ -724,17 +727,17 @@ msgstr ""
 msgid "%{ms} ms"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:938
+#: lib/bastion_web/live/device_live.ex:1066
 #, elixir-autogen, elixir-format
 msgid "%{m} min"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:859
+#: lib/bastion_web/live/device_live.ex:973
 #, elixir-autogen, elixir-format
 msgid "Connected since"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:856
+#: lib/bastion_web/live/device_live.ex:970
 #, elixir-autogen, elixir-format
 msgid "Connection"
 msgstr ""
@@ -744,12 +747,12 @@ msgstr ""
 msgid "Signal %{bars} of 4"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:865
+#: lib/bastion_web/live/device_live.ex:979
 #, elixir-autogen, elixir-format
 msgid "Uptime"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:862
+#: lib/bastion_web/live/device_live.ex:976
 #, elixir-autogen, elixir-format
 msgid "Wi-Fi signal"
 msgstr ""
@@ -769,22 +772,22 @@ msgstr ""
 msgid "The device sent a new request with a different code — compare the code again"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:303
+#: lib/bastion_web/live/device_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "BREAK sent"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:574
+#: lib/bastion_web/live/device_live.ex:688
 #, elixir-autogen, elixir-format
 msgid "Data bits"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:489
+#: lib/bastion_web/live/device_live.ex:579
 #, elixir-autogen, elixir-format
 msgid "Device busy"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:619
+#: lib/bastion_web/live/device_live.ex:733
 #, elixir-autogen, elixir-format
 msgid "Even"
 msgstr ""
@@ -794,42 +797,42 @@ msgstr ""
 msgid "Invalid port settings"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:619
+#: lib/bastion_web/live/device_live.ex:733
 #, elixir-autogen, elixir-format
 msgid "No parity"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:619
+#: lib/bastion_web/live/device_live.ex:733
 #, elixir-autogen, elixir-format
 msgid "Odd"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:584
+#: lib/bastion_web/live/device_live.ex:698
 #, elixir-autogen, elixir-format
 msgid "Parity"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:304
+#: lib/bastion_web/live/device_live.ex:349
 #, elixir-autogen, elixir-format
 msgid "Port settings applied"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:493
+#: lib/bastion_web/live/device_live.ex:583
 #, elixir-autogen, elixir-format
 msgid "Since"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:598
+#: lib/bastion_web/live/device_live.ex:712
 #, elixir-autogen, elixir-format
 msgid "Stop bits"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:502
+#: lib/bastion_web/live/device_live.ex:592
 #, elixir-autogen, elixir-format
 msgid "Take the console? The other tab will lose control."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:532
+#: lib/bastion_web/live/device_live.ex:622
 #, elixir-autogen, elixir-format
 msgid "The console is available for approved devices only."
 msgstr ""
@@ -839,7 +842,7 @@ msgstr ""
 msgid "The console is controlled by another tab"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:491
+#: lib/bastion_web/live/device_live.ex:581
 #, elixir-autogen, elixir-format
 msgid "The console is open in another tab or browser."
 msgstr ""
@@ -859,7 +862,7 @@ msgstr ""
 msgid "The device is offline"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:523
+#: lib/bastion_web/live/device_live.ex:613
 #, elixir-autogen, elixir-format
 msgid "The device is offline. The console will open when it connects."
 msgstr ""
@@ -879,37 +882,38 @@ msgstr ""
 msgid "Enter a network name of 1–32 characters"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:699
+#: lib/bastion_web/live/connect_live.ex:127
+#: lib/bastion_web/live/device_live.ex:813
 #, elixir-autogen, elixir-format
 msgid "Network name (SSID)"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:758
+#: lib/bastion_web/live/device_live.ex:872
 #, elixir-autogen, elixir-format
 msgid "Reboot %{name}?"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:725
+#: lib/bastion_web/live/device_live.ex:839
 #, elixir-autogen, elixir-format
 msgid "Switch %{name} to the new network? The device reboots. If the name or password is wrong, it can only be recovered with the button on site."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:731
+#: lib/bastion_web/live/device_live.ex:845
 #, elixir-autogen, elixir-format
 msgid "Switch network"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:748
+#: lib/bastion_web/live/device_live.ex:862
 #, elixir-autogen, elixir-format
 msgid "The console and the connection are interrupted for a few seconds."
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:305
+#: lib/bastion_web/live/device_live.ex:350
 #, elixir-autogen, elixir-format
 msgid "The device is rebooting"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:306
+#: lib/bastion_web/live/device_live.ex:351
 #, elixir-autogen, elixir-format
 msgid "The device saved the new network and is rebooting"
 msgstr ""
@@ -959,7 +963,7 @@ msgstr ""
 msgid "Firefox keeps its own list: Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import, and tick “Trust this CA to identify websites”."
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:132
+#: lib/bastion_web/live/connect_live.ex:204
 #, elixir-autogen, elixir-format
 msgid "How to install it"
 msgstr ""
@@ -974,7 +978,7 @@ msgstr ""
 msgid "The bastion signs its own HTTPS certificate. Install the root certificate as trusted once — and the browser stops warning about the bastion."
 msgstr ""
 
-#: lib/bastion_web/live/connect_live.ex:63
+#: lib/bastion_web/live/connect_live.ex:98
 #, elixir-autogen, elixir-format
 msgid "mDNS is turned off on this bastion (BASTION_MDNS=off)."
 msgstr ""
@@ -1244,7 +1248,7 @@ msgstr ""
 msgid "you"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:671
+#: lib/bastion_web/live/device_live.ex:785
 #, elixir-autogen, elixir-format
 msgid "A device can be in several folders; access is granted through any of them."
 msgstr ""
@@ -1269,7 +1273,7 @@ msgstr ""
 msgid "Folder deleted"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:648
+#: lib/bastion_web/live/device_live.ex:762
 #, elixir-autogen, elixir-format
 msgid "Folders"
 msgstr ""
@@ -1279,12 +1283,12 @@ msgstr ""
 msgid "Folders can be nested at most %{max} levels"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:250
+#: lib/bastion_web/live/device_live.ex:284
 #, elixir-autogen, elixir-format
 msgid "Folders changed"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:982
+#: lib/bastion_web/live/device_live.ex:1110
 #, elixir-autogen, elixir-format
 msgid "Folders: %{folders}"
 msgstr ""
@@ -1316,7 +1320,7 @@ msgstr ""
 msgid "New subfolder"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:650
+#: lib/bastion_web/live/device_live.ex:764
 #, elixir-autogen, elixir-format
 msgid "No folders yet — create them on the devices page"
 msgstr ""
@@ -1327,7 +1331,7 @@ msgstr ""
 msgid "Only an empty folder can be deleted"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:979
+#: lib/bastion_web/live/device_live.ex:1107
 #, elixir-autogen, elixir-format
 msgid "Removed from all folders"
 msgstr ""
@@ -1608,7 +1612,7 @@ msgstr ""
 msgid "Superadmin — everything"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:141
+#: lib/bastion_web/live/device_live.ex:146
 #, elixir-autogen, elixir-format
 msgid "The device was deleted or you no longer have access to it"
 msgstr ""
@@ -1653,13 +1657,13 @@ msgstr ""
 msgid "Who has access"
 msgstr ""
 
-#: lib/bastion_web/live/device_live.ex:514
+#: lib/bastion_web/live/device_live.ex:604
 #, elixir-autogen, elixir-format
 msgid "You do not have the right to control this console."
 msgstr ""
 
 #: lib/bastion_web/errors.ex:71
-#: lib/bastion_web/live/folder_map_live.ex:187
+#: lib/bastion_web/live/folder_map_live.ex:188
 #, elixir-autogen, elixir-format
 msgid "You do not have the right to do this"
 msgstr ""
@@ -1684,52 +1688,52 @@ msgstr ""
 msgid "group %{group}"
 msgstr ""
 
-#: lib/bastion_web/live/folder_map_live.ex:407
+#: lib/bastion_web/live/folder_map_live.ex:406
 #, elixir-autogen, elixir-format
 msgid "All items are placed"
 msgstr "All items are placed"
 
-#: lib/bastion_web/live/folder_map_live.ex:440
+#: lib/bastion_web/live/folder_map_live.ex:439
 #, elixir-autogen, elixir-format
 msgid "Background photo"
 msgstr "Background photo"
 
-#: lib/bastion_web/live/folder_map_live.ex:241
+#: lib/bastion_web/live/folder_map_live.ex:242
 #, elixir-autogen, elixir-format
 msgid "Choose one image"
 msgstr "Choose one image"
 
-#: lib/bastion_web/live/folder_map_live.ex:356
+#: lib/bastion_web/live/folder_map_live.ex:355
 #, elixir-autogen, elixir-format
 msgid "Click a folder to open its map"
 msgstr "Click a folder to open its map"
 
-#: lib/bastion_web/live/folder_map_live.ex:375
+#: lib/bastion_web/live/folder_map_live.ex:374
 #, elixir-autogen, elixir-format
 msgid "Console busy"
 msgstr "Console busy"
 
-#: lib/bastion_web/live/folder_map_live.ex:248
+#: lib/bastion_web/live/folder_map_live.ex:249
 #, elixir-autogen, elixir-format
 msgid "Could not update the map"
 msgstr "Could not update the map"
 
-#: lib/bastion_web/live/folder_map_live.ex:355
+#: lib/bastion_web/live/folder_map_live.ex:354
 #, elixir-autogen, elixir-format
 msgid "Drag items onto the map or choose an item and click the map"
 msgstr "Drag items onto the map or choose an item and click the map"
 
-#: lib/bastion_web/live/folder_map_live.ex:315
+#: lib/bastion_web/live/folder_map_live.ex:314
 #, elixir-autogen, elixir-format
 msgid "Edit map"
 msgstr "Edit map"
 
-#: lib/bastion_web/live/folder_map_live.ex:376
+#: lib/bastion_web/live/folder_map_live.ex:375
 #, elixir-autogen, elixir-format
 msgid "Empty folder"
 msgstr "Empty folder"
 
-#: lib/bastion_web/live/folder_map_live.ex:339
+#: lib/bastion_web/live/folder_map_live.ex:338
 #, elixir-autogen, elixir-format
 msgid "Fit to screen"
 msgstr "Fit to screen"
@@ -1740,169 +1744,299 @@ msgstr "Fit to screen"
 msgid "Folder map"
 msgstr "Folder map"
 
-#: lib/bastion_web/live/folder_map_live.ex:125
+#: lib/bastion_web/live/folder_map_live.ex:126
 #, elixir-autogen, elixir-format
 msgid "Map unavailable"
 msgstr "Map unavailable"
 
-#: lib/bastion_web/live/folder_map_live.ex:374
+#: lib/bastion_web/live/folder_map_live.ex:373
 #, elixir-autogen, elixir-format
 msgid "Offline"
 msgstr "Offline"
 
-#: lib/bastion_web/live/folder_map_live.ex:373
+#: lib/bastion_web/live/folder_map_live.ex:372
 #, elixir-autogen, elixir-format
 msgid "Online"
 msgstr "Online"
 
-#: lib/bastion_web/live/folder_map_live.ex:443
+#: lib/bastion_web/live/folder_map_live.ex:442
 #, elixir-autogen, elixir-format
 msgid "PNG, JPEG or WebP · up to 20 MB · 8000 × 8000 pixels"
 msgstr "PNG, JPEG or WebP · up to 20 MB · 8000 × 8000 pixels"
 
-#: lib/bastion_web/live/folder_map_live.ex:561
+#: lib/bastion_web/live/folder_map_live.ex:560
 #, elixir-autogen, elixir-format
 msgid "Placed items"
 msgstr "Placed items"
 
-#: lib/bastion_web/live/folder_map_live.ex:572
+#: lib/bastion_web/live/folder_map_live.ex:571
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "Remove"
 
-#: lib/bastion_web/live/folder_map_live.ex:557
+#: lib/bastion_web/live/folder_map_live.ex:556
 #, elixir-autogen, elixir-format
 msgid "Remove background"
 msgstr "Remove background"
 
-#: lib/bastion_web/live/folder_map_live.ex:555
+#: lib/bastion_web/live/folder_map_live.ex:554
 #, elixir-autogen, elixir-format
 msgid "Remove the background? Item positions will be kept."
 msgstr "Remove the background? Item positions will be kept."
 
-#: lib/bastion_web/live/folder_map_live.ex:405
+#: lib/bastion_web/live/folder_map_live.ex:404
 #, elixir-autogen, elixir-format
 msgid "Unplaced items"
 msgstr "Unplaced items"
 
-#: lib/bastion_web/live/folder_map_live.ex:231
+#: lib/bastion_web/live/folder_map_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Use PNG, JPEG or WebP, up to 20 MB and 8000 × 8000 pixels"
 msgstr "Use PNG, JPEG or WebP, up to 20 MB and 8000 × 8000 pixels"
 
-#: lib/bastion_web/live/folder_map_live.ex:345
+#: lib/bastion_web/live/folder_map_live.ex:344
 #, elixir-autogen, elixir-format
 msgid "Zoom in"
 msgstr "Zoom in"
 
-#: lib/bastion_web/live/folder_map_live.ex:351
+#: lib/bastion_web/live/folder_map_live.ex:350
 #, elixir-autogen, elixir-format
 msgid "Zoom out"
 msgstr "Zoom out"
 
-#: lib/bastion_web/live/folder_map_live.ex:211
+#: lib/bastion_web/live/folder_map_live.ex:212
 #, elixir-autogen, elixir-format
 msgid "Background updated"
 msgstr "Background updated"
 
-#: lib/bastion_web/live/folder_map_live.ex:240
+#: lib/bastion_web/live/folder_map_live.ex:241
 #, elixir-autogen, elixir-format
 msgid "Choose a PNG, JPEG or WebP image"
 msgstr "Choose a PNG, JPEG or WebP image"
 
-#: lib/bastion_web/live/folder_map_live.ex:456
-#: lib/bastion_web/live/folder_map_live.ex:469
+#: lib/bastion_web/live/folder_map_live.ex:455
+#: lib/bastion_web/live/folder_map_live.ex:468
 #, elixir-autogen, elixir-format
 msgid "Choose a photo"
 msgstr "Choose a photo"
 
-#: lib/bastion_web/live/folder_map_live.ex:192
+#: lib/bastion_web/live/folder_map_live.ex:193
 #, elixir-autogen, elixir-format
 msgid "Choose an image and wait for the upload to finish"
 msgstr "Choose an image and wait for the upload to finish"
 
-#: lib/bastion_web/live/folder_map_live.ex:236
+#: lib/bastion_web/live/folder_map_live.ex:237
 #, elixir-autogen, elixir-format
 msgid "Image storage is not configured"
 msgstr "Image storage is not configured"
 
-#: lib/bastion_web/live/folder_map_live.ex:237
+#: lib/bastion_web/live/folder_map_live.ex:238
 #, elixir-autogen, elixir-format
 msgid "Image storage is unavailable. Try saving again."
 msgstr "Image storage is unavailable. Try saving again."
 
-#: lib/bastion_web/live/folder_map_live.ex:505
+#: lib/bastion_web/live/folder_map_live.ex:504
 #, elixir-autogen, elixir-format
 msgid "Ready to save"
 msgstr "Ready to save"
 
-#: lib/bastion_web/live/folder_map_live.ex:493
+#: lib/bastion_web/live/folder_map_live.ex:492
 #, elixir-autogen, elixir-format
 msgid "Remove selected photo"
 msgstr "Remove selected photo"
 
-#: lib/bastion_web/live/folder_map_live.ex:547
+#: lib/bastion_web/live/folder_map_live.ex:546
 #, elixir-autogen, elixir-format
 msgid "Replacing the photo keeps all item positions"
 msgstr "Replacing the photo keeps all item positions"
 
-#: lib/bastion_web/live/folder_map_live.ex:540
+#: lib/bastion_web/live/folder_map_live.ex:539
 #, elixir-autogen, elixir-format
 msgid "Saving background…"
 msgstr "Saving background…"
 
-#: lib/bastion_web/live/folder_map_live.ex:234
+#: lib/bastion_web/live/folder_map_live.ex:235
 #, elixir-autogen, elixir-format
 msgid "Storage access denied. Check the S3 credentials."
 msgstr "Storage access denied. Check the S3 credentials."
 
-#: lib/bastion_web/live/folder_map_live.ex:239
+#: lib/bastion_web/live/folder_map_live.ex:240
 #, elixir-autogen, elixir-format
 msgid "The image must be smaller than 20 MB"
 msgstr "The image must be smaller than 20 MB"
 
-#: lib/bastion_web/live/folder_map_live.ex:242
+#: lib/bastion_web/live/folder_map_live.ex:243
 #, elixir-autogen, elixir-format
 msgid "Upload interrupted. Remove the file and try again."
 msgstr "Upload interrupted. Remove the file and try again."
 
-#: lib/bastion_web/live/folder_map_live.ex:506
+#: lib/bastion_web/live/folder_map_live.ex:505
 #, elixir-autogen, elixir-format
 msgid "Uploading photo"
 msgstr "Uploading photo"
 
-#: lib/bastion_web/live/folder_map_live.ex:544
+#: lib/bastion_web/live/folder_map_live.ex:543
 #, elixir-autogen, elixir-format
 msgid "Use as background"
 msgstr "Use as background"
 
-#: lib/bastion_web/live/folder_map_live.ex:470
+#: lib/bastion_web/live/folder_map_live.ex:469
 #, elixir-autogen, elixir-format
 msgid "or drag it here"
 msgstr "or drag it here"
 
-#: lib/bastion_web/live/folder_map_live.ex:390
+#: lib/bastion_web/live/folder_map_live.ex:389
 #, elixir-autogen, elixir-format
 msgid "Drop a device on the map to add it to this folder"
 msgstr "Drop a device on the map to add it to this folder"
 
-#: lib/bastion_web/live/folder_map_live.ex:335
+#: lib/bastion_web/live/folder_map_live.ex:334
 #, elixir-autogen, elixir-format
 msgid "Map layers"
 msgstr "Map layers"
 
-#: lib/bastion_web/live/folder_map_live.ex:330
-#: lib/bastion_web/live/folder_map_live.ex:388
+#: lib/bastion_web/live/folder_map_live.ex:329
+#: lib/bastion_web/live/folder_map_live.ex:387
 #, elixir-autogen, elixir-format
 msgid "Unassigned devices"
 msgstr "Unassigned devices"
 
-#: lib/bastion_web/live/folder_map_live.ex:286
+#: lib/bastion_web/live/folder_map_live.ex:285
 #, elixir-autogen, elixir-format
 msgid "Back"
 msgstr ""
 
-#: lib/bastion_web/live/folder_map_live.ex:432
+#: lib/bastion_web/live/folder_map_live.ex:431
 #, elixir-autogen, elixir-format
 msgid "Change cover"
 msgstr "Change cover"
+
+#: lib/bastion_web/live/connect_live.ex:53
+#, elixir-autogen, elixir-format
+msgid "Cannot change hotspot. Check the laptop setup and NetworkManager permissions."
+msgstr ""
+
+#: lib/bastion_web/live/connect_live.ex:142
+#, elixir-autogen, elixir-format
+msgid "Create hotspot"
+msgstr ""
+
+#: lib/bastion_web/live/connect_live.ex:44
+#, elixir-autogen, elixir-format
+msgid "Hotspot command completed"
+msgstr ""
+
+#: lib/bastion_web/live/connect_live.ex:119
+#, elixir-autogen, elixir-format
+msgid "Laptop hotspot"
+msgstr ""
+
+#: lib/bastion_web/live/connect_live.ex:121
+#, elixir-autogen, elixir-format
+msgid "Press BOOT six times on the device to join this network. New devices require approval."
+msgstr ""
+
+#: lib/bastion_web/live/connect_live.ex:149
+#, elixir-autogen, elixir-format
+msgid "Stop hotspot"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:988
+#, elixir-autogen, elixir-format
+msgid "Buffer overflows"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:991
+#, elixir-autogen, elixir-format
+msgid "Counters since device boot. TX counts bytes accepted by the UART driver. RX pin level alone does not prove connectivity."
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:986
+#, elixir-autogen, elixir-format
+msgid "Frame errors"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:987
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Parity errors"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:989
+#, elixir-autogen, elixir-format
+msgid "RX pin level"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:984
+#, elixir-autogen, elixir-format
+msgid "Received bytes"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:985
+#, elixir-autogen, elixir-format
+msgid "Transmitted bytes"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:983
+#, elixir-autogen, elixir-format
+msgid "UART diagnostics"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:641
+#, elixir-autogen, elixir-format
+msgid "Apply baud rate"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:649
+#, elixir-autogen, elixir-format
+msgid "Could not confirm restoration. The device restores temporary settings automatically after six seconds."
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:652
+#, elixir-autogen, elixir-format
+msgid "Could not detect the baud rate"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:568
+#, elixir-autogen, elixir-format
+msgid "Detect baud rate"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:643
+#, elixir-autogen, elixir-format
+msgid "Detection cancelled. Original port settings restored."
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:645
+#, elixir-autogen, elixir-format
+msgid "Detection listens only: it sends no Enter or commands. Start output on the connected device. Format: 8N1."
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:337
+#, elixir-autogen, elixir-format
+msgid "Device profile applied"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:531
+#, elixir-autogen, elixir-format
+msgid "Device profiles"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:635
+#, elixir-autogen, elixir-format
+msgid "Listening at"
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:637
+#, elixir-autogen, elixir-format
+msgid "No reliable output detected. The original port settings have been restored. Start output on the connected device and try again."
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:640
+#, elixir-autogen, elixir-format
+msgid "Possible baud rate. Review the sample before applying."
+msgstr ""
+
+#: lib/bastion_web/live/device_live.ex:653
+#, elixir-autogen, elixir-format
+msgid "Saved in this browser for this device"
+msgstr ""
