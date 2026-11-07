@@ -9,13 +9,13 @@ defmodule BastionWeb.DashboardLiveTest do
   setup :log_in_user
 
   test "пусто — приглашение подключить устройство", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/")
+    {:ok, _view, html} = live(conn, ~p"/?view=folders")
     assert html =~ ~s(id="empty")
     assert html =~ Bastion.PKI.bastion_code()
   end
 
   test "заявка появляется сама и одобряется после сверки кода", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/")
+    {:ok, view, _html} = live(conn, ~p"/?view=folders")
 
     device = pending_device(%{name: "core-sw-01"})
     assert render(view) =~ "request-#{device.id}"
@@ -48,7 +48,7 @@ defmodule BastionWeb.DashboardLiveTest do
     device = approved_device(%{name: "core-sw"})
     {:ok, building} = Fleet.create_folder(system(), "Здание А")
     {:ok, core} = Fleet.create_folder(system(), "Ядро сети")
-    {:ok, view, _html} = live(conn, ~p"/")
+    {:ok, view, _html} = live(conn, ~p"/?view=folders")
 
     view |> element("#new-subfolder-#{building.id}") |> render_click()
     view |> element("#folder-form") |> render_submit(%{folder: %{name: "Этаж 3"}})
@@ -76,12 +76,34 @@ defmodule BastionWeb.DashboardLiveTest do
     {:ok, view, _html} = live(conn, ~p"/")
 
     view |> element("#search-form") |> render_change(%{q: "alp"})
-    assert has_element?(view, "#device-none-#{a.id}")
-    refute has_element?(view, "#device-none-#{b.id}")
+    assert has_element?(view, "#row-#{a.id}")
+    refute has_element?(view, "#row-#{b.id}")
 
     mac = Fleet.format_mac(b.device_id)
     view |> element("#search-form") |> render_change(%{q: mac})
-    assert has_element?(view, "#device-none-#{b.id}")
+    assert has_element?(view, "#row-#{b.id}")
+  end
+
+  test "таблица ограничивает выдачу и сохраняет страницу и фильтр в URL", %{conn: conn} do
+    for n <- 1..27, do: approved_device(%{name: "switch-#{n}"})
+    {:ok, view, _} = live(conn, ~p"/?view=list")
+    assert has_element?(view, "#device-table")
+
+    assert render(view)
+           |> LazyHTML.from_fragment()
+           |> LazyHTML.query("#device-table tbody tr")
+           |> Enum.count() == 25
+
+    view |> element("#devices-next") |> render_click()
+    assert_patch(view, ~p"/?#{%{q: "", status: "all", view: "list", page: 2}}")
+
+    assert render(view)
+           |> LazyHTML.from_fragment()
+           |> LazyHTML.query("#device-table tbody tr")
+           |> Enum.count() == 2
+
+    view |> element("#status-filter") |> render_change(%{status: "online"})
+    assert has_element?(view, "#no-device-matches")
   end
 
   test "переключение языка на английский и обратно", %{conn: conn} do

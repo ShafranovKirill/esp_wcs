@@ -36,9 +36,6 @@ if config_env() in [:dev, :prod] do
       |> String.split(",", trim: true)
       |> Enum.map(&String.trim/1)
       |> Enum.reject(&(&1 == ""))
-      |> Kernel.++(
-        if env!("BASTION_HOTSPOT_ENABLED", :boolean, false), do: ["10.42.0.1"], else: []
-      )
 end
 
 if config_env() in [:dev, :prod] do
@@ -91,8 +88,3 @@ if config_env() in [:dev, :prod] do
       secret_access_key: env!("S3_SECRET_KEY", :string, "")
     ]
 end
-
-config :bastion, Bastion.Hotspot,
-  enabled: env!("BASTION_HOTSPOT_ENABLED", :boolean, false),
-  ssid: env!("BASTION_HOTSPOT_SSID", :string, "ESP-WCS-BASTION"),
-  password: env!("BASTION_HOTSPOT_PASSWORD", :string, "admin-admin")

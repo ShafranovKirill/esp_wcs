@@ -15,7 +15,6 @@ typedef enum {
     WCS_BUTTON_EVENT_HOLD_LONG,
     WCS_BUTTON_EVENT_HOLD_VERY_LONG,
     WCS_BUTTON_EVENT_TRIPLE_CLICK,
-    WCS_BUTTON_EVENT_SIX_CLICK,
 } wcs_button_event_t;
 
 typedef struct {

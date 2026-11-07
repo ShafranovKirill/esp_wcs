@@ -9,7 +9,7 @@ defmodule BastionWeb.DeviceLive do
   @tabs [:console, :settings, :info, :journal]
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => id} = params, _session, socket) do
     case Fleet.fetch_device(socket.assigns.current_actor, id) do
       nil ->
         {:ok,
@@ -28,10 +28,14 @@ defmodule BastionWeb.DeviceLive do
          socket
          |> assign(
            device: device,
+           return_path: workspace_path(params["from"]),
            folders: Fleet.visible_folders(socket.assigns.current_actor).folders,
            online: Bastion.Link.presence(device.id),
            console: :idle,
            auto_baud: false,
+           folder_query: "",
+           folder_draft: device.folder_ids,
+           journal_filter: "all",
            console_since: nil
          )
          |> assign_forms()
@@ -56,21 +60,40 @@ defmodule BastionWeb.DeviceLive do
   end
 
   defp sync_console(socket) do
+    socket = assign_can(socket)
     %{device: device, tab: tab, console: console} = socket.assigns
     wanted? = connected?(socket) and tab == :console and device.status == :approved
 
     cond do
+      wanted? and not socket.assigns.can.console_write and socket.assigns.can.console_read ->
+        if console == :reader do
+          socket
+        else
+          socket = drop_console(socket)
+
+          case Console.observe(socket.assigns.current_actor, device.id) do
+            {:ok, history} ->
+              socket
+              |> assign(console: :reader)
+              |> push_event("console-reset", %{data: Base.encode64(history)})
+              |> push_event("console-state", %{owner: false})
+
+            _ ->
+              assign(socket, console: :forbidden)
+          end
+        end
+
       wanted? and not socket.assigns.can.console_write ->
         socket |> drop_console() |> assign(console: :forbidden)
 
       wanted? and console != :owner ->
-        attach_console(socket)
+        socket |> drop_console() |> attach_console()
 
       not wanted? and console == :owner ->
         release_console(socket)
 
       not wanted? ->
-        assign(socket, console: :idle)
+        socket |> drop_console() |> assign(console: :idle)
 
       true ->
         socket
@@ -94,6 +117,12 @@ defmodule BastionWeb.DeviceLive do
   end
 
   defp drop_console(%{assigns: %{console: :owner}} = socket), do: release_console(socket)
+
+  defp drop_console(%{assigns: %{console: :reader}} = socket) do
+    Console.unobserve(socket.assigns.device.id)
+    assign(socket, console: :idle)
+  end
+
   defp drop_console(socket), do: socket
 
   defp assign_can(socket) do
@@ -105,6 +134,7 @@ defmodule BastionWeb.DeviceLive do
       can: %{
         approve: Bastion.Access.can?(actor, "enrollment.approve"),
         console_write: can.("console.write"),
+        console_read: can.("console.read"),
         configure: can.("device.configure"),
         wifi: can.("device.wifi"),
         reboot: can.("device.reboot"),
@@ -118,7 +148,7 @@ defmodule BastionWeb.DeviceLive do
     socket
     |> assign(console: :owner, console_since: nil)
     |> push_event("console-reset", %{data: Base.encode64(history)})
-    |> push_event("console-state", %{owner: true})
+    |> push_event("console-state", %{owner: socket.assigns.online != nil})
   end
 
   defp busy(socket, since) do
@@ -163,13 +193,20 @@ defmodule BastionWeb.DeviceLive do
   def handle_info(
         {:event, %PresenceChanged{id: id}},
         %{assigns: %{device: %{id: id}}} = socket
-      ),
-      do: {:noreply, assign(socket, online: Bastion.Link.presence(id))}
+      ) do
+    online = Bastion.Link.presence(id)
+
+    {:noreply,
+     socket
+     |> assign(online: online)
+     |> push_event("console-state", %{owner: socket.assigns.console == :owner and online != nil})}
+  end
 
   def handle_info({:event, %PresenceChanged{}}, socket), do: {:noreply, socket}
 
-  def handle_info({:event, %ConsoleOutput{data: data}}, %{assigns: %{console: :owner}} = socket),
-    do: {:noreply, push_event(socket, "console-output", %{data: Base.encode64(data)})}
+  def handle_info({:event, %ConsoleOutput{data: data}}, %{assigns: %{console: mode}} = socket)
+      when mode in [:owner, :reader],
+      do: {:noreply, push_event(socket, "console-output", %{data: Base.encode64(data)})}
 
   def handle_info({:event, %ConsoleOutput{}}, socket), do: {:noreply, socket}
 
@@ -202,7 +239,9 @@ defmodule BastionWeb.DeviceLive do
   @impl true
   def handle_event("console-input", %{"data" => data}, %{assigns: %{console: :owner}} = socket)
       when is_binary(data) do
-    Console.input(socket.assigns.device.id, data)
+    if Fleet.can?(socket.assigns.current_actor, "console.write", socket.assigns.device),
+      do: Console.input(socket.assigns.device.id, data)
+
     {:noreply, socket}
   end
 
@@ -277,8 +316,30 @@ defmodule BastionWeb.DeviceLive do
     end
   end
 
-  def handle_event("set-folders", params, socket) do
-    ids = get_in(params, ["device", "folder_ids"]) || []
+  def handle_event("folder-search", %{"q" => query}, socket),
+    do: {:noreply, assign(socket, folder_query: String.slice(query, 0, 120))}
+
+  def handle_event("folder-toggle", %{"id" => id}, socket) do
+    draft = socket.assigns.folder_draft
+    visible = Enum.any?(socket.assigns.folders, &(&1.id == id))
+
+    if socket.assigns.can.configure and visible do
+      ids = if id in draft, do: List.delete(draft, id), else: Enum.uniq([id | draft])
+      {:noreply, assign(socket, folder_draft: ids)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("folder-cancel", _, socket),
+    do:
+      {:noreply, assign(socket, folder_draft: socket.assigns.device.folder_ids, folder_query: "")}
+
+  def handle_event("journal-filter", %{"type" => type}, socket),
+    do: {:noreply, assign(socket, journal_filter: type)}
+
+  def handle_event("set-folders", _params, socket) do
+    ids = socket.assigns.folder_draft
 
     case Fleet.set_folders(socket.assigns.current_actor, socket.assigns.device.id, ids) do
       {:ok, _} -> {:noreply, socket |> reload() |> put_flash(:info, gettext("Folders changed"))}
@@ -378,7 +439,7 @@ defmodule BastionWeb.DeviceLive do
       current_path={@current_path}
     >
       <.link
-        navigate={~p"/"}
+        navigate={@return_path}
         class="inline-flex items-center gap-1 text-sm text-base-content/60 hover:text-base-content"
       >
         <.icon name="hero-arrow-left" class="size-4" /> {gettext("All devices")}
@@ -427,7 +488,7 @@ defmodule BastionWeb.DeviceLive do
         <.link
           :for={tab <- @tabs}
           :if={tab != :settings or @can.settings}
-          patch={tab_path(@device, tab)}
+          patch={tab_path(@device, tab, @return_path)}
           role="tab"
           id={"tab-#{tab}"}
           class={["tab gap-2", @tab == tab && "tab-active"]}
@@ -448,6 +509,8 @@ defmodule BastionWeb.DeviceLive do
       />
       <.settings_tab
         :if={@tab == :settings and @can.settings}
+        folder_query={@folder_query}
+        folder_draft={@folder_draft}
         can={@can}
         device={@device}
         online={@online}
@@ -456,7 +519,7 @@ defmodule BastionWeb.DeviceLive do
         folders={@folders}
       />
       <.info_tab :if={@tab == :info} device={@device} online={@online} />
-      <.journal_tab :if={@tab == :journal} events={@events} />
+      <.journal_tab :if={@tab == :journal} events={@events} filter={@journal_filter} />
 
       <.dialog id="approve-dialog" title={gettext("Approve the device?")}>
         <p class="text-sm">
@@ -491,25 +554,38 @@ defmodule BastionWeb.DeviceLive do
   attr :can, :map, required: true
 
   defp console_tab(assigns) do
-    banner = ["\e[1;36mESP WCS\e[0m · #{assigns.device.name}", ""]
     line = assigns.online && assigns.online[:console]
 
     assigns =
       assign(assigns,
-        banner: JSON.encode!(banner),
         line: line,
         line_form: to_form(line_params(line), as: :line)
       )
 
     ~H"""
     <section class="space-y-3" id="console">
+      <div
+        :if={@console == :reader}
+        id="console-readonly"
+        class="flex items-center gap-2 rounded-lg border border-base-300 bg-base-100 px-4 py-3 text-sm"
+      >
+        <.icon name="hero-eye" class="size-4" />{gettext(
+          "Read-only console. Another operator may control this device."
+        )}
+      </div>
       <.form
         for={@line_form}
         id="console-line"
-        phx-change="console-line"
+        phx-submit="console-line"
         class="flex flex-wrap items-center gap-2"
       >
         <.line_fields form={@line_form} disabled={!@online or !@can.configure or @auto_baud} />
+        <button
+          type="submit"
+          id="console-line-apply"
+          class="btn btn-sm btn-primary"
+          disabled={!@online or !@can.configure or @auto_baud}
+        >{gettext("Apply")}</button>
         <span :if={@line} class="text-sm text-base-content/50" id="console-line-current">
           {Console.format_line(@line)}
         </span>
@@ -519,7 +595,7 @@ defmodule BastionWeb.DeviceLive do
           class="btn btn-sm"
           id="console-break"
           phx-click="console-break"
-          disabled={@console != :owner}
+          disabled={@console != :owner or !@online}
           title={gettext("Send BREAK")}
         >
           <.icon name="hero-bolt" class="size-4" /> BREAK
@@ -622,13 +698,72 @@ defmodule BastionWeb.DeviceLive do
         <span>{gettext("The console is available for approved devices only.")}</span>
       </div>
 
-      <div class="h-[28rem] overflow-hidden rounded-box border border-base-300 bg-base-200 p-2">
+      <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <span class="inline-flex items-center gap-2 text-base-content/65">
+          <.icon name="hero-command-line" class="size-4" />
+          {if @console == :owner and @online,
+            do: gettext("Controlling console"),
+            else: gettext("Console preview")}
+        </span>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-ghost"
+            id="terminal-download"
+            phx-click={JS.dispatch("wcs:terminal-download", to: "#terminal-#{@device.id}")}
+          >
+            <.icon name="hero-arrow-down-tray" class="size-4" />{gettext("Download visible history")}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-ghost"
+            id="terminal-fullscreen"
+            phx-click={JS.dispatch("wcs:terminal-fullscreen", to: "#terminal-#{@device.id}")}
+          >
+            <.icon name="hero-arrows-pointing-out" class="size-4" />{gettext("Full screen")}
+          </button>
+        </div>
+      </div>
+      <details class="rounded-lg border border-base-300 bg-base-100 p-3" id="terminal-recording-panel">
+        <summary class="cursor-pointer text-sm font-medium">{gettext("Session recording")}</summary>
+        <p class="mt-3 max-w-3xl text-xs leading-relaxed text-base-content/65">
+          {gettext(
+            "Records this tab's input and output with timestamps. May contain passwords. Kept only in this tab until downloaded; leaving the console clears it. Input does not confirm command execution. Recording stops at 2 MB."
+          )}
+        </p>
+        <div
+          id="terminal-recording-controls"
+          phx-update="ignore"
+          class="mt-3 flex flex-wrap items-center gap-3"
+        >
+          <button
+            id="terminal-record"
+            type="button"
+            class="btn btn-sm btn-outline"
+            data-start={gettext("Start recording")}
+            data-stop={gettext("Stop recording")}
+          >{gettext("Start recording")}</button>
+          <button id="terminal-record-export" type="button" class="btn btn-sm btn-ghost" disabled>{gettext(
+            "Download session JSON"
+          )}</button>
+          <span
+            id="terminal-record-status"
+            class="text-xs text-base-content/65"
+            aria-live="polite"
+            data-recording={gettext("Recording in this tab")}
+            data-stopped={gettext("Recording stopped")}
+            data-limit={
+              gettext("Recording limit reached. Download the session before starting again.")
+            }
+          ></span>
+        </div>
+      </details>
+      <div class="terminal-frame">
         <div
           id={"terminal-#{@device.id}"}
           phx-hook="Terminal"
           phx-update="ignore"
           data-readonly="true"
-          data-banner={@banner}
           data-device-id={@device.id}
           data-tools-labels={
             JSON.encode!(%{
@@ -737,115 +872,193 @@ defmodule BastionWeb.DeviceLive do
   attr :name_form, :map, required: true
   attr :wifi_form, :map, required: true
   attr :folders, :list, required: true
+  attr :folder_query, :string, required: true
+  attr :folder_draft, :list, required: true
   attr :can, :map, required: true
 
   defp settings_tab(assigns) do
     line = assigns.online && assigns.online[:console]
-    assigns = assign(assigns, :line_form, to_form(line_params(line), as: :line))
+    by_id = Map.new(assigns.folders, &{&1.id, &1})
+    options = Enum.map(assigns.folders, &{Fleet.Folder.full_name(&1, by_id), &1.id})
+    query = String.downcase(String.trim(assigns.folder_query))
+
+    results =
+      if query == "",
+        do: [],
+        else:
+          Enum.filter(options, fn {name, _} -> String.contains?(String.downcase(name), query) end)
+
+    assigns =
+      assign(assigns,
+        line_form: to_form(line_params(line), as: :line),
+        folder_options: Map.new(options, fn {name, id} -> {id, name} end),
+        folder_results: Enum.take(results, 20),
+        folder_result_count: length(results)
+      )
 
     ~H"""
-    <section class="grid gap-4 lg:grid-cols-2" id="settings">
-      <.card :if={@can.configure} title={gettext("Name")}>
-        <.form for={@name_form} id="rename-form" phx-submit="rename" class="flex items-start gap-2">
-          <div class="flex-1">
-            <.input
-              field={@name_form[:name]}
-              maxlength={Fleet.name_max_length()}
-              required
-              autocomplete="off"
-            />
-          </div>
-          <button type="submit" class="btn btn-primary mt-1">{gettext("Save")}</button>
-        </.form>
-      </.card>
-
-      <.card :if={@can.configure} title={gettext("Folders")}>
-        <p :if={@folders == []} class="text-sm text-base-content/60">
-          {gettext("No folders yet — create them on the devices page")}
-        </p>
-        <form :if={@folders != []} id="folder-form" phx-change="set-folders" class="space-y-1">
-          <input type="hidden" name="device[folder_ids][]" value="" />
-          <label
-            :for={folder <- @folders}
-            class="flex cursor-pointer items-center gap-2 text-sm"
-            style={"padding-left: #{(Fleet.Folder.depth(folder) - 1) * 1.25}rem"}
-          >
-            <input
-              type="checkbox"
-              class="checkbox checkbox-sm"
-              name="device[folder_ids][]"
-              value={folder.id}
-              id={"folder-check-#{folder.id}"}
-              checked={folder.id in @device.folder_ids}
-            />
-            <.icon name="hero-folder" class="size-4 text-base-content/50" />
-            {folder.name}
-          </label>
-          <p class="pt-2 text-xs text-base-content/50">
-            {gettext("A device can be in several folders; access is granted through any of them.")}
-          </p>
-        </form>
-      </.card>
-
-      <.card
-        :if={@can.configure}
-        title={gettext("Console port")}
-        note={!@online && gettext("Available when the device is online")}
-      >
-        <.form
-          for={@line_form}
-          id="settings-line"
-          phx-change="console-line"
-          class="flex flex-wrap items-center gap-2"
+    <section class="grid items-start gap-6 lg:grid-cols-2" id="settings">
+      <div class="min-w-0 space-y-6">
+        <.card :if={@can.configure} title={gettext("Name")}>
+          <.form for={@name_form} id="rename-form" phx-submit="rename" class="flex items-start gap-2">
+            <div class="flex-1">
+              <.input
+                field={@name_form[:name]}
+                maxlength={Fleet.name_max_length()}
+                required
+                autocomplete="off"
+              />
+            </div>
+            <button type="submit" class="btn btn-primary mt-1">{gettext("Save")}</button>
+          </.form>
+        </.card>
+        <.card
+          :if={@can.configure}
+          title={gettext("Console port")}
+          note={!@online && gettext("Available when the device is online")}
         >
-          <.line_fields form={@line_form} disabled={!@online} />
-        </.form>
-      </.card>
-
-      <.card
-        :if={@can.wifi}
-        title={gettext("Device Wi-Fi")}
-        note={!@online && gettext("Available when the device is online")}
-      >
-        <.form for={@wifi_form} id="wifi-form" phx-submit="wifi" class="space-y-2">
-          <.input
-            field={@wifi_form[:ssid]}
-            label={gettext("Network name (SSID)")}
-            maxlength={Bastion.Control.ssid_max_length()}
-            autocomplete="off"
-            disabled={!@online}
-            required
-          />
-          <.input
-            field={@wifi_form[:password]}
-            type="password"
-            label={gettext("Password")}
-            maxlength="63"
-            autocomplete="new-password"
-            disabled={!@online}
-          />
-          <p class="flex items-start gap-2 text-sm text-warning">
-            <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
-            {gettext(
-              "With a wrong password the device loses its connection and can only be recovered with the button on site."
-            )}
-          </p>
-          <button
-            type="submit"
-            class="btn btn-warning btn-sm"
-            id="wifi-submit"
-            disabled={!@online}
-            data-confirm={
-              gettext(
-                "Switch %{name} to the new network? The device reboots. If the name or password is wrong, it can only be recovered with the button on site.",
-                name: @device.name
-              )
-            }
+          <.form
+            for={@line_form}
+            id="settings-line"
+            phx-submit="console-line"
+            class="flex flex-wrap items-center gap-2"
           >
-            {gettext("Switch network")}
-          </button>
-        </.form>
-      </.card>
+            <.line_fields form={@line_form} disabled={!@online} />
+            <button
+              type="submit"
+              id="settings-line-apply"
+              class="btn btn-sm btn-primary"
+              disabled={!@online}
+            >{gettext("Apply")}</button>
+          </.form>
+        </.card>
+      </div>
+      <div class="min-w-0 space-y-6">
+        <.card :if={@can.configure} title={gettext("Folders")}>
+          <p :if={@folders == []} class="text-sm text-base-content/60">
+            {gettext("No folders yet — create them on the devices page")}
+          </p>
+          <div id="folder-picker" class="space-y-4">
+            <div id="folder-selected" class="space-y-2">
+              <p :if={@folder_draft == []} class="text-sm text-base-content/60">
+                {gettext("No folders selected")}
+              </p>
+              <button
+                :for={id <- @folder_draft}
+                id={"folder-selected-#{id}"}
+                type="button"
+                phx-click="folder-toggle"
+                phx-value-id={id}
+                class="folder-result"
+              >
+                <.icon name="hero-folder" class="size-4 shrink-0 text-primary" />
+                <span class="flex-1">{Map.get(@folder_options, id, id)}</span>
+                <.icon name="hero-x-mark" class="size-4 shrink-0" />
+                <span class="sr-only">{gettext("Remove")}</span>
+              </button>
+            </div>
+            <form id="folder-search" phx-change="folder-search" phx-submit="folder-search">
+              <label class="text-sm font-medium" for="folder-query">{gettext("Find a folder")}</label>
+              <input
+                id="folder-query"
+                name="q"
+                type="search"
+                value={@folder_query}
+                phx-debounce="250"
+                class="input mt-2 w-full"
+                placeholder={gettext("Search by folder name or path")}
+                autocomplete="off"
+              />
+            </form>
+            <div
+              :if={@folder_query != ""}
+              id="folder-results"
+              class="max-h-64 space-y-2 overflow-y-auto"
+              aria-live="polite"
+            >
+              <p :if={@folder_result_count == 0} class="text-sm text-base-content/60">
+                {gettext("No matching folders")}
+              </p>
+              <button
+                :for={{name, id} <- @folder_results}
+                id={"folder-option-#{id}"}
+                type="button"
+                phx-click="folder-toggle"
+                phx-value-id={id}
+                class="folder-result"
+                aria-pressed={to_string(id in @folder_draft)}
+              >
+                <.icon
+                  name={if id in @folder_draft, do: "hero-check-circle", else: "hero-plus-circle"}
+                  class="size-4 shrink-0 text-primary"
+                />
+                <span>{name}</span>
+              </button>
+              <p :if={@folder_result_count > 20} class="text-xs text-base-content/60">
+                {gettext("Showing the first 20 matches. Refine your search.")}
+              </p>
+            </div>
+            <p class="text-xs leading-relaxed text-base-content/60">
+              {gettext("A device can be in several folders; access is granted through any of them.")}
+            </p>
+            <form id="folder-form" phx-submit="set-folders" class="flex gap-2">
+              <button
+                type="submit"
+                id="folder-save"
+                disabled={MapSet.new(@folder_draft) == MapSet.new(@device.folder_ids)}
+                class="btn btn-sm btn-primary"
+              >{gettext("Save folders")}</button>
+              <button type="button" phx-click="folder-cancel" class="btn btn-sm btn-ghost">{gettext(
+                "Cancel"
+              )}</button>
+            </form>
+          </div>
+        </.card>
+        <.card
+          :if={@can.wifi}
+          title={gettext("Device Wi-Fi")}
+          note={!@online && gettext("Available when the device is online")}
+        >
+          <.form for={@wifi_form} id="wifi-form" phx-submit="wifi" class="space-y-2">
+            <.input
+              field={@wifi_form[:ssid]}
+              label={gettext("Network name (SSID)")}
+              maxlength={Bastion.Control.ssid_max_length()}
+              autocomplete="off"
+              disabled={!@online}
+              required
+            />
+            <.input
+              field={@wifi_form[:password]}
+              type="password"
+              label={gettext("Password")}
+              maxlength="63"
+              autocomplete="new-password"
+              disabled={!@online}
+            />
+            <p class="flex items-start gap-2 text-sm text-warning">
+              <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
+              {gettext(
+                "With a wrong password the device loses its connection and can only be recovered with the button on site."
+              )}
+            </p>
+            <button
+              type="submit"
+              class="btn btn-warning btn-sm"
+              id="wifi-submit"
+              disabled={!@online}
+              data-confirm={
+                gettext(
+                  "Switch %{name} to the new network? The device reboots. If the name or password is wrong, it can only be recovered with the button on site.",
+                  name: @device.name
+                )
+              }
+            >
+              {gettext("Switch network")}
+            </button>
+          </.form>
+        </.card>
+      </div>
 
       <div
         :if={@can.reboot or @can.revoke}
@@ -1032,19 +1245,67 @@ defmodule BastionWeb.DeviceLive do
   end
 
   attr :events, :list, required: true
+  attr :filter, :string, required: true
 
   defp journal_tab(assigns) do
+    filtered =
+      Enum.filter(assigns.events, fn e ->
+        case assigns.filter do
+          "console" -> e.type in [:console_taken, :console_released]
+          "commands" -> e.type == :command
+          "connection" -> e.type in [:connected, :disconnected]
+          _ -> true
+        end
+      end)
+
+    assigns = assign(assigns, :filtered_events, filtered)
+
     ~H"""
     <section class="rounded-box border border-base-300 bg-base-100" id="journal">
-      <p :if={@events == []} class="px-4 py-6 text-sm text-base-content/50">
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-base-300 p-4">
+        <div>
+          <h2 class="font-semibold">{gettext("Device activity")}</h2>
+          <p class="mt-1 text-sm text-base-content/60">
+            {gettext(
+              "Latest 200 events. Control actions are recorded; terminal text is not stored in this journal."
+            )}
+          </p>
+        </div>
+        <form id="journal-filter" phx-change="journal-filter">
+          <select name="type" class="select select-sm" aria-label={gettext("Event type")}>
+            <option
+              :for={
+                {label, value} <- [
+                  {gettext("All events"), "all"},
+                  {gettext("Console sessions"), "console"},
+                  {gettext("Control actions"), "commands"},
+                  {gettext("Connection"), "connection"}
+                ]
+              }
+              value={value}
+              selected={@filter == value}
+            >
+              {label}
+            </option>
+          </select>
+        </form>
+      </div>
+      <p :if={@filtered_events == []} class="px-4 py-6 text-sm text-base-content/50">
         {gettext("No events yet")}
       </p>
-      <ol :if={@events != []} class="divide-y divide-base-300">
-        <li :for={event <- @events} id={"event-#{event.id}"} class="flex items-start gap-3 px-4 py-3">
+      <ol :if={@filtered_events != []} class="divide-y divide-base-300">
+        <li
+          :for={event <- @filtered_events}
+          id={"event-#{event.id}"}
+          class="flex items-start gap-3 px-4 py-3"
+        >
           <span class="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-base-200">
             <.icon name={event_icon(event.type)} class="size-4" />
           </span>
-          <p class="flex-1 text-sm">{event_text(event)}</p>
+          <div class="min-w-0 flex-1 text-sm">
+            <p>{event_text(event)}</p>
+            <p class="mt-1 text-xs text-base-content/55">{event.data["by"] || gettext("System")}</p>
+          </div>
           <span class="shrink-0 text-xs text-base-content/50"><.time
             at={event.at}
             id={"event-at-#{event.id}"}
@@ -1065,6 +1326,14 @@ defmodule BastionWeb.DeviceLive do
       hours > 0 -> gettext("%{h} h %{m} min", h: hours, m: minutes)
       true -> gettext("%{m} min", m: minutes)
     end
+  end
+
+  defp workspace_path("/?" <> _ = path), do: path
+  defp workspace_path(_), do: "/"
+
+  defp tab_path(device, tab, return_path) do
+    path = tab_path(device, tab)
+    if return_path == "/", do: path, else: path <> "?" <> URI.encode_query(%{from: return_path})
   end
 
   defp tab_path(device, :console), do: ~p"/devices/#{device.id}"
@@ -1118,5 +1387,15 @@ defmodule BastionWeb.DeviceLive do
   defp event_text(%{type: :disconnected}), do: gettext("Disconnected")
   defp event_text(%{type: :console_taken}), do: gettext("Console taken")
   defp event_text(%{type: :console_released}), do: gettext("Console released")
-  defp event_text(%{type: :command, data: d}), do: gettext("Command: %{op}", op: d["op"])
+
+  defp event_text(%{type: :command, data: %{"op" => "console_config"} = d}),
+    do: gettext("Port settings changed: %{line}", line: d["line"] || "—")
+
+  defp event_text(%{type: :command, data: %{"op" => "console_break"}}), do: gettext("BREAK sent")
+  defp event_text(%{type: :command, data: %{"op" => "reboot"}}), do: gettext("Reboot requested")
+
+  defp event_text(%{type: :command, data: %{"op" => "wifi_config"} = d}),
+    do: gettext("Wi-Fi changed to %{ssid}", ssid: d["ssid"] || "—")
+
+  defp event_text(%{type: :command, data: d}), do: gettext("Control action: %{op}", op: d["op"])
 end

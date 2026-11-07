@@ -16,6 +16,31 @@ const decode = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0))
 
 export const Terminal = {
   mounted() {
+    this.recording = false
+    this.recorded = []
+    this.recordedBytes = 0
+    this.recordToggle = document.getElementById("terminal-record")
+    this.recordExport = document.getElementById("terminal-record-export")
+    this.recordStatus = document.getElementById("terminal-record-status")
+    this.recordListener = () => {
+      if (this.recording) this.stopRecording()
+      else {
+        this.recorded = []
+        this.recordedBytes = 0
+        this.recordingStarted = new Date().toISOString()
+        this.recording = true
+        this.recordToggle.textContent = this.recordToggle.dataset.stop
+        this.recordStatus.textContent = this.recordStatus.dataset.recording
+        this.recordExport.disabled = true
+      }
+    }
+    this.recordExportListener = () => {
+      const file = {version: 1, device: this.el.dataset.deviceId, started_at: this.recordingStarted, events: this.recorded}
+      this.downloadFile(JSON.stringify(file, null, 2), "application/json", `session-${this.el.dataset.deviceId}-${Date.now()}.json`)
+      this.recordToggle.disabled = false
+    }
+    this.recordToggle.addEventListener("click", this.recordListener)
+    this.recordExport.addEventListener("click", this.recordExportListener)
     this.owner = false
     this.scan = null
     this.labels = JSON.parse(this.el.dataset.toolsLabels || "{}")
@@ -34,6 +59,22 @@ export const Terminal = {
       this.savePreference()
     }
     this.backspaceSelect.addEventListener("change", this.keyboardChange)
+    this.fullscreenListener = async () => {
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await this.el.closest("#console").requestFullscreen?.()
+    }
+    this.downloadListener = () => {
+      const buffer = this.term.buffer.active
+      const lines = Array.from({length: buffer.length}, (_, i) => buffer.getLine(i)?.translateToString(true) || "")
+      const url = URL.createObjectURL(new Blob([lines.join("\n")], {type: "text/plain;charset=utf-8"}))
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `console-${this.el.dataset.deviceId}.txt`
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+    this.el.addEventListener("wcs:terminal-fullscreen", this.fullscreenListener)
+    this.el.addEventListener("wcs:terminal-download", this.downloadListener)
     this.autoBaudListener = () => this.detectBaud()
     this.el.addEventListener("wcs:autobaud", this.autoBaudListener)
     this.term = new XTerm({
@@ -49,27 +90,25 @@ export const Terminal = {
     this.term.open(this.el)
     this.fit.fit()
 
-    this.banner = JSON.parse(this.el.dataset.banner || "[]")
-    this.writeBanner()
 
     this.term.attachCustomKeyEventHandler(event => {
       if (event.key !== "Backspace" || event.ctrlKey || event.altKey || event.metaKey) return true
       if (event.type === "keydown" && this.owner && !this.scan) {
-        this.pushEvent("console-input", {data: this.preference.backspace === "bs" ? "\x08" : "\x7f"})
+        this.sendInput(this.preference.backspace === "bs" ? "\x08" : "\x7f")
       }
       return false
     })
 
     this.term.onData(data => {
-      if (this.owner && !this.scan) this.pushEvent("console-input", {data})
+      if (this.owner && !this.scan) this.sendInput(data)
     })
 
     this.handleEvent("console-reset", ({data}) => {
       this.term.reset()
-      this.writeBanner()
-      if (data) this.term.write(decode(data))
+      if (data) { this.record("history", data); this.term.write(decode(data)) }
     })
     this.handleEvent("console-output", ({data}) => {
+      this.record("output", data)
       const bytes = decode(data)
       if (this.scan?.collecting && this.scan.bytes.length < 4096) this.scan.bytes.push(...bytes.subarray(0, 4096 - this.scan.bytes.length))
       this.term.write(bytes)
@@ -98,6 +137,38 @@ export const Terminal = {
 
     this.themeObserver = new MutationObserver(() => (this.term.options.theme = currentTheme()))
     this.themeObserver.observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]})
+  },
+  sendInput(data) {
+    const bytes = new TextEncoder().encode(data)
+    this.record("browser_input", btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join("")))
+    this.pushEvent("console-input", {data})
+  },
+  record(direction, data) {
+    if (!this.recording) return
+    const event = {at: new Date().toISOString(), direction, text: new TextDecoder().decode(decode(data)), data_base64: data}
+    const size = new TextEncoder().encode(JSON.stringify(event)).length
+    if (this.recordedBytes + size > 2 * 1024 * 1024) {
+      this.stopRecording()
+      this.recordStatus.textContent = this.recordStatus.dataset.limit
+      return
+    }
+    this.recorded.push(event)
+    this.recordedBytes += size
+    this.recordExport.disabled = false
+  },
+  stopRecording() {
+    this.recording = false
+    this.recordToggle.textContent = this.recordToggle.dataset.start
+    this.recordToggle.disabled = this.recorded.length > 0
+    this.recordStatus.textContent = this.recordStatus.dataset.stopped
+  },
+  downloadFile(data, type, filename) {
+    const url = URL.createObjectURL(new Blob([data], {type}))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   },
   savePreference() {
     try {localStorage.setItem(this.preferenceKey, JSON.stringify(this.preference))} catch {}
@@ -185,14 +256,16 @@ export const Terminal = {
       status.textContent = this.labels.no_data
     }
   },
-  writeBanner() {
-    for (const line of this.banner) this.term.writeln(line)
-  },
   destroyed() {
     this.destroyedFlag = true
+    this.recordToggle.removeEventListener("click", this.recordListener)
+    this.recordExport.removeEventListener("click", this.recordExportListener)
+    this.recorded = []
     if (this.scan) this.scan.cancelled = true
     this.backspaceSelect.removeEventListener("change", this.keyboardChange)
     this.el.removeEventListener("wcs:autobaud", this.autoBaudListener)
+    this.el.removeEventListener("wcs:terminal-fullscreen", this.fullscreenListener)
+    this.el.removeEventListener("wcs:terminal-download", this.downloadListener)
     clearInterval(this.ping)
     this.resizeObserver.disconnect()
     this.themeObserver.disconnect()

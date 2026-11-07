@@ -12,45 +12,10 @@ defmodule BastionWeb.ConnectLive do
 
     {:ok,
      assign(socket,
-       page_title: gettext("How to connect"),
+       page_title: gettext("Help"),
        addresses: addresses,
        bastion_code: Bastion.PKI.bastion_code(),
-       hotspot: Bastion.Hotspot.details(socket.assigns.current_actor),
-       hotspot_busy: false,
        mdns: Bastion.Discovery.method()
-     )}
-  end
-
-  @impl true
-  def handle_event("hotspot", %{"action" => action}, socket) when action in ["start", "stop"] do
-    if socket.assigns.hotspot_busy do
-      {:noreply, socket}
-    else
-      actor = socket.assigns.current_actor
-      operation = if action == "start", do: :start, else: :stop
-
-      {:noreply,
-       socket
-       |> assign(:hotspot_busy, true)
-       |> start_async(:hotspot, fn -> Bastion.Hotspot.change(actor, operation) end)}
-    end
-  end
-
-  @impl true
-  def handle_async(:hotspot, {:ok, :ok}, socket) do
-    {:noreply,
-     socket
-     |> assign(:hotspot_busy, false)
-     |> put_flash(:info, gettext("Hotspot command completed"))}
-  end
-
-  def handle_async(:hotspot, _result, socket) do
-    {:noreply,
-     socket
-     |> assign(:hotspot_busy, false)
-     |> put_flash(
-       :error,
-       gettext("Cannot change hotspot. Check the laptop setup and NetworkManager permissions.")
      )}
   end
 
@@ -65,6 +30,7 @@ defmodule BastionWeb.ConnectLive do
       current_path={@current_path}
     >
       <div>
+        <p class="page-eyebrow">{gettext("Help")}</p>
         <h1 class="text-2xl font-semibold">{gettext("How to connect a device")}</h1>
         <p class="text-sm text-base-content/60">
           {gettext(
@@ -73,6 +39,20 @@ defmodule BastionWeb.ConnectLive do
         </p>
       </div>
 
+      <nav aria-label={gettext("Help topics")} class="flex flex-wrap gap-2 text-sm">
+        <a
+          href="#steps"
+          class="rounded-lg border border-base-300 bg-base-100 px-3 py-2 hover:border-primary"
+        >{gettext("How to connect")}</a>
+        <a
+          href="#connection-troubleshooting"
+          class="rounded-lg border border-base-300 bg-base-100 px-3 py-2 hover:border-primary"
+        >{gettext("Troubleshooting")}</a>
+        <a
+          href="#workspace-help"
+          class="rounded-lg border border-base-300 bg-base-100 px-3 py-2 hover:border-primary"
+        >{gettext("Console and maps")}</a>
+      </nav>
       <div class="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <ol class="space-y-3" id="steps">
           <.step n={1} title={gettext("Open the device setup")}>
@@ -111,43 +91,6 @@ defmodule BastionWeb.ConnectLive do
         </ol>
 
         <aside class="space-y-4">
-          <div
-            :if={@hotspot}
-            id="laptop-hotspot"
-            class="rounded-box border border-base-300 bg-base-100 p-4 space-y-3"
-          >
-            <h2 class="font-semibold">{gettext("Laptop hotspot")}</h2>
-            <p class="text-sm">
-              {gettext(
-                "Press BOOT six times on the device to join this network. New devices require approval."
-              )}
-            </p>
-            <dl class="text-sm space-y-1">
-              <div>
-                <dt>{gettext("Network name (SSID)")}</dt><dd class="font-mono">{@hotspot.ssid}</dd>
-              </div>
-              <div>
-                <dt>{gettext("Password")}</dt><dd class="font-mono">{@hotspot.password}</dd>
-              </div>
-              <div>
-                <dt>{gettext("Bastion address")}</dt><dd class="font-mono">{@hotspot.address}</dd>
-              </div>
-            </dl>
-            <button
-              id="hotspot-start"
-              phx-click="hotspot"
-              phx-value-action="start"
-              disabled={@hotspot_busy}
-              class="btn btn-primary btn-sm"
-            >{gettext("Create hotspot")}</button>
-            <button
-              id="hotspot-stop"
-              phx-click="hotspot"
-              phx-value-action="stop"
-              disabled={@hotspot_busy}
-              class="btn btn-sm"
-            >{gettext("Stop hotspot")}</button>
-          </div>
           <div class="card border border-base-300 bg-base-100">
             <div class="card-body gap-3 p-4">
               <h2 class="font-semibold">{gettext("Bastion address")}</h2>
@@ -207,6 +150,63 @@ defmodule BastionWeb.ConnectLive do
           </div>
         </aside>
       </div>
+      <section id="connection-troubleshooting" class="workspace-panel space-y-4">
+        <h2 class="text-lg font-semibold">{gettext("Troubleshooting")}</h2>
+        <div class="grid gap-6 md:grid-cols-3">
+          <div>
+            <h3 class="font-medium">{gettext("No request appears")}</h3>
+            <p class="mt-2 text-sm text-base-content/65">
+              {gettext(
+                "Check that the device Wi-Fi can reach this bastion on port 7443. A local network is sufficient; internet access is not required."
+              )}
+            </p>
+          </div>
+          <div>
+            <h3 class="font-medium">{gettext("The codes do not match")}</h3>
+            <p class="mt-2 text-sm text-base-content/65">
+              {gettext(
+                "Stop the setup and verify the bastion address. Only trust a code confirmed by your administrator."
+              )}
+            </p>
+          </div>
+          <div>
+            <h3 class="font-medium">{gettext("The device lost Wi-Fi")}</h3>
+            <p class="mt-2 text-sm text-base-content/65">
+              {gettext(
+                "Hold the device button for 5 seconds, release it and sign in to the setup interface to select the network again."
+              )}
+            </p>
+          </div>
+        </div>
+      </section>
+      <section id="workspace-help" class="grid gap-6 md:grid-cols-2">
+        <div class="workspace-panel">
+          <h2 class="font-semibold">{gettext("Console")}</h2>
+          <p class="mt-3 text-sm leading-relaxed text-base-content/65">
+            {gettext(
+              "One operator controls the console. Read-only users can follow the output. Taking control interrupts the previous operator. Apply port settings explicitly; Backspace and device profiles are available above the terminal."
+            )}
+          </p>
+          <p class="mt-3 text-sm leading-relaxed text-base-content/65">
+            {gettext(
+              "Download visible history saves the current browser buffer. The device journal records control actions, not the commands typed into the terminal."
+            )}
+          </p>
+        </div>
+        <div class="workspace-panel">
+          <h2 class="font-semibold">{gettext("Folders and maps")}</h2>
+          <p class="mt-3 text-sm leading-relaxed text-base-content/65">
+            {gettext(
+              "Use Folders and maps on the Devices page to open a location. Search the map to focus a marker. Use the wheel or + and − to zoom, 0 to fit. Escape cancels placement; Close leaves the map."
+            )}
+          </p>
+          <p class="mt-3 text-sm leading-relaxed text-base-content/65">
+            {gettext(
+              "Map edits save automatically. Undo restores the previous marker position unless another operator changed it. Removing a marker leaves the device in its folder."
+            )}
+          </p>
+        </div>
+      </section>
     </Layouts.app>
     """
   end

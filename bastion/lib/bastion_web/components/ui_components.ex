@@ -90,10 +90,10 @@ defmodule BastionWeb.UIComponents do
     ~H"""
     <code
       class={[
-        "rounded-md bg-base-200 font-mono font-semibold tracking-wider",
+        "inline-block max-w-full break-all rounded-md bg-base-200 font-mono font-semibold tracking-wider",
         @size == "sm" && "px-1.5 py-0.5 text-xs",
         @size == "md" && "px-2 py-1 text-sm",
-        @size == "lg" && "px-3 py-1.5 text-xl"
+        @size == "lg" && "px-3 py-1.5 text-sm sm:text-xl"
       ]}
       {@rest}
     >

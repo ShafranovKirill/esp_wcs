@@ -17,6 +17,9 @@ defmodule BastionWeb.DashboardLive do
         page_title: gettext("Devices"),
         bastion_code: Bastion.PKI.bastion_code(),
         query: "",
+        view: "folders",
+        status: "all",
+        page: 1,
         approving: nil,
         folder_form: to_form(%{"name" => ""}, as: :folder),
         folder_mode: {:new, nil},
@@ -53,14 +56,39 @@ defmodule BastionWeb.DashboardLive do
   end
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    view = if params["view"] == "list", do: "list", else: "folders"
+    status = if params["status"] in ~w(online offline revoked), do: params["status"], else: "all"
+
+    page =
+      case Integer.parse(params["page"] || "1") do
+        {n, ""} when n > 0 -> min(n, 10000)
+        _ -> 1
+      end
+
+    {:noreply,
+     assign(socket,
+       view: view,
+       status: status,
+       page: page,
+       query: String.slice(params["q"] || "", 0, 120)
+     )}
+  end
+
+  @impl true
   def handle_info({:event, %Bastion.Link.Events.PresenceChanged{}}, socket),
     do: {:noreply, assign(socket, online: Bastion.Link.online())}
 
   def handle_info({:event, _event}, socket), do: {:noreply, load(socket)}
 
   @impl true
-  def handle_event("search", %{"q" => query}, socket),
-    do: {:noreply, assign(socket, query: String.trim(query))}
+  def handle_event("search", params, socket) do
+    {:noreply,
+     push_patch(socket,
+       to:
+         ~p"/?#{%{q: String.trim(params["q"] || socket.assigns.query), status: params["status"] || socket.assigns.status, view: socket.assigns.view}}"
+     )}
+  end
 
   def handle_event("confirm-approve", %{"id" => id}, socket) do
     device = Enum.find(socket.assigns.overview.requests, &(&1.id == id))
@@ -187,6 +215,37 @@ defmodule BastionWeb.DashboardLive do
 
   @impl true
   def render(assigns) do
+    all =
+      (assigns.overview.unfiled ++ List.flatten(Map.values(assigns.overview.devices)))
+      |> Enum.uniq_by(& &1.id)
+      |> Enum.sort_by(&String.downcase(&1.name))
+
+    matches =
+      all
+      |> filter(assigns.query)
+      |> Enum.filter(fn d ->
+        case assigns.status do
+          "online" -> d.status == :approved and Map.has_key?(assigns.online, d.id)
+          "offline" -> d.status == :approved and not Map.has_key?(assigns.online, d.id)
+          "revoked" -> d.status == :revoked
+          _ -> true
+        end
+      end)
+
+    pages = max(1, ceil(length(matches) / 25))
+    page = min(assigns.page, pages)
+    by_id = assigns.folders_by_id
+
+    assigns =
+      assign(assigns,
+        rows: Enum.slice(matches, (page - 1) * 25, 25),
+        match_count: length(matches),
+        pages: pages,
+        current_page: page,
+        online_count: Enum.count(all, &Map.has_key?(assigns.online, &1.id)),
+        folder_paths: Map.new(assigns.overview.folders, &{&1.id, Folder.full_name(&1, by_id)})
+      )
+
     ~H"""
     <Layouts.app
       flash={@flash}
@@ -197,17 +256,19 @@ defmodule BastionWeb.DashboardLive do
     >
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-semibold">{gettext("Devices")}</h1>
+          <p class="page-eyebrow">{gettext("Workspace")}</p>
+          <h1 class="text-2xl font-semibold tracking-tight">{gettext("Devices")}</h1>
           <p class="text-sm text-base-content/60">
             {ngettext("%{count} device", "%{count} devices", @total)}
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <form phx-change="search" phx-submit="search" id="search-form" class="contents">
-            <label class="input input-sm w-56">
+            <label class="input input-sm w-full sm:w-64">
               <.icon name="hero-magnifying-glass" class="size-4 opacity-60" />
               <input
                 type="search"
+                aria-label={gettext("Search devices")}
                 name="q"
                 value={@query}
                 placeholder={gettext("Name, MAC or IP")}
@@ -235,14 +296,18 @@ defmodule BastionWeb.DashboardLive do
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3 rounded-box border border-base-300 bg-base-100 px-4 py-3 text-sm">
-        <.icon name="hero-shield-check" class="size-5 text-success" />
-        <span class="text-base-content/70">{gettext("Bastion code")}</span>
-        <.code code={@bastion_code} id="bastion-code" />
-        <span class="text-base-content/50">
-          {gettext("compare it with the code shown in the device setup wizard")}
-        </span>
-      </div>
+      <details id="fleet-trust" class="rounded-xl border border-base-300 bg-base-100 text-sm">
+        <summary class="flex cursor-pointer items-center gap-2 px-4 py-3 text-base-content/60">
+          <.icon name="hero-shield-check" class="size-4 text-success" />{gettext("Bastion code")}
+          <.icon name="hero-chevron-down" class="ml-auto size-3" />
+        </summary>
+        <div class="flex flex-wrap items-center gap-3 border-t border-base-300 p-4">
+          <.code code={@bastion_code} id="bastion-code" />
+          <span class="text-base-content/50">{gettext(
+            "compare it with the code shown in the device setup wizard"
+          )}</span>
+        </div>
+      </details>
 
       <section :if={@overview.requests != []} id="requests" class="space-y-3">
         <h2 class="flex items-center gap-2 text-lg font-semibold">
@@ -313,7 +378,140 @@ defmodule BastionWeb.DashboardLive do
         <.link navigate={~p"/connect"} class="btn btn-primary btn-sm mt-4">{gettext("How to connect")}</.link>
       </div>
 
-      <section :if={@total > 0 or @tree != []} id="devices" class="space-y-3">
+      <div
+        id="fleet-toolbar"
+        class="workspace-panel flex flex-wrap items-center justify-between gap-4"
+      >
+        <div class="flex flex-wrap gap-5 text-sm">
+          <span><strong class="text-success">{@online_count}</strong> {gettext("Online")}</span>
+          <span><strong>{@total - @online_count}</strong> {gettext("Offline or revoked")}</span>
+          <span :if={@can_approve}><strong>{length(@overview.requests)}</strong> {gettext(
+            "Awaiting approval"
+          )}</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <form id="status-filter" phx-change="search">
+            <select name="status" class="select select-sm" aria-label={gettext("Device status")}>
+              <option
+                :for={
+                  {label, value} <- [
+                    {gettext("All statuses"), "all"},
+                    {gettext("Online"), "online"},
+                    {gettext("Offline"), "offline"},
+                    {gettext("Revoked"), "revoked"}
+                  ]
+                }
+                value={value}
+                selected={@status == value}
+              >
+                {label}
+              </option>
+            </select>
+          </form>
+          <nav aria-label={gettext("Device view")} class="flex gap-1 rounded-lg bg-base-200 p-1">
+            <.link
+              :for={
+                {label, value, icon} <- [
+                  {gettext("List"), "list", "hero-list-bullet"},
+                  {gettext("Folders and maps"), "folders", "hero-folder"}
+                ]
+              }
+              patch={~p"/?#{%{view: value, q: @query, status: @status}}"}
+              id={"view-#{value}"}
+              class={[
+                "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm",
+                @view == value && "bg-base-100 shadow-sm font-medium"
+              ]}
+              aria-current={@view == value && "page"}
+            ><.icon name={icon} class="size-4" />{label}</.link>
+          </nav>
+        </div>
+      </div>
+
+      <section
+        :if={@view == "list" or @query != "" or @status != "all"}
+        id="device-table"
+        class="overflow-hidden rounded-xl border border-base-300 bg-base-100"
+      >
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="border-b border-base-300 bg-base-200/50 text-xs text-base-content/60">
+              <tr>
+                <th class="px-5 py-3">{gettext("Name")}</th><th class="px-5 py-3">
+                  {gettext("Connection")}
+                </th><th class="px-5 py-3">{gettext("Folders")}</th><th class="px-5 py-3">
+                  {gettext("IP address")}
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-base-300">
+              <tr :for={device <- @rows} id={"row-#{device.id}"} class="hover:bg-base-200/50">
+                <td class="px-5 py-4">
+                  <.link
+                    navigate={~p"/devices/#{device.id}?#{%{from: @current_path}}"}
+                    class="font-semibold text-primary hover:underline"
+                  >{device.name}</.link><p class="mt-1 font-mono text-xs text-base-content/50">
+                    {Fleet.format_mac(device.device_id)}
+                  </p>
+                </td>
+                <td class="px-5 py-4">
+                  <.presence
+                    :if={device.status == :approved}
+                    device={device}
+                    online={@online[device.id]}
+                    scope="table"
+                  /><.status_badge :if={device.status != :approved} status={device.status} />
+                </td>
+                <td class="max-w-sm px-5 py-4">
+                  <span :if={device.folder_ids == []} class="text-base-content/50">{gettext(
+                    "No folder"
+                  )}</span>
+                  <.link
+                    :for={id <- device.folder_ids}
+                    navigate={~p"/folders/#{id}/map?#{%{from: @current_path}}"}
+                    class="block truncate text-xs leading-6 hover:text-primary"
+                    title={@folder_paths[id]}
+                  >{@folder_paths[id]}</.link>
+                </td>
+                <td class="px-5 py-4 font-mono text-xs">{device.last_ip || "—"}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p
+          :if={@rows == []}
+          id="no-device-matches"
+          class="p-10 text-center text-sm text-base-content/60"
+        >
+          {gettext("Nothing found")}
+        </p>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300 px-5 py-3 text-sm">
+          <span class="text-base-content/60">{gettext("%{count} results · Page %{page} of %{pages}",
+            count: @match_count,
+            page: @current_page,
+            pages: @pages
+          )}</span>
+          <div class="flex gap-2">
+            <.link
+              :if={@current_page > 1}
+              patch={~p"/?#{%{q: @query, status: @status, view: @view, page: @current_page - 1}}"}
+              class="btn btn-sm btn-ghost"
+            >{gettext("Previous")}</.link>
+            <.link
+              :if={@current_page < @pages}
+              patch={~p"/?#{%{q: @query, status: @status, view: @view, page: @current_page + 1}}"}
+              id="devices-next"
+              class="btn btn-sm btn-ghost"
+            >{gettext("Next")}</.link>
+          </div>
+        </div>
+      </section>
+
+      <section
+        :if={@view == "folders" and @query == "" and @status == "all" and (@total > 0 or @tree != [])}
+        id="devices"
+        class="space-y-3"
+      >
         <.folder_node
           :for={node <- @tree}
           node={node}

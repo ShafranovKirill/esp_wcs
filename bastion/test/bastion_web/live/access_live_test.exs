@@ -28,9 +28,15 @@ defmodule BastionWeb.AccessLiveTest do
 
       {:ok, view, _} = live(conn, ~p"/access")
 
+      view |> element("#grant-folder-picker button[phx-click=toggle]") |> render_click()
+
+      view
+      |> element("#grant-folder-picker button[phx-value-value='#{folder.id}']")
+      |> render_click()
+
       view
       |> form("#grant-form",
-        grant: %{who: "group:#{group.id}", role_id: role("operator").id, folder_id: folder.id}
+        grant: %{who: "group:#{group.id}", role_id: role("operator").id}
       )
       |> render_submit()
 
@@ -78,6 +84,7 @@ defmodule BastionWeb.AccessLiveTest do
       {:ok, folder} = Fleet.create_folder(system(), "Ядро сети")
       device = approved_device()
       {:ok, _} = Fleet.set_folders(system(), device.id, [folder.id])
+      device |> Bastion.FakeDevice.start() |> Bastion.FakeDevice.stop_on_exit()
       {conn, user} = log_in_employee(conn, "duty")
 
       {:ok, viewer} =
@@ -100,7 +107,7 @@ defmodule BastionWeb.AccessLiveTest do
 
       :ok = Access.revoke(system(), operator.id)
       assert_push_event(view, "console-state", %{owner: false})
-      assert has_element?(view, "#console-forbidden")
+      assert has_element?(view, "#console-readonly")
       assert Bastion.Console.lock(device.id) == :free
 
       :ok = Access.revoke(system(), viewer.id)

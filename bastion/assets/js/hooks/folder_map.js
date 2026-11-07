@@ -7,8 +7,23 @@ export const FolderMap = {
     this.el.append(this.stage)
     const on = (el, name, fn, opts = {}) => el.addEventListener(name, fn, {...opts, signal: this.abort.signal})
     this.page = this.el.closest("#folder-map-page")
+    this.handleEvent("map-focus", ({id}) => {
+      const item = JSON.parse(this.el.dataset.items).find(item => item.id === id)
+      if (!item) return
+      this.dx = this.el.clientWidth / 2 - item.x * this.width * this.scale
+      this.dy = this.el.clientHeight / 2 - item.y * this.height * this.scale
+      this.transform()
+      const marker = [...this.stage.querySelectorAll("[data-marker]")].find(marker => JSON.parse(marker.dataset.marker).id === id)
+      marker?.focus({preventScroll: true})
+    })
     on(window, "keydown", e => {
-      if (e.key === "Escape" && !e.repeat) { e.preventDefault(); this.pushEvent("close-map", {}) }
+      if (e.key !== "Escape" || e.repeat || e.target.closest("input, select, textarea, dialog")) return
+      if (this.selected) {
+        this.selected = null
+        this.el.style.cursor = ""
+        this.page.querySelectorAll("[aria-pressed=true]").forEach(el => el.setAttribute("aria-pressed", "false"))
+        e.preventDefault()
+      }
     })
     on(this.page, "dragstart", e => {
       const item = e.target.closest("[data-map-id]")
@@ -93,7 +108,6 @@ export const FolderMap = {
     })
     this.el.tabIndex = 0
     on(this.el, "keydown", e => {
-      if (e.key === "Escape") { this.selected = null; this.el.style.cursor = "" }
       if (e.key === "0") this.fit()
       if (["+", "="].includes(e.key)) this.zoom(1.25, this.el.clientWidth / 2, this.el.clientHeight / 2)
       if (e.key === "-") this.zoom(0.8, this.el.clientWidth / 2, this.el.clientHeight / 2)
@@ -105,7 +119,7 @@ export const FolderMap = {
       const r = this.el.getBoundingClientRect()
       this.zoom(1.5, e.clientX - r.left, e.clientY - r.top)
     })
-    this.resize = new ResizeObserver(() => this.fit()); this.resize.observe(this.el)
+    this.resize = new ResizeObserver(() => { if (!this.hasFitted) this.fit() }); this.resize.observe(this.el)
     this.sync()
   },
   updated() { this.sync() },
@@ -123,6 +137,7 @@ export const FolderMap = {
   transform() {
     this.stage.style.transform = `translate(${this.dx}px, ${this.dy}px) scale(${this.scale})`
     this.stage.querySelectorAll("[data-marker]").forEach(marker => {
+      marker.classList.toggle("map-marker-compact", this.scale < 0.35)
       marker.style.transform = `translate(-50%, -50%) scale(${1 / this.scale})`
     })
   },
@@ -131,6 +146,7 @@ export const FolderMap = {
     this.scale = Math.max(0.02, Math.min((this.el.clientWidth - 48) / this.width, (this.el.clientHeight - 48) / this.height))
     this.dx = (this.el.clientWidth - this.width * this.scale) / 2
     this.dy = (this.el.clientHeight - this.height * this.scale) / 2
+    this.hasFitted = this.el.clientWidth > 0 && this.el.clientHeight > 0
     this.transform()
   },
   zoom(factor, x, y) {
@@ -153,12 +169,14 @@ export const FolderMap = {
     JSON.parse(d.items).forEach(item => {
       const marker = document.createElement("a")
       marker.href = item.url; marker.draggable = false; marker.dataset.marker = JSON.stringify({kind: item.kind, id: item.id})
+      marker.className = "map-marker"
+      marker.setAttribute("aria-label", `${item.name} · ${d[item.status] || item.status}`)
       marker.title = `${item.name} · ${d[item.status] || item.status}`
       Object.assign(marker.style, {position: "absolute", left: `${item.x * 100}%`, top: `${item.y * 100}%`, transform: "translate(-50%, -50%)",
-        display: "flex", alignItems: "center", gap: "6px", padding: "10px 14px", borderRadius: "14px", border: `1px solid ${colors[item.status]}`,
+        display: "flex", alignItems: "center", gap: "6px", padding: "8px 10px", borderRadius: "9px", border: `1px solid ${colors[item.status]}`,
         background: "var(--color-base-100, white)", color: "var(--color-base-content, #111)", whiteSpace: "nowrap", fontSize: "14px", boxShadow: "0 4px 18px #0003", cursor: this.editing ? "grab" : "pointer"})
       const icon = document.createElement("span"); icon.textContent = item.kind === "folder" ? "▣" : "●"; icon.style.color = colors[item.status]
-      const label = document.createElement("span"); label.textContent = item.name
+      const label = document.createElement("span"); label.textContent = item.name; label.className = "marker-label"
       marker.append(icon, label); this.stage.append(marker)
     })
     if (refit) this.fit()

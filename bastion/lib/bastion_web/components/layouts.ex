@@ -14,77 +14,113 @@ defmodule BastionWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header
-      :if={!@map_mode}
-      class="sticky top-0 z-30 border-b border-base-300 bg-base-100/90 backdrop-blur"
-    >
-      <div class="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-        <.link navigate={~p"/"} class="flex items-center gap-2 font-semibold">
-          <span class="grid size-8 place-items-center rounded-lg bg-primary text-primary-content">
-            <.icon name="hero-server-stack" class="size-5" />
-          </span>
-          <span class="hidden sm:inline">{gettext("ESP WCS Bastion")}</span>
+    <header :if={!@map_mode} class="app-header">
+      <div class="app-header-inner">
+        <.link navigate={~p"/"} class="brand-link">
+          <span class="brand-icon"><.icon name="hero-server-stack" class="size-5" /></span>
+          <span>Bastion</span>
         </.link>
+        <span class="header-separator" aria-hidden="true"></span>
+        <details
+          id="navigation-menu"
+          class="app-disclosure"
+          phx-hook="Disclosure"
+          phx-mounted={JS.ignore_attributes(["open"])}
+        >
+          <summary class="shell-button navigation-button" aria-label={gettext("Navigation")}>
+            <.icon name="hero-bars-3" class="size-5" />
+            <span class="hidden sm:inline">{gettext("Menu")}</span>
+            <.icon name="hero-chevron-down" class="disclosure-chevron size-3" />
+          </summary>
+          <nav class="shell-popover navigation-popover left-0" aria-label={gettext("Navigation")}>
+            <p class="shell-menu-label">{gettext("Workspace")}</p>
+            <.nav_link
+              to={~p"/"}
+              icon="hero-cpu-chip"
+              label={gettext("Devices")}
+              active={
+                @current_path == "/" or String.starts_with?(@current_path, "/?") or
+                  String.starts_with?(@current_path, "/devices")
+              }
+            />
+            <div :if={can?(@current_actor, "users.manage") or can?(@current_actor, "roles.manage")}>
+              <p class="shell-menu-label mt-3">{gettext("Administration")}</p>
+              <.nav_link
+                :if={can?(@current_actor, "users.manage")}
+                to={~p"/users"}
+                icon="hero-users"
+                label={gettext("Staff")}
+                active={String.starts_with?(@current_path, "/users")}
+              />
+              <.nav_link
+                to={~p"/access"}
+                icon="hero-shield-check"
+                label={gettext("Access")}
+                active={String.starts_with?(@current_path, "/access")}
+              />
+            </div>
+            <div class="shell-divider"></div>
+            <.nav_link
+              to={~p"/connect"}
+              icon="hero-question-mark-circle"
+              label={gettext("Help")}
+              active={@current_path == "/connect"}
+            />
+          </nav>
+        </details>
 
-        <nav class="flex items-center gap-1 text-sm">
-          <.nav_link
-            to={~p"/"}
-            icon="hero-cpu-chip"
-            label={gettext("Devices")}
-            active={@current_path == "/" or String.starts_with?(@current_path, "/devices")}
-          />
-          <.nav_link
-            to={~p"/connect"}
-            icon="hero-plus-circle"
-            label={gettext("How to connect")}
-            active={@current_path == "/connect"}
-          />
-          <.nav_link
-            :if={can?(@current_actor, "users.manage")}
-            to={~p"/users"}
-            icon="hero-users"
-            label={gettext("Staff")}
-            active={String.starts_with?(@current_path, "/users")}
-          />
-          <.nav_link
-            :if={can?(@current_actor, "users.manage") or can?(@current_actor, "roles.manage")}
-            to={~p"/access"}
-            icon="hero-shield-check"
-            label={gettext("Access")}
-            active={String.starts_with?(@current_path, "/access")}
-          />
-        </nav>
-
-        <div class="ml-auto flex items-center gap-2">
-          <.locale_switch locale={@locale} return_to={@current_path} />
-          <.theme_toggle />
-          <.link
-            :if={@current_user}
-            navigate={~p"/account"}
-            id="account-link"
-            class="btn btn-ghost btn-sm"
-            title={gettext("Account")}
-          >
-            <.icon name="hero-user-circle" class="size-4" />
-            <span class="hidden md:inline">{@current_user.username}</span>
-          </.link>
-          <.link
-            :if={@current_user}
-            href={~p"/logout"}
-            method="delete"
-            id="logout"
-            class="btn btn-ghost btn-sm"
-            title={gettext("Sign out")}
-          >
-            <.icon name="hero-arrow-right-start-on-rectangle" class="size-4" />
-            <span class="hidden sm:inline">{gettext("Sign out")}</span>
-          </.link>
-        </div>
+        <details
+          :if={@current_user}
+          id="profile-menu"
+          class="app-disclosure ml-auto"
+          phx-hook="Disclosure"
+          phx-mounted={JS.ignore_attributes(["open"])}
+        >
+          <summary class="shell-button profile-button">
+            <span class="profile-avatar" aria-hidden="true">{String.upcase(
+              String.first(@current_user.username)
+            )}</span>
+            <span class="profile-name">{@current_user.username}</span>
+            <.icon name="hero-chevron-down" class="disclosure-chevron size-3" />
+          </summary>
+          <div class="shell-popover right-0 profile-popover">
+            <div class="profile-identity">
+              <span class="profile-avatar profile-avatar-large" aria-hidden="true">{String.upcase(
+                String.first(@current_user.username)
+              )}</span>
+              <div class="min-w-0">
+                <p class="identity-caption">{gettext("Signed in as")}</p>
+                <p class="identity-name">{@current_user.username}</p>
+              </div>
+            </div>
+            <.link navigate={~p"/account"} id="account-link" class="shell-menu-link">
+              <span class="menu-icon"><.icon name="hero-user-circle" class="size-4" /></span><span class="menu-link-label">{gettext(
+                "Account"
+              )}</span><.icon name="hero-chevron-right" class="menu-link-arrow size-3" />
+            </.link>
+            <div class="shell-divider"></div>
+            <div class="profile-preference">
+              <p class="preference-label">{gettext("Language")}</p>
+              <.locale_switch locale={@locale} return_to={@current_path} />
+            </div>
+            <div class="profile-preference">
+              <p class="preference-label">{gettext("Appearance")}</p>
+              <.theme_toggle />
+            </div>
+            <div class="shell-divider"></div>
+            <.link href={~p"/logout"} method="delete" id="logout" class="shell-menu-link logout-link">
+              <span class="menu-icon"><.icon
+                name="hero-arrow-right-start-on-rectangle"
+                class="size-4"
+              /></span><span class="menu-link-label">{gettext("Sign out")}</span>
+            </.link>
+          </div>
+        </details>
       </div>
     </header>
 
-    <main class={if @map_mode, do: "h-dvh overflow-hidden", else: "px-4 py-6 sm:px-6 lg:px-8"}>
-      <div class={["mx-auto space-y-6", !@wide && "max-w-6xl"]}>
+    <main class={if @map_mode, do: "h-dvh overflow-hidden", else: "app-main"}>
+      <div class={["mx-auto min-w-0 space-y-6", !@wide && "max-w-7xl"]}>
         {render_slot(@inner_block)}
       </div>
     </main>
@@ -107,13 +143,12 @@ defmodule BastionWeb.Layouts do
       navigate={@to}
       title={@label}
       aria-label={@label}
-      class={[
-        "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 transition-colors",
-        if(@active, do: "bg-base-200 font-medium", else: "text-base-content/70 hover:bg-base-200/60")
-      ]}
+      aria-current={@active && "page"}
+      class={["shell-menu-link", @active && "shell-menu-link-active"]}
     >
-      <.icon name={@icon} class="size-4 md:hidden" />
-      <span class="hidden md:inline">{@label}</span>
+      <span class="menu-icon"><.icon name={@icon} class="size-4" /></span>
+      <span class="menu-link-label">{@label}</span>
+      <.icon name="hero-chevron-right" class="menu-link-arrow size-3" />
     </.link>
     """
   end
@@ -123,12 +158,12 @@ defmodule BastionWeb.Layouts do
 
   def locale_switch(assigns) do
     ~H"""
-    <div class="join" id="locale-switch">
+    <div class="locale-control" id="locale-switch" role="group" aria-label={gettext("Language")}>
       <form
         :for={loc <- BastionWeb.Locale.locales()}
         method="post"
         action={~p"/locale"}
-        class="join-item"
+        class="locale-form"
       >
         <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
         <input type="hidden" name="locale" value={loc} />
@@ -136,12 +171,13 @@ defmodule BastionWeb.Layouts do
         <button
           type="submit"
           class={[
-            "btn btn-xs join-item uppercase",
-            if(@locale == loc, do: "btn-active", else: "btn-ghost")
+            "locale-choice",
+            @locale == loc && "locale-choice-active"
           ]}
           aria-pressed={to_string(@locale == loc)}
         >
-          {loc}
+          <span>{if loc == "ru", do: "Русский", else: "English"}</span>
+          <.icon :if={@locale == loc} name="hero-check" class="size-3.5" />
         </button>
       </form>
     </div>
@@ -160,7 +196,7 @@ defmodule BastionWeb.Layouts do
     </main>
     <div class="fixed right-4 top-4 flex items-center gap-2">
       <.locale_switch locale={@locale} return_to={@current_path} />
-      <.theme_toggle />
+      <.theme_toggle compact={true} />
     </div>
     <.flash_group flash={@flash} />
     """
@@ -178,7 +214,7 @@ defmodule BastionWeb.Layouts do
       <.flash
         id="client-error"
         kind={:error}
-        title={gettext("We can't find the internet")}
+        title={gettext("Connection to the bastion lost")}
         phx-disconnected={
           show(".phx-client-error #client-error")
           |> JS.remove_attribute("hidden", to: ".phx-client-error #client-error")
@@ -208,33 +244,36 @@ defmodule BastionWeb.Layouts do
     """
   end
 
+  attr :compact, :boolean, default: false
+
   def theme_toggle(assigns) do
     ~H"""
-    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 [[data-theme-source=system]_&]:!left-0 transition-[left]" />
-
+    <div
+      id="theme-control"
+      phx-hook="ThemeChoices"
+      phx-update="ignore"
+      class={["theme-control", @compact && "theme-control-compact"]}
+      role="group"
+      aria-label={gettext("Appearance")}
+    >
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        :for={
+          {theme, icon, label} <- [
+            {"system", "hero-computer-desktop", gettext("System")},
+            {"light", "hero-sun", gettext("Light")},
+            {"dark", "hero-moon", gettext("Dark")}
+          ]
+        }
+        type="button"
+        class="theme-choice"
         phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="system"
+        data-phx-theme={theme}
+        aria-label={label}
+        title={label}
+        aria-pressed="false"
       >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="light"
-      >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="dark"
-      >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name={icon} class="size-5" />
+        <span class="theme-choice-label">{label}</span>
       </button>
     </div>
     """

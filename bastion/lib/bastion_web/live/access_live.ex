@@ -226,6 +226,22 @@ defmodule BastionWeb.AccessLive do
       locale={@locale}
       current_path={@current_path}
     >
+      <nav
+        id="administration-nav"
+        class="flex flex-wrap items-center gap-2 text-sm"
+        aria-label={gettext("Administration")}
+      >
+        <span class="mr-2 font-semibold text-base-content/50">{gettext("Administration")}</span>
+        <.link
+          :if={Bastion.Access.can?(@current_actor, "users.manage")}
+          navigate={~p"/users"}
+          class="rounded-lg border border-base-300 bg-base-100 px-3 py-2 hover:border-primary"
+        >{gettext("Staff")}</.link>
+        <.link
+          navigate={~p"/access"}
+          class="rounded-lg border border-base-300 bg-base-100 px-3 py-2 hover:border-primary"
+        >{gettext("Access")}</.link>
+      </nav>
       <div>
         <h1 class="text-2xl font-semibold">{gettext("Access")}</h1>
         <p class="text-sm text-base-content/60">
@@ -275,10 +291,13 @@ defmodule BastionWeb.AccessLive do
             />
           </div>
           <div class="min-w-48 flex-1">
-            <.input
-              field={@grant_form[:folder_id]}
-              type="select"
+            <.live_component
+              module={BastionWeb.SearchSelectComponent}
+              id="grant-folder-picker"
+              name="grant[folder_id]"
+              value={@grant_form[:folder_id].value}
               label={gettext("Where")}
+              prompt={gettext("Everywhere, including “No folder”")}
               options={[
                 {gettext("Everywhere, including “No folder”"), ""}
                 | Enum.map(@folders, &{Folder.full_name(&1, @folders_by_id), &1.id})

@@ -21,6 +21,19 @@ defmodule Bastion.Console do
          do: Locks.attach(id, actor)
   end
 
+  def observe(actor, id) do
+    with :ok <- Bastion.Fleet.authorize(actor, "console.read", id) do
+      Bastion.Link.subscribe_console(id)
+
+      case Bastion.Link.console_history(id) do
+        {:ok, data} -> {:ok, data}
+        {:error, _} -> {:ok, <<>>}
+      end
+    end
+  end
+
+  def unobserve(id), do: Bastion.Link.unsubscribe_console(id)
+
   @spec take(actor(), String.t()) :: {:ok, binary()} | {:error, :forbidden | :not_found}
   def take(actor, id) do
     with :ok <- Bastion.Fleet.authorize(actor, "console.write", id),
