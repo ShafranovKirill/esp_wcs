@@ -147,7 +147,7 @@ defmodule BastionWeb.FolderMapLive do
     {:noreply,
      assign(socket,
        editing: socket.assigns.map.editable and not socket.assigns.editing,
-       panel: true
+       panel: not socket.assigns.editing
      )}
   end
 
@@ -444,19 +444,6 @@ defmodule BastionWeb.FolderMapLive do
           </div>
         </div>
         <div class="relative min-h-0 flex-1" id="map-workspace">
-          <div class="absolute right-3 top-16 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap justify-end gap-2">
-            <button
-              :if={@map.editable}
-              id="map-unfiled-toggle"
-              phx-click="show-unfiled"
-              class="rounded-xl border border-base-300 bg-base-100/95 px-4 py-2 text-sm shadow-lg backdrop-blur"
-            >{gettext("Unassigned devices")} ({length(@map.unfiled)})</button>
-            <button
-              id="map-panel-toggle"
-              phx-click="toggle-panel"
-              class="rounded-xl border border-base-300 bg-base-100/95 px-4 py-2 text-sm shadow-lg backdrop-blur"
-            >{gettext("Map layers")}</button>
-          </div>
           <section class="flex h-full min-w-0 flex-col overflow-hidden bg-base-200">
             <div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-100 px-4 py-3">
               <button
@@ -480,7 +467,20 @@ defmodule BastionWeb.FolderMapLive do
                 aria-label={gettext("Zoom out")}
                 class="rounded border px-3 py-1"
               >−</button>
-              <span class="self-center text-xs opacity-60">{if @editing,
+              <div class="flex flex-wrap gap-2 sm:ml-auto">
+                <button
+                  :if={@map.editable}
+                  id="map-unfiled-toggle"
+                  phx-click="show-unfiled"
+                  class="rounded-lg border border-base-300 bg-base-100 px-3 py-1.5 text-sm hover:border-primary"
+                >{gettext("Unassigned devices")} ({length(@map.unfiled)})</button>
+                <button
+                  id="map-panel-toggle"
+                  phx-click="toggle-panel"
+                  class="rounded-lg border border-base-300 bg-base-100 px-3 py-1.5 text-sm hover:border-primary"
+                >{gettext("Map layers")}</button>
+              </div>
+              <span class="basis-full text-xs opacity-60">{if @editing,
                 do: gettext("Drag items onto the map or choose an item and click the map"),
                 else: gettext("Click a folder to open its map")}</span>
             </div>
@@ -509,7 +509,7 @@ defmodule BastionWeb.FolderMapLive do
           <aside
             id="map-inspector"
             class={[
-              "absolute right-3 top-28 z-20 max-h-[calc(100%-8rem)] w-80 max-w-[calc(100%-2rem)] space-y-3 overflow-y-auto rounded-xl bg-base-100/95 p-3 shadow-2xl backdrop-blur",
+              "absolute bottom-3 right-3 z-20 max-h-[60%] w-80 max-w-[calc(100%-2rem)] space-y-3 overflow-y-auto rounded-xl bg-base-100/95 p-3 shadow-2xl backdrop-blur",
               !@panel && "hidden"
             ]}
           >
