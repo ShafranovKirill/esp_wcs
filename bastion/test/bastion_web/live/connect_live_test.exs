@@ -12,28 +12,12 @@ defmodule BastionWeb.ConnectLiveTest do
     assert html =~ ~s(id="download-ca")
   end
 
-  test "управление точкой доступно только при включённом локальном режиме", %{conn: conn} do
-    previous = Application.get_env(:bastion, Bastion.Hotspot)
-
-    on_exit(fn ->
-      if previous,
-        do: Application.put_env(:bastion, Bastion.Hotspot, previous),
-        else: Application.delete_env(:bastion, Bastion.Hotspot)
-    end)
-
-    Application.put_env(:bastion, Bastion.Hotspot, enabled: false)
+  test "подключение только через интерфейс ESP, без hotspot", %{conn: conn} do
     {:ok, view, _} = live(conn, ~p"/connect")
+    assert has_element?(view, "#steps")
+    assert has_element?(view, "#connection-troubleshooting")
     refute has_element?(view, "#laptop-hotspot")
-
-    Application.put_env(:bastion, Bastion.Hotspot,
-      enabled: true,
-      ssid: "test-network",
-      password: "test-password"
-    )
-
-    {:ok, view, _} = live(conn, ~p"/connect")
-    assert has_element?(view, "#hotspot-start")
-    assert has_element?(view, "#hotspot-stop")
+    refute has_element?(view, "#hotspot-start")
   end
 
   test "корневой сертификат скачивается без входа", %{conn: _conn} do

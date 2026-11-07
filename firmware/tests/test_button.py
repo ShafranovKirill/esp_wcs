@@ -54,11 +54,11 @@ static void run(int n,int duration,int expected) {
 int main(void) {
  run(1,70,WCS_BUTTON_EVENT_CLICK);
  run(3,70,WCS_BUTTON_EVENT_TRIPLE_CLICK);
- run(6,70,WCS_BUTTON_EVENT_SIX_CLICK);
+ run(6,70,-1);
  run(4,70,-1);
  return 0;
 }
 ''')
  subprocess.run(['cc','-I'+str(p),'-I'+str(root/'include'),'-I'+str(root),str(p/'test.c'),'-o',str(p/'test')],check=True)
  subprocess.run([str(p/'test')],check=True)
- print('Button simulation: single/triple/six clicks and ignored four clicks passed')
+ print('Button simulation: single/triple clicks and ignored four/six clicks passed')

@@ -16,10 +16,6 @@ typedef struct {
     const char *setup_ap_password;
     const char *direct_ap_ssid_prefix;
     const char *direct_ap_password;
-    const char *laptop_ssid;
-    const char *laptop_password;
-    const char *laptop_addr;
-    const char *laptop_ca;
     const char *admin_username;
     wcs_password_hash_t admin_password;
 } wcs_defaults_t;

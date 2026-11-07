@@ -137,6 +137,22 @@ defmodule BastionWeb.UsersLive do
       locale={@locale}
       current_path={@current_path}
     >
+      <nav
+        id="administration-nav"
+        class="flex flex-wrap items-center gap-2 text-sm"
+        aria-label={gettext("Administration")}
+      >
+        <span class="mr-2 font-semibold text-base-content/50">{gettext("Administration")}</span>
+        <.link
+          :if={Bastion.Access.can?(@current_actor, "users.manage")}
+          navigate={~p"/users"}
+          class="rounded-lg border border-base-300 bg-base-100 px-3 py-2 hover:border-primary"
+        >{gettext("Staff")}</.link>
+        <.link
+          navigate={~p"/access"}
+          class="rounded-lg border border-base-300 bg-base-100 px-3 py-2 hover:border-primary"
+        >{gettext("Access")}</.link>
+      </nav>
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 class="text-2xl font-semibold">{gettext("Staff")}</h1>

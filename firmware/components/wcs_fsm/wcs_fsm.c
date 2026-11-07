@@ -40,8 +40,6 @@ typedef enum {
     CMD_BUTTON_LONG,
     CMD_BUTTON_VERY_LONG,
     CMD_BUTTON_TRIPLE_CLICK,
-    CMD_BUTTON_SIX_CLICK,
-    CMD_LAPTOP_TIMEOUT,
     CMD_AP_CLIENT_JOINED,
     CMD_AP_CLIENT_LEFT,
     CMD_AP_IDLE_TIMEOUT,
@@ -84,8 +82,6 @@ static const char *TAG = "wcs_fsm";
 
 static QueueHandle_t s_cmd_queue;
 static esp_timer_handle_t s_ap_idle_timer;
-static esp_timer_handle_t s_laptop_timer;
-static bool s_laptop_mode;
 static volatile wcs_fsm_state_t s_state;
 static int s_ap_clients;
 static bool s_error;
@@ -163,9 +159,6 @@ static void on_button(void *arg, esp_event_base_t base, int32_t id, void *data)
     case WCS_BUTTON_EVENT_VERY_LONG:
         send_cmd(CMD_BUTTON_VERY_LONG);
         break;
-    case WCS_BUTTON_EVENT_SIX_CLICK:
-        send_cmd(CMD_BUTTON_SIX_CLICK);
-        break;
     case WCS_BUTTON_EVENT_TRIPLE_CLICK:
         send_cmd(CMD_BUTTON_TRIPLE_CLICK);
         break;
@@ -186,11 +179,6 @@ static void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
 static void on_link(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     send_cmd(CMD_LINK_STATE);
-}
-
-static void on_laptop_timer(void *arg)
-{
-    send_cmd(CMD_LAPTOP_TIMEOUT);
 }
 
 static void on_ap_idle_timer(void *arg)
@@ -268,8 +256,6 @@ static void load_direct_credentials(void)
 
 static void enter_setup(void)
 {
-    esp_timer_stop(s_laptop_timer);
-    s_laptop_mode = false;
     ESP_LOGI(TAG, "-> setup");
     wcs_link_stop();
     stop_access_point();
@@ -296,8 +282,6 @@ static void start_direct_access_point(void)
 
 static void enter_direct(bool raise_ap)
 {
-    esp_timer_stop(s_laptop_timer);
-    s_laptop_mode = false;
     ESP_LOGI(TAG, "-> direct");
     wcs_link_stop();
     stop_access_point();
@@ -311,8 +295,6 @@ static void enter_direct(bool raise_ap)
 
 static void enter_bastion(const wcs_settings_t *settings)
 {
-    esp_timer_stop(s_laptop_timer);
-    s_laptop_mode = false;
     ESP_LOGI(TAG, "-> bastion, network \"%s\", bastion %s", settings->sta_ssid, settings->bastion_addr);
     stop_access_point();
     s_error = false;
@@ -359,8 +341,6 @@ static void switch_to_direct(void)
 
 static void enter_saved_mode(bool raise_direct_ap)
 {
-    esp_timer_stop(s_laptop_timer);
-    s_laptop_mode = false;
     wcs_settings_t settings;
     if (wcs_storage_load(&settings) != ESP_OK) {
         ESP_LOGE(TAG, "settings load failed, using factory state");
@@ -381,34 +361,6 @@ static void enter_saved_mode(bool raise_direct_ap)
         wcs_wifi_sta_disconnect();
         s_state = WCS_FSM_STATE_FACTORY;
         break;
-    }
-}
-
-static void enter_laptop(void)
-{
-    if (!wcs_defaults.laptop_ca[0]) {
-        ESP_LOGW(TAG, "laptop mode disabled: no build-time CA certificate");
-        return;
-    }
-    wcs_link_stop();
-    stop_access_point();
-    wcs_wifi_sta_disconnect();
-    s_error = false;
-    s_state = WCS_FSM_STATE_BASTION;
-    s_laptop_mode = true;
-    esp_timer_stop(s_laptop_timer);
-    esp_timer_start_once(s_laptop_timer, 120ULL * 1000000);
-    const wcs_link_config_t link = {
-        .bastion_addr = wcs_defaults.laptop_addr,
-        .ca_pem = wcs_defaults.laptop_ca,
-        .name = s_device_name,
-        .firmware = esp_app_get_description()->version,
-    };
-    ESP_LOGI(TAG, "temporary laptop mode: network %s, bastion %s", wcs_defaults.laptop_ssid,
-             wcs_defaults.laptop_addr);
-    if (wcs_wifi_sta_connect(wcs_defaults.laptop_ssid, wcs_defaults.laptop_password, true) != ESP_OK ||
-        wcs_link_start(&link) != ESP_OK) {
-        enter_saved_mode(true);
     }
 }
 
@@ -443,16 +395,6 @@ static void handle(app_cmd_t cmd)
         break;
     case CMD_BUTTON_VERY_LONG:
         factory_reset();
-        break;
-    case CMD_BUTTON_SIX_CLICK:
-        enter_laptop();
-        break;
-    case CMD_LAPTOP_TIMEOUT:
-        if (s_laptop_mode && wcs_link_get_state() != WCS_LINK_STATE_ONLINE &&
-            wcs_link_get_state() != WCS_LINK_STATE_PENDING) {
-            ESP_LOGW(TAG, "laptop unavailable, returning to saved mode");
-            enter_saved_mode(true);
-        }
         break;
     case CMD_BUTTON_TRIPLE_CLICK:
         switch_to_direct();
@@ -537,9 +479,6 @@ esp_err_t wcs_fsm_start(const wcs_fsm_config_t *config)
                         TAG, "link handler");
     const esp_timer_create_args_t idle_timer = { .callback = on_ap_idle_timer, .name = "ap_idle" };
     ESP_RETURN_ON_ERROR(esp_timer_create(&idle_timer, &s_ap_idle_timer), TAG, "timer create failed");
-
-    const esp_timer_create_args_t laptop_timer = { .callback = on_laptop_timer, .name = "laptop" };
-    ESP_RETURN_ON_ERROR(esp_timer_create(&laptop_timer, &s_laptop_timer), TAG, "laptop timer");
 
     enter_saved_mode(false);
     update_led();

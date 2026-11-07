@@ -14,77 +14,97 @@ defmodule BastionWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header
-      :if={!@map_mode}
-      class="sticky top-0 z-30 border-b border-base-300 bg-base-100/90 backdrop-blur"
-    >
-      <div class="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-        <.link navigate={~p"/"} class="flex items-center gap-2 font-semibold">
-          <span class="grid size-8 place-items-center rounded-lg bg-primary text-primary-content">
-            <.icon name="hero-server-stack" class="size-5" />
-          </span>
-          <span class="hidden sm:inline">{gettext("ESP WCS Bastion")}</span>
+    <header :if={!@map_mode} class="app-header">
+      <div class="app-header-inner">
+        <details
+          id="navigation-menu"
+          class="app-disclosure"
+          phx-hook="Disclosure"
+          phx-mounted={JS.ignore_attributes(["open"])}
+        >
+          <summary class="shell-button" aria-label={gettext("Navigation")}>
+            <.icon name="hero-bars-3" class="size-5" />
+            <span class="hidden sm:inline">{gettext("Menu")}</span>
+            <.icon name="hero-chevron-down" class="disclosure-chevron size-3" />
+          </summary>
+          <nav class="shell-popover left-0" aria-label={gettext("Navigation")}>
+            <p class="shell-menu-label">{gettext("Workspace")}</p>
+            <.nav_link
+              to={~p"/"}
+              icon="hero-cpu-chip"
+              label={gettext("Devices")}
+              active={
+                @current_path == "/" or String.starts_with?(@current_path, "/?") or
+                  String.starts_with?(@current_path, "/devices")
+              }
+            />
+            <div :if={can?(@current_actor, "users.manage") or can?(@current_actor, "roles.manage")}>
+              <p class="shell-menu-label mt-3">{gettext("Administration")}</p>
+              <.nav_link
+                :if={can?(@current_actor, "users.manage")}
+                to={~p"/users"}
+                icon="hero-users"
+                label={gettext("Staff")}
+                active={String.starts_with?(@current_path, "/users")}
+              />
+              <.nav_link
+                to={~p"/access"}
+                icon="hero-shield-check"
+                label={gettext("Access")}
+                active={String.starts_with?(@current_path, "/access")}
+              />
+            </div>
+            <div class="shell-divider"></div>
+            <.nav_link
+              to={~p"/connect"}
+              icon="hero-question-mark-circle"
+              label={gettext("Help")}
+              active={@current_path == "/connect"}
+            />
+          </nav>
+        </details>
+        <.link navigate={~p"/"} class="brand-link">
+          <span class="brand-icon"><.icon name="hero-server-stack" class="size-5" /></span>
+          <span>Bastion</span>
         </.link>
-
-        <nav class="flex items-center gap-1 text-sm">
-          <.nav_link
-            to={~p"/"}
-            icon="hero-cpu-chip"
-            label={gettext("Devices")}
-            active={@current_path == "/" or String.starts_with?(@current_path, "/devices")}
-          />
-          <.nav_link
-            to={~p"/connect"}
-            icon="hero-plus-circle"
-            label={gettext("How to connect")}
-            active={@current_path == "/connect"}
-          />
-          <.nav_link
-            :if={can?(@current_actor, "users.manage")}
-            to={~p"/users"}
-            icon="hero-users"
-            label={gettext("Staff")}
-            active={String.starts_with?(@current_path, "/users")}
-          />
-          <.nav_link
-            :if={can?(@current_actor, "users.manage") or can?(@current_actor, "roles.manage")}
-            to={~p"/access"}
-            icon="hero-shield-check"
-            label={gettext("Access")}
-            active={String.starts_with?(@current_path, "/access")}
-          />
-        </nav>
-
-        <div class="ml-auto flex items-center gap-2">
-          <.locale_switch locale={@locale} return_to={@current_path} />
-          <.theme_toggle />
-          <.link
-            :if={@current_user}
-            navigate={~p"/account"}
-            id="account-link"
-            class="btn btn-ghost btn-sm"
-            title={gettext("Account")}
-          >
-            <.icon name="hero-user-circle" class="size-4" />
-            <span class="hidden md:inline">{@current_user.username}</span>
-          </.link>
-          <.link
-            :if={@current_user}
-            href={~p"/logout"}
-            method="delete"
-            id="logout"
-            class="btn btn-ghost btn-sm"
-            title={gettext("Sign out")}
-          >
-            <.icon name="hero-arrow-right-start-on-rectangle" class="size-4" />
-            <span class="hidden sm:inline">{gettext("Sign out")}</span>
-          </.link>
-        </div>
+        <details
+          :if={@current_user}
+          id="profile-menu"
+          class="app-disclosure ml-auto"
+          phx-hook="Disclosure"
+          phx-mounted={JS.ignore_attributes(["open"])}
+        >
+          <summary class="shell-button profile-button">
+            <.icon name="hero-user-circle" class="size-5 text-primary" />
+            <span class="max-w-32 truncate">{@current_user.username}</span>
+            <.icon name="hero-chevron-down" class="disclosure-chevron size-3" />
+          </summary>
+          <div class="shell-popover right-0 profile-popover">
+            <p class="shell-menu-label">{gettext("Signed in as")}</p>
+            <p class="px-3 pb-3 font-semibold break-all">{@current_user.username}</p>
+            <.link navigate={~p"/account"} id="account-link" class="shell-menu-link">
+              <.icon name="hero-user-circle" class="size-4" />{gettext("Account")}
+            </.link>
+            <div class="shell-divider"></div>
+            <div class="space-y-2 px-3 py-2">
+              <p class="text-xs font-medium text-base-content/60">{gettext("Language")}</p>
+              <.locale_switch locale={@locale} return_to={@current_path} />
+            </div>
+            <div class="space-y-2 px-3 py-2">
+              <p class="text-xs font-medium text-base-content/60">{gettext("Appearance")}</p>
+              <.theme_toggle />
+            </div>
+            <div class="shell-divider"></div>
+            <.link href={~p"/logout"} method="delete" id="logout" class="shell-menu-link">
+              <.icon name="hero-arrow-right-start-on-rectangle" class="size-4" />{gettext("Sign out")}
+            </.link>
+          </div>
+        </details>
       </div>
     </header>
 
-    <main class={if @map_mode, do: "h-dvh overflow-hidden", else: "px-4 py-6 sm:px-6 lg:px-8"}>
-      <div class={["mx-auto space-y-6", !@wide && "max-w-6xl"]}>
+    <main class={if @map_mode, do: "h-dvh overflow-hidden", else: "app-main"}>
+      <div class={["mx-auto min-w-0 space-y-6", !@wide && "max-w-7xl"]}>
         {render_slot(@inner_block)}
       </div>
     </main>
@@ -107,13 +127,11 @@ defmodule BastionWeb.Layouts do
       navigate={@to}
       title={@label}
       aria-label={@label}
-      class={[
-        "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 transition-colors",
-        if(@active, do: "bg-base-200 font-medium", else: "text-base-content/70 hover:bg-base-200/60")
-      ]}
+      aria-current={@active && "page"}
+      class={["shell-menu-link", @active && "shell-menu-link-active"]}
     >
-      <.icon name={@icon} class="size-4 md:hidden" />
-      <span class="hidden md:inline">{@label}</span>
+      <.icon name={@icon} class="size-4" />
+      <span>{@label}</span>
     </.link>
     """
   end
@@ -178,7 +196,7 @@ defmodule BastionWeb.Layouts do
       <.flash
         id="client-error"
         kind={:error}
-        title={gettext("We can't find the internet")}
+        title={gettext("Connection to the bastion lost")}
         phx-disconnected={
           show(".phx-client-error #client-error")
           |> JS.remove_attribute("hidden", to: ".phx-client-error #client-error")
@@ -217,6 +235,8 @@ defmodule BastionWeb.Layouts do
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
+        aria-label={gettext("System theme")}
+        title={gettext("System theme")}
       >
         <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
@@ -225,6 +245,8 @@ defmodule BastionWeb.Layouts do
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
+        aria-label={gettext("Light theme")}
+        title={gettext("Light theme")}
       >
         <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
@@ -233,6 +255,8 @@ defmodule BastionWeb.Layouts do
         class="flex p-2 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
+        aria-label={gettext("Dark theme")}
+        title={gettext("Dark theme")}
       >
         <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>

@@ -48,6 +48,50 @@ defmodule BastionWeb.DeviceLiveTest do
     end
   end
 
+  test "поиск папок ограничивает выдачу и отмена не меняет назначение", %{conn: conn} do
+    device = approved_device()
+    for n <- 1..24, do: Fleet.create_folder(system(), "Room #{n}")
+    {:ok, view, _} = live(conn, ~p"/devices/#{device.id}/settings")
+    refute has_element?(view, "#folder-results")
+    view |> element("#folder-search") |> render_change(%{q: "Room"})
+
+    assert view
+           |> element("#folder-results")
+           |> render()
+           |> LazyHTML.from_fragment()
+           |> LazyHTML.query("button")
+           |> Enum.count() == 20
+
+    folder = hd(Fleet.list_folders())
+    view |> element("#folder-option-#{folder.id}") |> render_click()
+    view |> element("button[phx-click=folder-cancel]") |> render_click()
+    assert Fleet.get_device(device.id).folder_ids == []
+    refute has_element?(view, "#folder-selected-#{folder.id}")
+  end
+
+  test "читатель получает вывод без блокировки и не может отправить ввод", %{conn: conn} do
+    {:ok, folder} = Fleet.create_folder(system(), "Read only")
+    device = approved_device()
+    {:ok, _} = Fleet.set_folders(system(), device.id, [folder.id])
+    fake = device |> FakeDevice.start() |> FakeDevice.stop_on_exit()
+    {reader_conn, user} = log_in_employee(conn, "observer")
+    role = Enum.find(Bastion.Access.list_roles(), &(&1.builtin == "viewer"))
+
+    {:ok, _} =
+      Bastion.Access.grant(system(), %{user_id: user.id, role_id: role.id, folder_id: folder.id})
+
+    {:ok, owner, _} = live(conn, ~p"/devices/#{device.id}")
+    {:ok, reader, _} = live(reader_conn, ~p"/devices/#{device.id}")
+    assert has_element?(reader, "#console-readonly")
+    refute has_element?(reader, "#console-take")
+    FakeDevice.send_binary(fake, <<1, "Switch#">>)
+    assert_push_event(reader, "console-output", %{data: data})
+    assert Base.decode64!(data) == "Switch#"
+    render_hook(reader, "console-input", %{data: "reload\r"})
+    refute_receive {:fake_frame, ^fake, {:binary, _}}, 50
+    assert has_element?(owner, "#terminal-#{device.id}")
+  end
+
   test "профиль Eltex применяет UART и настраивает Backspace", %{conn: conn} do
     device = approved_device()
     fake = device |> FakeDevice.start() |> FakeDevice.stop_on_exit()
@@ -145,14 +189,15 @@ defmodule BastionWeb.DeviceLiveTest do
     view |> element("#rename-form") |> render_submit(%{device: %{name: "core-sw-01"}})
     assert has_element?(view, "#device-name", "core-sw-01")
 
-    view
-    |> element("#folder-form")
-    |> render_change(%{device: %{folder_ids: ["", folder.id]}})
-
+    view |> element("#folder-search") |> render_change(%{q: "Склад"})
+    view |> element("#folder-option-#{folder.id}") |> render_click()
+    assert Fleet.get_device(device.id).folder_ids == []
+    view |> element("#folder-form") |> render_submit()
     assert Fleet.get_device(device.id).folder_ids == [folder.id]
-    assert has_element?(view, "#folder-check-#{folder.id}[checked]")
+    assert has_element?(view, "#folder-selected-#{folder.id}")
 
-    view |> element("#folder-form") |> render_change(%{device: %{folder_ids: [""]}})
+    view |> element("#folder-selected-#{folder.id}") |> render_click()
+    view |> element("#folder-form") |> render_submit()
     assert Fleet.get_device(device.id).folder_ids == []
   end
 
@@ -180,7 +225,7 @@ defmodule BastionWeb.DeviceLiveTest do
 
     view
     |> element("#settings-line")
-    |> render_change(%{line: %{baud: "115200", data_bits: "8", parity: "none", stop_bits: "1"}})
+    |> render_submit(%{line: %{baud: "115200", data_bits: "8", parity: "none", stop_bits: "1"}})
 
     assert_receive {:fake_frame, ^fake, {:text, frame}}
     assert %{"op" => "console_config", "args" => %{"baud" => 115_200}} = JSON.decode!(frame)

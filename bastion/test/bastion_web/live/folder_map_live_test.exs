@@ -14,7 +14,7 @@ defmodule BastionWeb.FolderMapLiveTest do
   end
 
   test "map link, edit, place, reload and remove", %{conn: conn} = c do
-    {:ok, dashboard, _} = live(conn, ~p"/")
+    {:ok, dashboard, _} = live(conn, ~p"/?view=folders")
     assert has_element?(dashboard, "#folder-map-#{c.folder.id}")
     {:ok, view, _} = live(conn, ~p"/folders/#{c.folder.id}/map")
     view |> element("#map-panel-toggle") |> render_click()
@@ -30,6 +30,36 @@ defmodule BastionWeb.FolderMapLiveTest do
     refute has_element?(reloaded, "#map-unplaced #unplaced-#{c.device.id}")
     view |> element("#remove-placement-#{c.device.id}") |> render_click()
     assert has_element?(view, "#unplaced-#{c.device.id}")
+  end
+
+  test "undo restores placement and rejects another operator's newer edit", %{conn: conn} = c do
+    {:ok, view, _} = live(conn, ~p"/folders/#{c.folder.id}/map")
+    view |> element("#map-edit") |> render_click()
+    render_hook(view, "place", %{kind: "device", id: c.device.id, x: 0.2, y: 0.8})
+    view |> element("#map-undo") |> render_click()
+    {:ok, map} = Maps.fetch(system(), c.folder.id)
+    assert Enum.find(map.items, &(&1.id == c.device.id)).x == nil
+    render_hook(view, "place", %{kind: "device", id: c.device.id, x: 0.3, y: 0.4})
+    render_hook(view, "remove", %{kind: "device", id: c.device.id})
+    view |> element("#map-undo") |> render_click()
+    {:ok, map} = Maps.fetch(system(), c.folder.id)
+    assert Enum.find(map.items, &(&1.id == c.device.id)).x == 0.3
+    {:ok, _} = Maps.place(system(), c.folder.id, "device", c.device.id, 0.8, 0.9)
+    render(view)
+    view |> element("#map-undo") |> render_click()
+    {:ok, map} = Maps.fetch(system(), c.folder.id)
+    assert Enum.find(map.items, &(&1.id == c.device.id)).x == 0.8
+    assert has_element?(view, "#flash-error")
+  end
+
+  test "search finds a placed item and focuses it", %{conn: conn} = c do
+    {:ok, _} = Maps.place(system(), c.folder.id, "device", c.device.id, 0.2, 0.8)
+    {:ok, view, _} = live(conn, ~p"/folders/#{c.folder.id}/map")
+    view |> element("#map-search-form") |> render_change(%{q: c.device.name})
+    assert has_element?(view, "#map-search-results button", c.device.name)
+    view |> element("#map-search-results button") |> render_click()
+    id = c.device.id
+    assert_push_event(view, "map-focus", %{id: ^id})
   end
 
   test "unauthorized users cannot read map or background", %{conn: conn} = c do
@@ -195,6 +225,6 @@ defmodule BastionWeb.FolderMapLiveTest do
     view |> element("#map-change-cover") |> render_click()
     assert has_element?(view, "#map-upload")
     view |> element("#map-close") |> render_click()
-    assert_redirect(view, "/")
+    assert_redirect(view, "/?view=folders")
   end
 end

@@ -103,8 +103,6 @@ static void button_task(void *arg)
             ESP_LOGI(TAG, "click sequence: %d", clicks);
             if (clicks == 3) {
                 post(WCS_BUTTON_EVENT_TRIPLE_CLICK, 0);
-            } else if (clicks == 6) {
-                post(WCS_BUTTON_EVENT_SIX_CLICK, 0);
             } else if (clicks == 1) {
                 post(WCS_BUTTON_EVENT_CLICK, 0);
             }

@@ -14,6 +14,8 @@ defmodule BastionWeb.FolderMapLive do
      |> assign(
        page_title: gettext("Folder map"),
        editing: false,
+       map_query: "",
+       undo: [],
        cover_open: false,
        panel: false,
        show_unfiled: false,
@@ -32,7 +34,7 @@ defmodule BastionWeb.FolderMapLive do
   end
 
   @impl true
-  def handle_params(%{"id" => id}, _uri, socket) do
+  def handle_params(%{"id" => id} = params, _uri, socket) do
     if connected?(socket), do: Maps.subscribe(id)
 
     {:noreply,
@@ -41,6 +43,8 @@ defmodule BastionWeb.FolderMapLive do
      |> assign(
        cover_open: false,
        folder_id: id,
+       return_path: workspace_path(params["from"]),
+       undo: [],
        editing: false,
        panel: false,
        show_unfiled: false,
@@ -109,8 +113,8 @@ defmodule BastionWeb.FolderMapLive do
             |> Map.put(
               :url,
               if(item.kind == "folder",
-                do: ~p"/folders/#{item.id}/map",
-                else: ~p"/devices/#{item.id}"
+                do: ~p"/folders/#{item.id}/map?#{%{from: socket.assigns.return_path}}",
+                else: ~p"/devices/#{item.id}?#{%{from: socket.assigns.return_path}}"
               )
             )
           end)
@@ -131,6 +135,12 @@ defmodule BastionWeb.FolderMapLive do
   def handle_info({:event, _}, socket), do: {:noreply, load(socket)}
 
   @impl true
+  def handle_event("map-search", %{"q" => query}, socket),
+    do: {:noreply, assign(socket, map_query: String.slice(query, 0, 120))}
+
+  def handle_event("map-focus", %{"id" => id}, socket),
+    do: {:noreply, socket |> assign(map_query: "") |> push_event("map-focus", %{id: id})}
+
   def handle_event("toggle-edit", _, socket) do
     socket = socket |> cancel_background_uploads() |> load()
 
@@ -141,7 +151,8 @@ defmodule BastionWeb.FolderMapLive do
      )}
   end
 
-  def handle_event("close-map", _, socket), do: {:noreply, push_navigate(socket, to: ~p"/")}
+  def handle_event("close-map", _, socket),
+    do: {:noreply, push_navigate(socket, to: socket.assigns.return_path)}
 
   def handle_event("change-cover", _, socket),
     do: {:noreply, assign(socket, panel: true, cover_open: not socket.assigns.cover_open)}
@@ -158,17 +169,45 @@ defmodule BastionWeb.FolderMapLive do
      )}
   end
 
-  def handle_event("place", %{"kind" => kind, "id" => id, "x" => x, "y" => y}, socket),
-    do:
-      mutate(socket, fn ->
-        Maps.place(socket.assigns.current_actor, socket.assigns.folder_id, kind, id, x, y)
-      end)
+  def handle_event("place", %{"kind" => kind, "id" => id, "x" => x, "y" => y}, socket) do
+    update_position(socket, kind, id, {x, y}, fn ->
+      Maps.place(socket.assigns.current_actor, socket.assigns.folder_id, kind, id, x, y)
+    end)
+  end
 
-  def handle_event("remove", %{"kind" => kind, "id" => id}, socket),
-    do:
-      mutate(socket, fn ->
-        Maps.remove(socket.assigns.current_actor, socket.assigns.folder_id, kind, id)
-      end)
+  def handle_event("remove", %{"kind" => kind, "id" => id}, socket) do
+    update_position(socket, kind, id, nil, fn ->
+      Maps.remove(socket.assigns.current_actor, socket.assigns.folder_id, kind, id)
+    end)
+  end
+
+  def handle_event("undo", _, %{assigns: %{undo: [last | rest]}} = socket) do
+    {kind, id, expected, previous} = last
+
+    case Maps.restore_position(
+           socket.assigns.current_actor,
+           socket.assigns.folder_id,
+           kind,
+           id,
+           expected,
+           previous
+         ) do
+      :ok ->
+        {:noreply, socket |> assign(undo: rest) |> load()}
+
+      _ ->
+        {:noreply,
+         socket
+         |> assign(undo: [])
+         |> load()
+         |> put_flash(
+           :error,
+           gettext("Cannot undo: the item changed. Reload the map and try again.")
+         )}
+    end
+  end
+
+  def handle_event("undo", _, socket), do: {:noreply, socket}
 
   def handle_event("clear-background", _, socket),
     do:
@@ -242,12 +281,38 @@ defmodule BastionWeb.FolderMapLive do
   defp upload_error_text(:too_many_files), do: gettext("Choose one image")
   defp upload_error_text(_), do: gettext("Upload interrupted. Remove the file and try again.")
 
+  defp update_position(socket, kind, id, next, fun) do
+    item = Enum.find(socket.assigns.map.items, &(&1.id == id and &1.kind == kind))
+    previous = if item && item.x != nil, do: {item.x, item.y}, else: nil
+
+    case fun.() do
+      result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
+        undo =
+          if kind in ["device", "folder"] and previous != next,
+            do: Enum.take([{kind, id, next, previous} | socket.assigns.undo], 20),
+            else: socket.assigns.undo
+
+        {:noreply, socket |> assign(undo: undo) |> load()}
+
+      _ ->
+        {:noreply, socket |> put_flash(:error, gettext("Could not update the map")) |> load()}
+    end
+  end
+
   defp mutate(socket, fun) do
     case fun.() do
       :ok -> {:noreply, load(socket)}
       {:ok, _} -> {:noreply, load(socket)}
       _ -> {:noreply, socket |> put_flash(:error, gettext("Could not update the map")) |> load()}
     end
+  end
+
+  defp workspace_path("/?" <> _ = path), do: path
+  defp workspace_path(_), do: "/?view=folders"
+
+  defp map_matches(items, query) do
+    q = String.downcase(String.trim(query))
+    items |> Enum.filter(&String.contains?(String.downcase(&1.name), q)) |> Enum.take(10)
   end
 
   defp canvas_data(map) do
@@ -288,7 +353,7 @@ defmodule BastionWeb.FolderMapLive do
               <span :for={folder <- @map.breadcrumbs} class="contents">
                 <span :if={folder.id != hd(@map.breadcrumbs).id} class="opacity-30">/</span>
                 <.link
-                  navigate={~p"/folders/#{folder.id}/map"}
+                  navigate={~p"/folders/#{folder.id}/map?#{%{from: @return_path}}"}
                   class={[
                     "truncate max-w-48 hover:text-primary",
                     folder.id == @folder_id && "font-semibold"
@@ -297,7 +362,66 @@ defmodule BastionWeb.FolderMapLive do
               </span>
             </nav>
           </div>
+          <form
+            id="map-search-form"
+            phx-change="map-search"
+            phx-submit="map-search"
+            class="relative min-w-48 flex-1 max-w-sm"
+          >
+            <input
+              id="map-search"
+              type="search"
+              name="q"
+              value={@map_query}
+              phx-debounce="200"
+              placeholder={gettext("Find on this map")}
+              aria-label={gettext("Find on this map")}
+              class="input input-sm w-full"
+              autocomplete="off"
+            />
+            <div
+              :if={@map_query != ""}
+              id="map-search-results"
+              class="absolute top-full mt-2 max-h-64 w-full overflow-auto rounded-xl border border-base-300 bg-base-100 p-2 shadow-xl"
+            >
+              <p
+                :if={map_matches(@map.items, @map_query) == []}
+                class="p-3 text-sm text-base-content/60"
+              >
+                {gettext("Nothing found")}
+              </p>
+              <div
+                :for={item <- map_matches(@map.items, @map_query)}
+                class="flex items-center gap-2 p-2 text-sm"
+              >
+                <button
+                  :if={item.x != nil}
+                  type="button"
+                  phx-click="map-focus"
+                  phx-value-id={item.id}
+                  class="flex-1 truncate text-left hover:text-primary"
+                >{item.name}</button>
+                <span :if={item.x == nil} class="flex-1 truncate">{item.name}</span>
+                <.link navigate={item.url} class="text-primary" aria-label={gettext("Open")}><.icon
+                  name="hero-arrow-top-right-on-square"
+                  class="size-4"
+                /></.link>
+              </div>
+            </div>
+          </form>
           <div class="flex items-center gap-2">
+            <button
+              :if={@editing and @undo != []}
+              type="button"
+              id="map-undo"
+              phx-click="undo"
+              class="btn btn-sm btn-ghost"
+            ><.icon name="hero-arrow-uturn-left" class="size-4" />{gettext("Undo")}</button>
+            <span
+              :if={@editing}
+              id="map-autosave"
+              class="hidden sm:inline text-xs text-base-content/60"
+            >{gettext("Changes save automatically")}</span>
             <button
               :if={@map.editable}
               id="map-edit"
@@ -310,7 +434,7 @@ defmodule BastionWeb.FolderMapLive do
                 )
               ]}
             ><.icon name={if @editing, do: "hero-check", else: "hero-pencil-square"} class="size-4" />{if @editing,
-              do: gettext("Save"),
+              do: gettext("Done"),
               else: gettext("Edit map")}</button>
             <button
               id="map-close"
@@ -320,7 +444,7 @@ defmodule BastionWeb.FolderMapLive do
           </div>
         </div>
         <div class="relative min-h-0 flex-1" id="map-workspace">
-          <div class="absolute right-4 top-4 z-20 flex gap-2">
+          <div class="absolute right-3 top-16 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap justify-end gap-2">
             <button
               :if={@map.editable}
               id="map-unfiled-toggle"
@@ -334,7 +458,13 @@ defmodule BastionWeb.FolderMapLive do
             >{gettext("Map layers")}</button>
           </div>
           <section class="flex h-full min-w-0 flex-col overflow-hidden bg-base-200">
-            <div class="flex flex-wrap gap-2 border-b border-base-300 p-2">
+            <div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-100 px-4 py-3">
+              <button
+                type="button"
+                data-map-control="fullscreen"
+                class="rounded border border-base-300 px-3 py-1"
+                aria-label={gettext("Full screen")}
+              ><.icon name="hero-arrows-pointing-out" class="size-4" /></button>
               <button type="button" data-map-control="fit" class="rounded border px-3 py-1">{gettext(
                 "Fit to screen"
               )}</button>
@@ -379,7 +509,7 @@ defmodule BastionWeb.FolderMapLive do
           <aside
             id="map-inspector"
             class={[
-              "absolute right-4 top-20 z-20 max-h-[calc(100%-6rem)] w-80 max-w-[calc(100%-2rem)] space-y-3 overflow-y-auto rounded-xl bg-base-100/95 p-3 shadow-2xl backdrop-blur",
+              "absolute right-3 top-28 z-20 max-h-[calc(100%-8rem)] w-80 max-w-[calc(100%-2rem)] space-y-3 overflow-y-auto rounded-xl bg-base-100/95 p-3 shadow-2xl backdrop-blur",
               !@panel && "hidden"
             ]}
           >

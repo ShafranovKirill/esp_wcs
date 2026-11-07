@@ -130,6 +130,51 @@ defmodule Bastion.Maps do
     end
   end
 
+  def restore_position(actor, folder_id, kind, id, expected, previous) do
+    with {:ok, _} <- authorize(actor, folder_id, "folder.manage"),
+         {:ok, map} <- fetch(actor, folder_id),
+         true <- Enum.any?(map.items, &(&1.id == id and &1.kind == kind)) do
+      query =
+        from p in Placement,
+          where: p.folder_id == ^folder_id and (p.device_id == ^id or p.child_id == ^id)
+
+      count =
+        case {expected, previous} do
+          {{x, y}, nil} ->
+            {count, _} = Repo.delete_all(from p in query, where: p.x == ^x and p.y == ^y)
+            count
+
+          {{x, y}, {px, py}} ->
+            {count, _} =
+              Repo.update_all(from(p in query, where: p.x == ^x and p.y == ^y),
+                set: [x: px, y: py]
+              )
+
+            count
+
+          {nil, {px, py}} ->
+            attrs = %{
+              folder_id: folder_id,
+              device_id: if(kind == "device", do: id),
+              child_id: if(kind == "folder", do: id),
+              x: px,
+              y: py
+            }
+
+            {count, _} = Repo.insert_all(Placement, [attrs], on_conflict: :nothing)
+            count
+
+          _ ->
+            0
+        end
+
+      if count == 1, do: changed(folder_id, :ok), else: {:error, :conflict}
+    else
+      false -> {:error, :not_found}
+      error -> error
+    end
+  end
+
   def set_background(actor, folder_id, path) do
     with {:ok, _} <- authorize(actor, folder_id, "folder.manage"),
          {:ok, image} <- Image.inspect_file(path) do

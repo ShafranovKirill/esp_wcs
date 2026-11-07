@@ -7,13 +7,14 @@ import "./hooks/dialog"
 import {Clipboard} from "./hooks/clipboard"
 import {LocalTime} from "./hooks/local_time"
 import {FolderMap} from "./hooks/folder_map"
+import {Disclosure} from "./hooks/disclosure"
 import {Terminal} from "./hooks/terminal"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, Clipboard, LocalTime, Terminal, FolderMap},
+  hooks: {...colocatedHooks, Clipboard, LocalTime, Terminal, FolderMap, Disclosure},
 })
 
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

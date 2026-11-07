@@ -29,7 +29,9 @@ defmodule BastionWeb.Locale do
       socket
       |> Phoenix.Component.assign(locale: locale, current_path: "/")
       |> Phoenix.LiveView.attach_hook(:current_path, :handle_params, fn _params, uri, socket ->
-        {:cont, Phoenix.Component.assign(socket, :current_path, URI.parse(uri).path)}
+        parsed = URI.parse(uri)
+        path = parsed.path <> if(parsed.query, do: "?" <> parsed.query, else: "")
+        {:cont, Phoenix.Component.assign(socket, :current_path, path)}
       end)
 
     {:cont, socket}
