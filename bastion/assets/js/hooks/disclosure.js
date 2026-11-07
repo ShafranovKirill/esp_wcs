@@ -25,3 +25,19 @@ export const Disclosure = {
   },
   destroyed() { this.abort.abort() },
 }
+
+export const ThemeChoices = {
+  mounted() {
+    this.syncTheme = () => {
+      const root = document.documentElement
+      const selected = root.dataset.themeSource === "system" ? "system" : root.dataset.theme
+      this.el.querySelectorAll("[data-phx-theme]").forEach(button => {
+        button.setAttribute("aria-pressed", String(button.dataset.phxTheme === selected))
+      })
+    }
+    this.syncTheme()
+    this.observer = new MutationObserver(this.syncTheme)
+    this.observer.observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme", "data-theme-source"]})
+  },
+  destroyed() { this.observer.disconnect() },
+}
