@@ -41,6 +41,7 @@ export const Terminal = {
     }
     this.recordToggle.addEventListener("click", this.recordListener)
     this.recordExport.addEventListener("click", this.recordExportListener)
+    this.sequenceRunning = false
     this.owner = false
     this.scan = null
     this.labels = JSON.parse(this.el.dataset.toolsLabels || "{}")
@@ -93,14 +94,14 @@ export const Terminal = {
 
     this.term.attachCustomKeyEventHandler(event => {
       if (event.key !== "Backspace" || event.ctrlKey || event.altKey || event.metaKey) return true
-      if (event.type === "keydown" && this.owner && !this.scan) {
+      if (event.type === "keydown" && this.owner && !this.scan && !this.sequenceRunning) {
         this.sendInput(this.preference.backspace === "bs" ? "\x08" : "\x7f")
       }
       return false
     })
 
     this.term.onData(data => {
-      if (this.owner && !this.scan) this.sendInput(data)
+      if (this.owner && !this.scan && !this.sequenceRunning) this.sendInput(data)
     })
 
     this.handleEvent("console-reset", ({data}) => {
@@ -120,11 +121,17 @@ export const Terminal = {
       this.savePreference()
       this.term.focus()
     })
+    this.handleEvent("sequence-state", ({running}) => {
+      this.sequenceRunning = running
+      this.term.options.disableStdin = !this.owner || running
+      this.term.options.cursorBlink = this.owner && !running
+    })
+    this.handleEvent("sequence-input", ({data}) => this.record("sequence_input", data))
     this.handleEvent("console-state", ({owner}) => {
       this.owner = owner
       if (!owner && this.scan) this.scan.cancelled = true
-      this.term.options.disableStdin = !owner
-      this.term.options.cursorBlink = owner
+      this.term.options.disableStdin = !owner || this.sequenceRunning
+      this.term.options.cursorBlink = owner && !this.sequenceRunning
       if (owner) this.term.focus()
     })
 

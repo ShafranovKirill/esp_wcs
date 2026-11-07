@@ -82,5 +82,26 @@ defmodule BastionWeb.Errors do
   def message(:last_superadmin),
     do: gettext("At least one superadmin must remain")
 
+  def message(:sequence_too_large), do: gettext("Configuration exceeds 256 KB")
+
+  def message(:sequence_invalid_text),
+    do: gettext("Use UTF-8 text without terminal control characters")
+
+  def message(:sequence_empty), do: gettext("Enter at least one command")
+  def message(:sequence_too_many_lines), do: gettext("Use no more than 1000 command lines")
+  def message(:sequence_line_too_long), do: gettext("A command line must not exceed 1024 bytes")
+  def message(:sequence_invalid_delay), do: gettext("Choose an interval from 50 to 5000 ms")
+  def message(:sequence_busy), do: gettext("Stop baud detection before sending commands")
+  def message(:sequence_upload_pending), do: gettext("Wait for the file upload to finish")
+
+  def message(:sequence_choose_source),
+    do: gettext("Use either pasted commands or a file, not both")
+
+  def message(:sequence_credit_timeout),
+    do: gettext("The device did not provide input credit for 30 seconds. Sending stopped.")
+
+  def message(:sequence_no_credit),
+    do: gettext("The device does not support flow-controlled configuration transfer")
+
   def message(_), do: gettext("Something went wrong, try again")
 end

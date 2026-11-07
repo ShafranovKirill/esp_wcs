@@ -289,6 +289,16 @@ defmodule Bastion.Link.Application.Session do
     flush_input(%{state | input: state.input <> data})
   end
 
+  def handle_info({:console_send, caller, ref, data}, %{phase: :device} = state) do
+    if state.input == <<>> and state.credit >= byte_size(data) do
+      send(caller, {ref, :ok})
+      flush_input(%{state | input: data})
+    else
+      send(caller, {ref, {:error, :backpressure}})
+      {:ok, state}
+    end
+  end
+
   def handle_info({:console_history, caller, ref}, %{phase: :device} = state) do
     send(caller, {ref, {:ok, state.history}})
     {:ok, state}

@@ -2,6 +2,7 @@ defmodule BastionWeb.DeviceLive do
   use BastionWeb, :live_view
 
   alias Bastion.Console
+  alias Bastion.Console.Domain.Sequence
   alias Bastion.Console.Events.{ConsoleTaken, LockChanged}
   alias Bastion.Fleet
   alias Bastion.Link.Events.{ConsoleOutput, PresenceChanged}
@@ -36,10 +37,20 @@ defmodule BastionWeb.DeviceLive do
            folder_query: "",
            folder_draft: device.folder_ids,
            journal_filter: "all",
-           console_since: nil
+           console_since: nil,
+           sequence: nil,
+           sequence_error: nil,
+           sequence_form:
+             to_form(%{"script" => "", "delay_ms" => "500", "ending" => "cr"}, as: :sequence)
          )
          |> assign_forms()
-         |> assign_can()}
+         |> assign_can()
+         |> allow_upload(:command_file,
+           accept: ~w(.txt .cfg .conf),
+           max_entries: 1,
+           max_file_size: 256 * 1024,
+           auto_upload: true
+         )}
     end
   end
 
@@ -109,6 +120,7 @@ defmodule BastionWeb.DeviceLive do
   end
 
   defp release_console(socket) do
+    socket = stop_sequence(socket, :stopped)
     Console.release(socket.assigns.current_actor, socket.assigns.device.id)
 
     socket
@@ -152,6 +164,8 @@ defmodule BastionWeb.DeviceLive do
   end
 
   defp busy(socket, since) do
+    socket = stop_sequence(socket, :stopped)
+
     socket
     |> assign(console: :busy, console_since: since, auto_baud: false)
     |> push_event("console-state", %{owner: false})
@@ -191,10 +205,54 @@ defmodule BastionWeb.DeviceLive do
 
   @impl true
   def handle_info(
+        {:sequence_tick, id},
+        %{assigns: %{sequence: %Sequence{id: id, status: :running}}} = socket
+      ) do
+    sequence = socket.assigns.sequence
+    actor = Bastion.Access.actor(socket.assigns.current_user)
+
+    case Console.send_sequence_line(actor, socket.assigns.device.id, Sequence.frame(sequence)) do
+      :ok ->
+        data = Sequence.frame(sequence)
+        next = Sequence.advance(sequence)
+
+        socket =
+          socket
+          |> assign(sequence: next)
+          |> push_event("sequence-input", %{data: Base.encode64(data)})
+
+        if next.sent == next.total do
+          {:noreply, stop_sequence(socket, :completed)}
+        else
+          Process.send_after(self(), {:sequence_tick, id}, next.delay_ms)
+          {:noreply, socket}
+        end
+
+      {:error, :backpressure} ->
+        now = System.monotonic_time(:millisecond)
+        waiting = sequence.waiting_since || now
+
+        if now - waiting >= 30_000 do
+          {:noreply,
+           socket |> assign(sequence_error: :sequence_credit_timeout) |> stop_sequence(:stopped)}
+        else
+          Process.send_after(self(), {:sequence_tick, id}, 100)
+          {:noreply, assign(socket, sequence: %{sequence | waiting_since: waiting})}
+        end
+
+      {:error, reason} ->
+        {:noreply, socket |> assign(sequence_error: reason) |> stop_sequence(:stopped)}
+    end
+  end
+
+  def handle_info({:sequence_tick, _}, socket), do: {:noreply, socket}
+
+  def handle_info(
         {:event, %PresenceChanged{id: id}},
         %{assigns: %{device: %{id: id}}} = socket
       ) do
     online = Bastion.Link.presence(id)
+    socket = if online, do: socket, else: stop_sequence(socket, :stopped)
 
     {:noreply,
      socket
@@ -237,6 +295,101 @@ defmodule BastionWeb.DeviceLive do
   def handle_info({:event, _event}, socket), do: {:noreply, socket |> reload() |> sync_console()}
 
   @impl true
+  def handle_event(event, _, %{assigns: %{sequence: %Sequence{status: :running}}} = socket)
+      when event in ["console-probe", "console-probe-end"] do
+    {:reply, %{ok: false, error: gettext("Stop the command sequence first")}, socket}
+  end
+
+  def handle_event(event, _, %{assigns: %{sequence: %Sequence{status: :running}}} = socket)
+      when event in [
+             "console-input",
+             "console-line",
+             "console-profile",
+             "console-break",
+             "sequence-preview",
+             "sequence-start"
+           ] do
+    {:noreply, socket}
+  end
+
+  def handle_event(
+        "sequence-file",
+        _,
+        %{assigns: %{sequence: %Sequence{status: :running}}} = socket
+      ),
+      do: {:noreply, socket}
+
+  def handle_event("sequence-file", _, socket),
+    do: {:noreply, assign(socket, sequence: nil, sequence_error: nil)}
+
+  def handle_event("sequence-file-cancel", %{"ref" => ref}, socket),
+    do: {:noreply, cancel_upload(socket, :command_file, ref)}
+
+  def handle_event("sequence-preview", %{"sequence" => params}, socket) do
+    with :ok <-
+           Fleet.authorize(
+             socket.assigns.current_actor,
+             "console.write",
+             socket.assigns.device.id
+           ),
+         {:ok, text, socket} <- sequence_text(socket, params["script"] || ""),
+         {:ok, sequence} <- Console.prepare_sequence(text, params) do
+      {:noreply,
+       assign(socket,
+         sequence: sequence,
+         sequence_error: nil,
+         sequence_form: to_form(Map.put(params, "script", text), as: :sequence)
+       )}
+    else
+      {:error, reason} -> {:noreply, assign(socket, sequence_error: reason, sequence: nil)}
+    end
+  end
+
+  def handle_event(
+        "sequence-start",
+        %{"id" => id},
+        %{assigns: %{sequence: %Sequence{id: id, status: :ready}}} = socket
+      ) do
+    case sequence_allowed(socket) do
+      :ok ->
+        sequence = %{socket.assigns.sequence | status: :running}
+
+        :ok =
+          Fleet.record_event(
+            socket.assigns.device.id,
+            :command,
+            Sequence.audit(sequence),
+            socket.assigns.current_actor
+          )
+
+        send(self(), {:sequence_tick, id})
+
+        {:noreply,
+         socket
+         |> assign(sequence: sequence, sequence_error: nil)
+         |> push_event("sequence-state", %{running: true})}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, sequence_error: reason)}
+    end
+  end
+
+  def handle_event("sequence-start", _, socket), do: {:noreply, socket}
+
+  def handle_event("sequence-stop", _, socket), do: {:noreply, stop_sequence(socket, :stopped)}
+
+  def handle_event("sequence-clear", _, socket) do
+    socket = stop_sequence(socket, :stopped)
+
+    {:noreply,
+     assign(socket,
+       sequence: nil,
+       sequence_error: nil,
+       sequence_form:
+         to_form(%{"script" => "", "delay_ms" => "500", "ending" => "cr"}, as: :sequence)
+     )}
+  end
+
   def handle_event("console-input", %{"data" => data}, %{assigns: %{console: :owner}} = socket)
       when is_binary(data) do
     if Fleet.can?(socket.assigns.current_actor, "console.write", socket.assigns.device),
@@ -386,6 +539,71 @@ defmodule BastionWeb.DeviceLive do
     end
   end
 
+  defp sequence_allowed(socket) do
+    cond do
+      socket.assigns.console != :owner ->
+        {:error, :not_owner}
+
+      is_nil(socket.assigns.online) ->
+        {:error, :offline}
+
+      socket.assigns.auto_baud ->
+        {:error, :sequence_busy}
+
+      not Enum.all?(~w(console credit), &(&1 in Map.get(socket.assigns.online, :caps, []))) ->
+        {:error, :sequence_no_credit}
+
+      not Fleet.can?(socket.assigns.current_actor, "console.write", socket.assigns.device) ->
+        {:error, :forbidden}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp sequence_text(socket, text) when is_binary(text) do
+    {complete, pending} = uploaded_entries(socket, :command_file)
+
+    cond do
+      pending != [] ->
+        {:error, :sequence_upload_pending}
+
+      complete != [] and String.trim(text) != "" ->
+        {:error, :sequence_choose_source}
+
+      complete != [] ->
+        [text] =
+          consume_uploaded_entries(socket, :command_file, fn %{path: path}, _ ->
+            {:ok, File.read!(path)}
+          end)
+
+        {:ok, text, socket}
+
+      true ->
+        {:ok, text, socket}
+    end
+  end
+
+  defp sequence_text(_, _), do: {:error, :sequence_invalid_text}
+
+  defp stop_sequence(
+         %{assigns: %{sequence: %Sequence{status: :running} = sequence}} = socket,
+         status
+       ) do
+    sequence = Sequence.finish(sequence, status)
+
+    Fleet.record_event(
+      socket.assigns.device.id,
+      :command,
+      Sequence.audit(sequence),
+      socket.assigns.current_actor
+    )
+
+    socket |> assign(sequence: sequence) |> push_event("sequence-state", %{running: false})
+  end
+
+  defp stop_sequence(socket, _), do: socket
+
   @impl true
   def handle_async(:console_profile, {:ok, {:ok, profile}}, socket) do
     {:noreply,
@@ -505,6 +723,10 @@ defmodule BastionWeb.DeviceLive do
         console={@console}
         since={@console_since}
         auto_baud={@auto_baud}
+        sequence={@sequence}
+        sequence_error={@sequence_error}
+        sequence_form={@sequence_form}
+        command_upload={@uploads.command_file}
         can={@can}
       />
       <.settings_tab
@@ -553,8 +775,16 @@ defmodule BastionWeb.DeviceLive do
   attr :auto_baud, :boolean, default: false
   attr :can, :map, required: true
 
+  attr :sequence, :any, default: nil
+  attr :sequence_error, :any, default: nil
+  attr :sequence_form, :map, required: true
+  attr :command_upload, :any, required: true
+
   defp console_tab(assigns) do
     line = assigns.online && assigns.online[:console]
+
+    assigns =
+      assign(assigns, :sequence_running, match?(%Sequence{status: :running}, assigns.sequence))
 
     assigns =
       assign(assigns,
@@ -579,12 +809,15 @@ defmodule BastionWeb.DeviceLive do
         phx-submit="console-line"
         class="flex flex-wrap items-center gap-2"
       >
-        <.line_fields form={@line_form} disabled={!@online or !@can.configure or @auto_baud} />
+        <.line_fields
+          form={@line_form}
+          disabled={!@online or !@can.configure or @auto_baud or @sequence_running}
+        />
         <button
           type="submit"
           id="console-line-apply"
           class="btn btn-sm btn-primary"
-          disabled={!@online or !@can.configure or @auto_baud}
+          disabled={!@online or !@can.configure or @auto_baud or @sequence_running}
         >{gettext("Apply")}</button>
         <span :if={@line} class="text-sm text-base-content/50" id="console-line-current">
           {Console.format_line(@line)}
@@ -595,7 +828,7 @@ defmodule BastionWeb.DeviceLive do
           class="btn btn-sm"
           id="console-break"
           phx-click="console-break"
-          disabled={@console != :owner or !@online}
+          disabled={@console != :owner or !@online or @sequence_running}
           title={gettext("Send BREAK")}
         >
           <.icon name="hero-bolt" class="size-4" /> BREAK
@@ -615,7 +848,9 @@ defmodule BastionWeb.DeviceLive do
                 type="button"
                 phx-click="console-profile"
                 phx-value-profile={profile.id}
-                disabled={!@online or !@can.configure or @console != :owner or @auto_baud}
+                disabled={
+                  !@online or !@can.configure or @console != :owner or @auto_baud or @sequence_running
+                }
                 class="btn btn-sm btn-ghost mt-1"
               >{profile.model} · 115200 8N1 · BS</button>
             </details>
@@ -639,7 +874,9 @@ defmodule BastionWeb.DeviceLive do
           id="console-autobaud"
           type="button"
           class="btn btn-sm btn-outline"
-          disabled={!@online or !@can.configure or @console != :owner or @auto_baud}
+          disabled={
+            !@online or !@can.configure or @console != :owner or @auto_baud or @sequence_running
+          }
           phx-click={JS.dispatch("wcs:autobaud", to: "#terminal-#{@device.id}")}
         >{gettext("Detect baud rate")}</button>
       </div>
@@ -724,6 +961,14 @@ defmodule BastionWeb.DeviceLive do
           </button>
         </div>
       </div>
+      <.sequence_panel
+        sequence={@sequence}
+        can_prepare={@can.console_write}
+        error={@sequence_error}
+        form={@sequence_form}
+        upload={@command_upload}
+        disabled={@console != :owner or !@online or @auto_baud}
+      />
       <details class="rounded-lg border border-base-300 bg-base-100 p-3" id="terminal-recording-panel">
         <summary class="cursor-pointer text-sm font-medium">{gettext("Session recording")}</summary>
         <p class="mt-3 max-w-3xl text-xs leading-relaxed text-base-content/65">
@@ -795,6 +1040,153 @@ defmodule BastionWeb.DeviceLive do
     </section>
     """
   end
+
+  attr :sequence, :any, default: nil
+  attr :error, :any, default: nil
+  attr :form, :map, required: true
+  attr :upload, :any, required: true
+  attr :disabled, :boolean, default: false
+
+  attr :can_prepare, :boolean, default: false
+
+  defp sequence_panel(assigns) do
+    assigns = assign(assigns, :running, match?(%Sequence{status: :running}, assigns.sequence))
+
+    ~H"""
+    <details id="configuration-panel" class="workspace-panel">
+      <summary class="cursor-pointer text-sm font-semibold">{gettext("Send configuration")}</summary>
+      <div class="mt-4 space-y-4">
+        <p class="max-w-3xl text-sm leading-relaxed text-base-content/65">
+          {gettext(
+            "Paste commands or upload a UTF-8 .txt, .cfg or .conf file. Each line is sent followed by Enter. Review the device prompt first. The interval does not wait for a command result; interactive questions require manual control."
+          )}
+        </p>
+        <.form
+          for={@form}
+          id="sequence-form"
+          phx-submit="sequence-preview"
+          phx-change="sequence-file"
+          class="space-y-3"
+        >
+          <.input
+            field={@form[:script]}
+            type="textarea"
+            label={gettext("Commands, one per line")}
+            class="textarea min-h-40 w-full font-mono text-sm"
+            maxlength="262144"
+            disabled={@running}
+          />
+          <div class="flex flex-wrap items-end gap-4">
+            <div class="min-w-0 flex-1">
+              <label for={@upload.ref} class="mb-2 block text-sm font-medium">{gettext(
+                "Or choose a configuration file"
+              )}</label>
+              <.live_file_input upload={@upload} disabled={@running} class="block w-full text-sm" />
+            </div>
+            <.input
+              field={@form[:delay_ms]}
+              type="number"
+              min="50"
+              max="5000"
+              label={gettext("Interval between lines, ms")}
+              disabled={@running}
+            />
+            <.input
+              field={@form[:ending]}
+              type="select"
+              label={gettext("Enter format")}
+              options={[{"CR", "cr"}, {"CRLF", "crlf"}, {"LF", "lf"}]}
+              disabled={@running}
+            />
+          </div>
+          <div :for={entry <- @upload.entries} class="flex flex-wrap items-center gap-3 text-sm">
+            <span>{entry.client_name} · {entry.progress}%</span>
+            <button
+              type="button"
+              phx-click="sequence-file-cancel"
+              phx-value-ref={entry.ref}
+              disabled={@running}
+              class="btn btn-xs btn-ghost"
+            >{gettext("Remove")}</button>
+            <span :for={_error <- upload_errors(@upload, entry)} class="text-error">{gettext(
+              "Use a UTF-8 text file up to 256 KB"
+            )}</span>
+          </div>
+          <div class="flex gap-2">
+            <button
+              type="submit"
+              id="sequence-preview"
+              class="btn btn-sm"
+              disabled={!@can_prepare or @running}
+            >{gettext("Review commands")}</button>
+            <button
+              type="button"
+              phx-click="sequence-clear"
+              class="btn btn-sm btn-ghost"
+              disabled={@running}
+            >{gettext("Clear")}</button>
+          </div>
+        </.form>
+        <p :if={@error} id="sequence-error" class="text-sm text-error" role="alert">
+          {BastionWeb.Errors.message(@error)}
+        </p>
+        <div
+          :if={@sequence}
+          id="sequence-progress"
+          class="space-y-3 rounded-lg border border-base-300 p-4"
+          aria-live="polite"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <p class="font-medium">{sequence_status(@sequence.status)}</p>
+            <span class="text-sm tabular-nums">{gettext("%{sent} / %{total} lines sent",
+              sent: @sequence.sent,
+              total: @sequence.total
+            )}</span>
+          </div>
+          <progress
+            class="progress progress-primary w-full"
+            value={@sequence.sent}
+            max={@sequence.total}
+          ></progress>
+          <p class="text-xs text-base-content/60">
+            {gettext(
+              "Sending is not proof of execution. Stop prevents the next lines; commands already sent cannot be undone. Leaving this console stops the sequence. The activity journal stores counts and a checksum, not command text."
+            )}
+          </p>
+          <ol
+            :if={@sequence.status == :ready}
+            class="max-h-56 list-inside list-decimal overflow-auto rounded bg-base-200 p-3 font-mono text-xs leading-6"
+          >
+            <li :for={line <- @sequence.lines} class="whitespace-pre-wrap break-all">
+              {if line == "", do: gettext("[empty line]"), else: line}
+            </li>
+          </ol>
+          <button
+            :if={@sequence.status == :ready}
+            type="button"
+            id="sequence-start"
+            phx-click="sequence-start"
+            phx-value-id={@sequence.id}
+            disabled={@disabled}
+            class="btn btn-sm btn-primary"
+          >{gettext("Start sending")}</button>
+          <button
+            :if={@running}
+            type="button"
+            id="sequence-stop"
+            phx-click="sequence-stop"
+            class="btn btn-sm btn-warning"
+          >{gettext("Stop sending")}</button>
+        </div>
+      </div>
+    </details>
+    """
+  end
+
+  defp sequence_status(:ready), do: gettext("Ready for review")
+  defp sequence_status(:running), do: gettext("Sending configuration")
+  defp sequence_status(:completed), do: gettext("All lines sent. Check the terminal output.")
+  defp sequence_status(:stopped), do: gettext("Sending stopped")
 
   attr :form, :map, required: true
   attr :disabled, :boolean, default: false
@@ -1388,6 +1780,15 @@ defmodule BastionWeb.DeviceLive do
   defp event_text(%{type: :console_taken}), do: gettext("Console taken")
   defp event_text(%{type: :console_released}), do: gettext("Console released")
 
+  defp event_text(%{type: :command, data: %{"op" => "command_sequence"} = d}),
+    do:
+      gettext("Configuration transfer: %{status}, %{sent}/%{total} lines · Run %{id}",
+        status: sequence_status_text(d["status"]),
+        sent: d["sent"],
+        total: d["total"],
+        id: d["run_id"]
+      )
+
   defp event_text(%{type: :command, data: %{"op" => "console_config"} = d}),
     do: gettext("Port settings changed: %{line}", line: d["line"] || "—")
 
@@ -1398,4 +1799,7 @@ defmodule BastionWeb.DeviceLive do
     do: gettext("Wi-Fi changed to %{ssid}", ssid: d["ssid"] || "—")
 
   defp event_text(%{type: :command, data: d}), do: gettext("Control action: %{op}", op: d["op"])
+  defp sequence_status_text("running"), do: gettext("started")
+  defp sequence_status_text("completed"), do: gettext("all lines sent")
+  defp sequence_status_text(_), do: gettext("stopped")
 end
